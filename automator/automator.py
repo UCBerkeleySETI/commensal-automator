@@ -1,5 +1,7 @@
 import redis
 
+from .logger import log, set_logger
+
 class Automator(object):
     """The commensal automator. 
       
@@ -75,5 +77,4 @@ class Automator(object):
                                              decode_responses=True)
        self.proc_script = proc_script
        self.margin = margin
-
-       # subscribe to channels
+       set_logger("DEBUG")
