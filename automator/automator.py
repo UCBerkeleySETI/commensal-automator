@@ -71,6 +71,7 @@ class Automator(object):
        """Initialise the automator. 
 
        Args: 
+
            redis_endpoint (str): Redis endpoint (of the form <host IP
            address>:<port>) 
            redis_channel (str): Name of the redis channel
@@ -80,12 +81,84 @@ class Automator(object):
            when calculating the estimated end of a recording. 
 
        Returns:
+
            None
        """
-       redis_host, redis_port = redis_endpoint.split(":")
+       set_logger('DEBUG')
+       log.info('Starting Automator:\n'
+                'Redis endpoint: {}\n'
+                'Processing script: {}\n'.format(redis_endpoint, proc_script))
+       redis_host, redis_port = redis_endpoint.split(':')
        self.redis_server = redis.StrictRedis(host=redis_host, 
                                              port=redis_port, 
                                              decode_responses=True)
+       self.receive_channel = redis_channel
        self.proc_script = proc_script
        self.margin = margin
-       set_logger("DEBUG")
+
+    def start(self):
+        """Start the automator. Actions to be taken depend on the incoming 
+        observational stage messages on the appropriate Redis channel.  
+    
+        Args:
+
+            None
+ 
+        Returns:
+
+            None
+        """
+        ps = self.redis_server.pubsub(ignore_subscribe_messages=True)
+        ps.subscribe(self.receive_channel)
+        for msg in ps.listen():
+           msg_parts = self.parse_msg(msg)
+           if(msg_parts is not None):
+               # Take action accordingly  
+            
+
+    def parse_msg(self, msg):
+        """Examines an incoming message (from the appropriate Redis channel)
+        and determines whether or not it is relevant to the automator. If it is
+        relevent, it is processed and the result returned.
+
+        Args:
+
+            msg (str): A message to be processed (as would arrive from the 
+            appropriate Redis pub/sub channel. Desired messages are of the 
+            format <message>:<subarray_name>.
+
+            Messages that are responded to are as follows:
+ 
+            - configure
+            - tracking
+            - not-tracking
+            - deconfigure
+            - processing
+            - processing-complete
+
+            If the <message> component of msg is one of the above, then the 
+            first component of msg is the subarray name. 
+
+        Returns:
+
+            subarray_message: 
+
+                A list of strings containing subarray_name (the name of the 
+                subarray to which the message pertains) and subarray_state 
+                (the state of the subarray associated with the message if the 
+                <message> component is present in the list above.
+
+                None if the <message> component is not present in the list 
+                above.
+        """ 
+        state_list = ['configure', 'tracking', 'not-tracking', 'deconfigure', 
+                     'processing', 'processing-complete']
+        msg_parts = msg.split(':')
+        if(msg_parts[0] in state_list):
+            subarray_message = [msg_parts[1], msg_parts[0]]
+        else:
+            log.info("Not processing message: {}".format(msg))
+            subarray_message = None
+        return subarray_message
+ 
+
