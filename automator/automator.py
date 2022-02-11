@@ -43,9 +43,9 @@ class Automator(object):
        margin have passed, `nshot` is set to 0 and processing (in 3 below) 
        is commenced. 
   
-    3. Processing. Processing does not take place if `nshot > 0`. In general, 
-       this means that processing will only take place once the buffers are 
-       full.
+    3. Initiates processing tasks. Processing does not take place if 
+       `nshot > 0`. In general, this means that processing will only
+       take place once the buffers are full.
 
        A script is called which runs all processing across the processing
        nodes assigned to the current subarray. Multiple processing steps
@@ -53,7 +53,18 @@ class Automator(object):
       
        The location of the script is retrieved from Redis. 
 
-    4. Clearing the buffers.      
+    4. Waits for all processing tasks to finish (once the script has finished
+       running or a timeout duration is reached). 
+    
+    5. Clearing the buffers. Essentially, this is just another processing
+       task (which only takes place at the end of all other processing 
+       tasks). Circus or slurm or ssh could be used to accomplish this across
+       processing nodes.
+
+    6. Resets `nshot` to re-enable recording (for the current processing nodes
+       allocated to the current subarray). 
+
+    7. Returns to the waiting state (see 1).     
  
     """
     def _init__(self, redis_endpoint, redis_channel, proc_script, margin):
