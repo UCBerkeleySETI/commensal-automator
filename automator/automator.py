@@ -68,33 +68,33 @@ class Automator(object):
  
     """
     def _init__(self, redis_endpoint, redis_channel, proc_script, margin):
-       """Initialise the automator. 
+        """Initialise the automator. 
 
-       Args: 
+        Args: 
 
-           redis_endpoint (str): Redis endpoint (of the form <host IP
-           address>:<port>) 
-           redis_channel (str): Name of the redis channel
-           proc_script (str): Location of the processing script for the 
-           processing script. 
-           margin (float): Safety margin (in seconds) to add to `DWELL`
-           when calculating the estimated end of a recording. 
+            redis_endpoint (str): Redis endpoint (of the form <host IP
+            address>:<port>) 
+            redis_channel (str): Name of the redis channel
+            proc_script (str): Location of the processing script for the 
+            processing script. 
+            margin (float): Safety margin (in seconds) to add to `DWELL`
+            when calculating the estimated end of a recording. 
 
-       Returns:
+        Returns:
 
-           None
-       """
-       set_logger('DEBUG')
-       log.info('Starting Automator:\n'
-                'Redis endpoint: {}\n'
-                'Processing script: {}\n'.format(redis_endpoint, proc_script))
-       redis_host, redis_port = redis_endpoint.split(':')
-       self.redis_server = redis.StrictRedis(host=redis_host, 
-                                             port=redis_port, 
-                                             decode_responses=True)
-       self.receive_channel = redis_channel
-       self.proc_script = proc_script
-       self.margin = margin
+            None
+        """
+        set_logger('DEBUG')
+        log.info('Starting Automator:\n'
+                 'Redis endpoint: {}\n'
+                 'Processing script: {}\n'.format(redis_endpoint, proc_script))
+        redis_host, redis_port = redis_endpoint.split(':')
+        self.redis_server = redis.StrictRedis(host=redis_host, 
+                                              port=redis_port, 
+                                              decode_responses=True)
+        self.receive_channel = redis_channel
+        self.proc_script = proc_script
+        self.margin = margin
 
     def start(self):
         """Start the automator. Actions to be taken depend on the incoming 
