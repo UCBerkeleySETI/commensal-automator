@@ -1,12 +1,17 @@
 import redis
+import datetime
 
 from .logger import log, set_logger
+from .subarray import Subarray
 
 class Automator(object):
     """The commensal automator. 
       
     The purpose of the commensal automator is to automate commensal observing,
-    end-to-end. In practice, the commensal automator operates as follows:
+    end-to-end. The automator must be started before a recording has started. 
+    If it is not, then the current recording will be skipped. 
+
+    In practice, the commensal automator operates as follows:
 
     1. Waits for the start of a recording. When a recording starts, the list 
        of processing nodes and their Hashpipe-Redis Gateway group address are 
@@ -95,6 +100,7 @@ class Automator(object):
         self.receive_channel = redis_channel
         self.proc_script = proc_script
         self.margin = margin
+        self.active_subarrays = {}
 
     def start(self):
         """Start the automator. Actions to be taken depend on the incoming 
@@ -113,8 +119,54 @@ class Automator(object):
         for msg in ps.listen():
            msg_parts = self.parse_msg(msg)
            if(msg_parts is not None):
-               # Take action accordingly  
-            
+               subarray_name = msg_parts[0]
+               subarray_state = msg_parts[1] 
+               # If a subarray object already exists, its state is updated via
+               # the appropriate function. If the subarray object does not 
+               # exist, this is the first time it has become visible to the 
+               # `automator`.  
+               if(subarray_name not in self.active_subarrays):
+                   self.init_subarray(subarray_name, subarray_state)  
+                   
+               # msg to func goes here
+
+    def subarray_init(self, subarray_name, subarray_state):
+        """Initialise a subarray. This means retrieving appropriate metadata 
+        for the current subarray. This step must take place before a recording
+        has started. 
+
+        Args:
+            subarray_name (str): The name of the new subarray whose state is
+            to be tracked.
+            subarray_state (str): The current state of the new subarray. 
+
+       Returns:
+           None
+       """
+       # `nshot`, the number of recordings still to be taken
+       nshot_key = 'coordinator:trigger_mode:{}'.format(subarray_name)
+       # `nshot` is retrieved in the format: `nshot:<n>`
+       nshot = self.redis_server.get(nshot_key).split(':')[1] 
+       # `allocated_hosts` is the list of host names assigned to record and
+       # process incoming data from the current subarray. 
+       allocated_hosts_key = 'coordinator:allocated_hosts:{}'.format(subarray_name)     
+       allocated_hosts = self.redis_server.lrange(allocated_hosts_key, 0,
+           self.red.llen(array_key))        
+       # DWELL, the duration of a recording in seconds
+       dwell = self.retrieve_dwell(self, allocated_hosts)
+       # If the subarray state is `tracking` or `processing`, we can simply
+       # assume that this transition has just happened and record `start_ts`
+       # as the current time. This is because if the start of a recording
+       # has been missed, it will be ignored by the `automator`.  
+       start_ts = datetime.utcnow()
+       subarray_obj = Subarray(subarray_name, 
+                               subarray_state, 
+                               nshot, 
+                               dwell, 
+                               start_ts, 
+                               self.margin, 
+                               allocated_hosts)
+        self.active_subarrays['subarray_name'] = subarray_obj
 
     def parse_msg(self, msg):
         """Examines an incoming message (from the appropriate Redis channel)
