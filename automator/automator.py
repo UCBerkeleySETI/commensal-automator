@@ -75,7 +75,7 @@ class Automator(object):
     7. Returns to the waiting state (see 1).     
  
     """
-    def _init__(self, r_endpt, r_chan, p_script, p_env, p_args, margin, hpgdom):
+    def _init__(self, r_endpt, r_chan, p_script, p_env, p_args, margin, hpgdom, buffer_length, nshot_chan, nshot_msg):
         """Initialise the automator. 
 
         Args: 
@@ -90,6 +90,12 @@ class Automator(object):
             when calculating the estimated end of a recording. 
             hpgdom (str): The Hashpipe-Redis Gateway domain for the instrument
             in question. 
+            buffer_length (float): Maximum duration of recording (in seconds)
+            for the maximum possible incoming data rate. 
+            nshot_chan (str): The Redis channel for resetting nshot.
+            nshot_msg (str): The base form of the Redis message for resetting
+            nshot. For example, `coordinator:trigger_mode:<subarray_name>:nshot:<n>`
+
 
         Returns:
 
@@ -109,6 +115,10 @@ class Automator(object):
         self.proc_args = p_args
         self.margin = margin
         self.hpgdomain = hpgdom
+        self.buffer_length = buffer_length
+        # Future work: split off Redis info into its own module
+        self.nshot_chan = nshot_chan
+        self.nshot_msg = nshot_msg
         self.active_subarrays = {}
 
     def start(self):
@@ -341,6 +351,29 @@ class Automator(object):
                       self.proc_args]
         log.info('Running processing script: {}'.format(script_cmd))
         subprocess.Popen(script_cmd) 
+
+    def processing_complete(self, subarray_name):
+        """Actions to be taken once processing is complete for the  current 
+        subarray. 
+
+        It is assumed that as part of the processing, the NVMe buffers have 
+        been emptied. 
+
+        Args:
+           
+            subarray_name (str): The name of the subarray for which processing
+            has completed. 
+
+        Returns:
+      
+            None
+        """
+        dwell = self.active_subarrays[subarray_name].dwell
+        new_nshot = np.floor(self.buffer_length/dwell)
+        # Reset nshot by publishing to the appropriate channel 
+        nshot_msg = self.nshot_msg.format(subarray_name, new_nshot)
+        self.redis_server.publish(self.nshot_chan, nshot_msg)        
+
 
     def timeout(self, next_state, subarray_name):
         """When a timeout happens (for completion of recording or processing,
