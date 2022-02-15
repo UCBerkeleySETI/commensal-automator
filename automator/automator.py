@@ -1,6 +1,8 @@
 import redis
 import datetime
 import threading
+import numpy
+import subprocess
 
 from .logger import log, set_logger
 from .subarray import Subarray
@@ -73,16 +75,17 @@ class Automator(object):
     7. Returns to the waiting state (see 1).     
  
     """
-    def _init__(self, redis_endpoint, redis_channel, proc_script, margin, hpgdom):
+    def _init__(self, r_endpt, r_chan, p_script, p_env, p_args, margin, hpgdom):
         """Initialise the automator. 
 
         Args: 
 
-            redis_endpoint (str): Redis endpoint (of the form <host IP
+            r_endpt (str): Redis endpoint (of the form <host IP
             address>:<port>) 
-            redis_channel (str): Name of the redis channel
-            proc_script (str): Location of the processing script for the 
+            r_chan (str): Name of the redis channel
+            p_script (str): Location of the processing script for the 
             processing script. 
+            script_env (str): Virtual environment for processing script. 
             margin (float): Safety margin (in seconds) to add to `DWELL`
             when calculating the estimated end of a recording. 
             hpgdom (str): The Hashpipe-Redis Gateway domain for the instrument
@@ -95,13 +98,15 @@ class Automator(object):
         set_logger('DEBUG')
         log.info('Starting Automator:\n'
                  'Redis endpoint: {}\n'
-                 'Processing script: {}\n'.format(redis_endpoint, proc_script))
-        redis_host, redis_port = redis_endpoint.split(':')
+                 'Processing script: {}\n'.format(r_endpt, p_script))
+        redis_host, redis_port = r_endpt.split(':')
         self.redis_server = redis.StrictRedis(host=redis_host, 
                                               port=redis_port, 
                                               decode_responses=True)
-        self.receive_channel = redis_channel
-        self.proc_script = proc_script
+        self.receive_channel = r_chan
+        self.proc_script = p_script
+        self.proc_env = p_env
+        self.proc_args = p_args
         self.margin = margin
         self.hpgdomain = hpgdom
         self.active_subarrays = {}
@@ -317,6 +322,25 @@ class Automator(object):
            log.info('No active recording for end'
                     'of track for {}'.format(subarray_name)) 
 
+    def processing(self, subarray_name):
+        """Initiate processing across processing nodes in the current subarray. 
+
+        Args:
+           
+            subarray_name (str): The name of the subarray for which data is to 
+            be processed. 
+
+        Returns:
+      
+            None
+        """
+        # Future work: add a timeout for the script.
+        # Future work: pass host list to script?
+        script_cmd = [self.proc_env, 
+                      self.proc_script, 
+                      self.proc_args]
+        log.info('Running processing script: {}'.format(script_cmd))
+        subprocess.Popen(script_cmd) 
 
     def timeout(self, next_state, subarray_name):
         """When a timeout happens (for completion of recording or processing,
