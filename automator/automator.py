@@ -166,7 +166,7 @@ class Automator(object):
                                start_ts, 
                                self.margin, 
                                allocated_hosts)
-        self.active_subarrays['subarray_name'] = subarray_obj
+        self.active_subarrays[subarray_name] = subarray_obj
 
     def parse_msg(self, msg):
         """Examines an incoming message (from the appropriate Redis channel)
