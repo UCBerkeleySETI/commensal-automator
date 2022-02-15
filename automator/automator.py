@@ -73,7 +73,7 @@ class Automator(object):
     7. Returns to the waiting state (see 1).     
  
     """
-    def _init__(self, redis_endpoint, redis_channel, proc_script, margin):
+    def _init__(self, redis_endpoint, redis_channel, proc_script, margin, hpgdom):
         """Initialise the automator. 
 
         Args: 
@@ -85,6 +85,8 @@ class Automator(object):
             processing script. 
             margin (float): Safety margin (in seconds) to add to `DWELL`
             when calculating the estimated end of a recording. 
+            hpgdom (str): The Hashpipe-Redis Gateway domain for the instrument
+            in question. 
 
         Returns:
 
@@ -101,6 +103,7 @@ class Automator(object):
         self.receive_channel = redis_channel
         self.proc_script = proc_script
         self.margin = margin
+        self.hpgdomain = hpgdom
         self.active_subarrays = {}
 
     def start(self):
@@ -311,3 +314,51 @@ class Automator(object):
         # An additional check may be performed by reading the status of `NETSTAT`
         # in the Hashpipe-Redis Gateway status buffer. 
         self.change_state(next_state)(subarray_name)
+
+    def retrieve_dwell(self, host_list):
+        """Retrieve the current value of `DWELL` from the Hashpipe-Redis 
+        Gateway for a specific set of hosts. 
+
+        Args:
+
+            host_list (str): The list of hosts allocated to the current subarray. 
+
+        Returns:
+
+            DWELL (float): The duration for which the processing nodes will record
+            for the current subarray (in seconds). 
+        """
+        dwell = 0
+        dwell_values = []
+        for host in host_list:
+            host_key = '{}://{}/status'.format(self.hpgdomain, host)
+            host_status = self.redis_server.hgetall(host_key)
+            if(len(host_status > 0):
+                if('DWELL' in host_status):
+                    dwell_values.append(float(host_status['DWELL']))
+                else:
+                    log.warning('Cannot retrieve DWELL for {}'.format(host))
+            else:
+                log.warning('Cannot access {}'.format(host))
+        if(len(dwell_values) > 0):
+            dwell = self.mode_1d(dwell_values)
+            if(len(np.unique(dwell_values)) > 1):
+                log.warning("DWELL disagreement")    
+        else:
+            log.warning("Could not retrieve DWELL")
+
+    def mode_1d(self, data_1d):
+        """Calculate the mode of a one-dimensional list. 
+
+        Args:
+
+            data_1d (list): List of values for which to calculate the mode. 
+
+        Returns:
+
+            mode_1d (float): The most common value in the list.
+        """
+        vals, freqs = np.unique(data_1d, return_counts=True)
+        mode_index = np.argmax(freqs)
+        mode_1d = vals[mode_index]
+        return mode_1d
