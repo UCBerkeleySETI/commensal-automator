@@ -284,9 +284,39 @@ class Automator(object):
             # start a timer for `DWELL` + margin seconds. 
             duration = self.active_subarrays[subarray_name].dwell + self.margin
             # The state to transition to after tracking is processing. 
-            self.active_subarrays[subarray_name].timer = threading.Timer(duration, 
+            self.active_subarrays[subarray_name].tracking_timer = threading.Timer(duration, 
                 lambda:self.timeout('tracking', 'processing', subarray_name))
-            self.active_subarrays[subarray_name].timer.start()
+            self.active_subarrays[subarray_name].tracking_timer.start()
+
+    def not_tracking(self, subarray_name):
+        """These actions are taken when an existing subarray has ceased to 
+        track a source.  
+
+
+        If a timer has previously been set (and therefore tracking of the 
+        current source has ended prematurely), cancel the timer and (if 
+        `nshot > 0`), wait for the next source to be tracked. If 
+        `nshot == 0`, then transition to the processing state.  
+
+        Args:
+           
+            subarray_name (str): The name of the subarray which has just
+            ceased to track a specific source. 
+
+        Returns:
+      
+            None
+        """
+        if(hasattr(self.active_subarrays[subarray_name], 'tracking_timer')):
+            self.active_subarrays[subarray_name].tracking_timer.cancel()
+            del self.active_subarrays[subarray_name].timer
+            if(self.active_subarrays[subarray_name].nshot == 0):
+                log.info('Final recording completed. Moving to processing state.')
+                self.change_state(processing)(subarray_name)
+        else:
+           log.info('No active recording for end'
+                    'of track for {}'.format(subarray_name)) 
+
 
     def timeout(self, next_state, subarray_name):
         """When a timeout happens (for completion of recording or processing,
