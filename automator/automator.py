@@ -117,18 +117,7 @@ class Automator(object):
         ps = self.redis_server.pubsub(ignore_subscribe_messages=True)
         ps.subscribe(self.receive_channel)
         for msg in ps.listen():
-           msg_parts = self.parse_msg(msg)
-           if(msg_parts is not None):
-               subarray_name = msg_parts[0]
-               subarray_state = msg_parts[1] 
-               # If a subarray object already exists, its state is updated via
-               # the appropriate function. If the subarray object does not 
-               # exist, this is the first time it has become visible to the 
-               # `automator`.  
-               if(subarray_name not in self.active_subarrays):
-                   self.init_subarray(subarray_name, subarray_state)  
-                   
-               # msg to func goes here
+            self.parse_msg(msg)
 
     def subarray_init(self, subarray_name, subarray_state):
         """Initialise a subarray. This means retrieving appropriate metadata 
@@ -136,11 +125,13 @@ class Automator(object):
         has started. 
 
         Args:
+
             subarray_name (str): The name of the new subarray whose state is
             to be tracked.
             subarray_state (str): The current state of the new subarray. 
 
        Returns:
+
            None
        """
        # `nshot`, the number of recordings still to be taken
@@ -171,7 +162,7 @@ class Automator(object):
     def parse_msg(self, msg):
         """Examines an incoming message (from the appropriate Redis channel)
         and determines whether or not it is relevant to the automator. If it is
-        relevent, it is processed and the result returned.
+        relevent, the appropriate state-change function is called. 
 
         Args:
 
@@ -193,24 +184,69 @@ class Automator(object):
 
         Returns:
 
-            subarray_message: 
-
-                A list of strings containing subarray_name (the name of the 
-                subarray to which the message pertains) and subarray_state 
-                (the state of the subarray associated with the message if the 
-                <message> component is present in the list above.
-
-                None if the <message> component is not present in the list 
-                above.
+            None
         """ 
-        state_list = ['configure', 'tracking', 'not-tracking', 'deconfigure', 
-                     'processing', 'processing-complete']
-        msg_parts = msg.split(':')
-        if(msg_parts[0] in state_list):
-            subarray_message = [msg_parts[1], msg_parts[0]]
+        msg_components = msg.split(':')
+        if(len(msg_components) > 2):
+            self.unknown_state(msg)
         else:
-            log.info("Not processing message: {}".format(msg))
-            subarray_message = None
-        return subarray_message
+            subarray_state = msg_components[0]
+            subarray_name = msg_components[1]
+            self.change_state(subarray_state)(subarray_name)
  
+  def change_state(self, state):
+      """Select and return the function corresponding to the change in state
+      of the subarray. A dictionary is used since Python's `match-case` switch
+      statement implementation is only available in 3.10.
+
+      For all unrecognised states, the same default `unknown_state` function
+      is returned. 
+
+      Args:
+
+          state (str): New subarray state (one of configure, tracking, 
+          not-tracking, deconfigure, processing, processing-complete).
+
+     Returns:
+
+         None
+     """
+     states = {'configure':self.configure, 
+               'tracking':self.tracking, 
+               'not-tracking':self.not_tracking, 
+               'deconfigure':self.deconfigure, 
+               'processing':self.processing, 
+               'processing-complete':self.processing_complete}
+     return states.get(state, self.unknown_state)
+     
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
