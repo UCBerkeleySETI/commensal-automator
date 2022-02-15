@@ -224,14 +224,31 @@ class Automator(object):
         state not relevant to the `automator`) is received.
 
         Args:
+
             subarray_name (str): The name of the subarray for which an 
             unrecognised or ignored state has been received. 
 
         Returns:
+           
             None
         """
         log.info('Ignoring irrelevant state for {}'.format(subarray_name))
 
+    def configure(self, subarray_name):
+        """This function is to be run on configuration of a new subarray. 
+
+        Args:
+           
+            subarray_name (str): The name of the subarray which has just been
+            configured. 
+
+        Returns:
+      
+            None
+        """
+        # Since a subarray only exists after configuration, this is the first 
+        # possible time a subarray object can have been created. 
+        self.subarray_init(subarray_name, 'configure')
 
 
 
