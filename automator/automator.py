@@ -119,6 +119,66 @@ class Automator(object):
         for msg in ps.listen():
             self.parse_msg(msg)
 
+    def parse_msg(self, msg):
+        """Examines an incoming message (from the appropriate Redis channel)
+        and determines whether or not it is relevant to the automator. If it is
+        relevent, the appropriate state-change function is called. 
+
+        Args:
+
+            msg (str): A message to be processed (as would arrive from the 
+            appropriate Redis pub/sub channel. Desired messages are of the 
+            format <message>:<subarray_name>.
+
+            Messages that are responded to are as follows:
+ 
+            - configure
+            - tracking
+            - not-tracking
+            - deconfigure
+            - processing
+            - processing-complete
+
+            If the <message> component of msg is one of the above, then the 
+            first component of msg is the subarray name. 
+
+        Returns:
+
+            None
+        """ 
+        msg_components = msg.split(':')
+        if((len(msg_components) !=  2):
+            log.warning("Unrecognised message: {}".format(msg))
+        else:
+            subarray_state = msg_components[0]
+            subarray_name = msg_components[1]
+            self.change_state(subarray_state)(subarray_name)
+ 
+  def change_state(self, state):
+      """Select and return the function corresponding to the change in state
+      of the subarray. A dictionary is used since Python's `match-case` switch
+      statement implementation is only available in 3.10.
+
+      For all unrecognised states, the same default `ignored_state` function
+      is returned. 
+
+      Args:
+
+          state (str): New subarray state (one of configure, tracking, 
+          not-tracking, deconfigure, processing, processing-complete).
+
+     Returns:
+
+         None
+     """
+     states = {'configure':self.configure, 
+               'tracking':self.tracking, 
+               'not-tracking':self.not_tracking, 
+               'deconfigure':self.deconfigure, 
+               'processing':self.processing, 
+               'processing-complete':self.processing_complete}
+     return states.get(state, self.ignored_state)
+
     def subarray_init(self, subarray_name, subarray_state):
         """Initialise a subarray. This means retrieving appropriate metadata 
         for the current subarray. This step must take place before a recording
@@ -159,94 +219,21 @@ class Automator(object):
                                allocated_hosts)
         self.active_subarrays[subarray_name] = subarray_obj
 
-    def parse_msg(self, msg):
-        """Examines an incoming message (from the appropriate Redis channel)
-        and determines whether or not it is relevant to the automator. If it is
-        relevent, the appropriate state-change function is called. 
+    def ignored_state(self, subarray_name):
+        """This function is to be executed if an unrecognised state (or a 
+        state not relevant to the `automator`) is received.
 
         Args:
-
-            msg (str): A message to be processed (as would arrive from the 
-            appropriate Redis pub/sub channel. Desired messages are of the 
-            format <message>:<subarray_name>.
-
-            Messages that are responded to are as follows:
- 
-            - configure
-            - tracking
-            - not-tracking
-            - deconfigure
-            - processing
-            - processing-complete
-
-            If the <message> component of msg is one of the above, then the 
-            first component of msg is the subarray name. 
+            subarray_name (str): The name of the subarray for which an 
+            unrecognised or ignored state has been received. 
 
         Returns:
-
             None
-        """ 
-        msg_components = msg.split(':')
-        if(len(msg_components) > 2):
-            self.unknown_state(msg)
-        else:
-            subarray_state = msg_components[0]
-            subarray_name = msg_components[1]
-            self.change_state(subarray_state)(subarray_name)
+        """
+        log.info('Ignoring irrelevant state for {}'.format(subarray_name))
+
+
+
+
+
  
-  def change_state(self, state):
-      """Select and return the function corresponding to the change in state
-      of the subarray. A dictionary is used since Python's `match-case` switch
-      statement implementation is only available in 3.10.
-
-      For all unrecognised states, the same default `unknown_state` function
-      is returned. 
-
-      Args:
-
-          state (str): New subarray state (one of configure, tracking, 
-          not-tracking, deconfigure, processing, processing-complete).
-
-     Returns:
-
-         None
-     """
-     states = {'configure':self.configure, 
-               'tracking':self.tracking, 
-               'not-tracking':self.not_tracking, 
-               'deconfigure':self.deconfigure, 
-               'processing':self.processing, 
-               'processing-complete':self.processing_complete}
-     return states.get(state, self.unknown_state)
-     
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
