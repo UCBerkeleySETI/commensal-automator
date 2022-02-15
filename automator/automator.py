@@ -1,5 +1,6 @@
 import redis
 import datetime
+import threading
 
 from .logger import log, set_logger
 from .subarray import Subarray
@@ -154,30 +155,30 @@ class Automator(object):
             subarray_name = msg_components[1]
             self.change_state(subarray_state)(subarray_name)
  
-  def change_state(self, state):
-      """Select and return the function corresponding to the change in state
-      of the subarray. A dictionary is used since Python's `match-case` switch
-      statement implementation is only available in 3.10.
+    def change_state(self, state):
+        """Select and return the function corresponding to the change in state
+        of the subarray. A dictionary is used since Python's `match-case` switch
+        statement implementation is only available in 3.10.
 
-      For all unrecognised states, the same default `ignored_state` function
-      is returned. 
+        For all unrecognised states, the same default `ignored_state` function
+        is returned. 
 
-      Args:
+        Args:
 
-          state (str): New subarray state (one of configure, tracking, 
-          not-tracking, deconfigure, processing, processing-complete).
+            state (str): New subarray state (one of configure, tracking, 
+            not-tracking, deconfigure, processing, processing-complete).
 
-     Returns:
+       Returns:
 
-         None
-     """
-     states = {'configure':self.configure, 
-               'tracking':self.tracking, 
-               'not-tracking':self.not_tracking, 
-               'deconfigure':self.deconfigure, 
-               'processing':self.processing, 
-               'processing-complete':self.processing_complete}
-     return states.get(state, self.ignored_state)
+           None
+       """
+       states = {'configure':self.configure, 
+                 'tracking':self.tracking, 
+                 'not-tracking':self.not_tracking, 
+                 'deconfigure':self.deconfigure, 
+                 'processing':self.processing, 
+                 'processing-complete':self.processing_complete}
+       return states.get(state, self.ignored_state)
 
     def subarray_init(self, subarray_name, subarray_state):
         """Initialise a subarray. This means retrieving appropriate metadata 
@@ -190,34 +191,36 @@ class Automator(object):
             to be tracked.
             subarray_state (str): The current state of the new subarray. 
 
-       Returns:
+        Returns:
 
-           None
-       """
-       # `nshot`, the number of recordings still to be taken
-       nshot_key = 'coordinator:trigger_mode:{}'.format(subarray_name)
-       # `nshot` is retrieved in the format: `nshot:<n>`
-       nshot = self.redis_server.get(nshot_key).split(':')[1] 
-       # `allocated_hosts` is the list of host names assigned to record and
-       # process incoming data from the current subarray. 
-       allocated_hosts_key = 'coordinator:allocated_hosts:{}'.format(subarray_name)     
-       allocated_hosts = self.redis_server.lrange(allocated_hosts_key, 0,
-           self.red.llen(array_key))        
-       # DWELL, the duration of a recording in seconds
-       dwell = self.retrieve_dwell(self, allocated_hosts)
-       # If the subarray state is `tracking` or `processing`, we can simply
-       # assume that this transition has just happened and record `start_ts`
-       # as the current time. This is because if the start of a recording
-       # has been missed, it will be ignored by the `automator`.  
-       start_ts = datetime.utcnow()
-       subarray_obj = Subarray(subarray_name, 
-                               subarray_state, 
-                               nshot, 
-                               dwell, 
-                               start_ts, 
-                               self.margin, 
-                               allocated_hosts)
+            None
+        """
+        # `nshot`, the number of recordings still to be taken
+        nshot_key = 'coordinator:trigger_mode:{}'.format(subarray_name)
+        # `nshot` is retrieved in the format: `nshot:<n>`
+        nshot = self.redis_server.get(nshot_key).split(':')[1] 
+        # `allocated_hosts` is the list of host names assigned to record and
+        # process incoming data from the current subarray. 
+        allocated_hosts_key = 'coordinator:allocated_hosts:{}'.format(subarray_name)
+        allocated_hosts = self.redis_server.lrange(allocated_hosts_key, 0,
+            self.red.llen(array_key))        
+        # DWELL, the duration of a recording in seconds
+        dwell = self.retrieve_dwell(self, allocated_hosts)
+        # If the subarray state is `tracking` or `processing`, we can simply
+        # assume that this transition has just happened and record `start_ts`
+        # as the current time. This is because if the start of a recording
+        # has been missed, it will be ignored by the `automator`.  
+        start_ts = datetime.utcnow()
+        subarray_obj = Subarray(subarray_name, 
+                                subarray_state, 
+                                nshot, 
+                                dwell, 
+                                start_ts, 
+                                self.margin, 
+                                allocated_hosts)
         self.active_subarrays[subarray_name] = subarray_obj
+        log.info('Initialised new subarray object: {}'
+                 ' in state {}'.format(subarray_name, subarray_state))
 
     def ignored_state(self, subarray_name):
         """This function is to be executed if an unrecognised state (or a 
@@ -250,7 +253,61 @@ class Automator(object):
         # possible time a subarray object can have been created. 
         self.subarray_init(subarray_name, 'configure')
 
+    def tracking(self, subarray_name):
+        """These actions are taken when an existing subarray has begun to 
+        track a source.  
 
+        Args:
+           
+            subarray_name (str): The name of the subarray which has just begun
+            to track a new source. 
 
+        Returns:
+      
+            None
+        """
+        if(subarray_name not in self.active_subarrays):
+            self.init_subarray(subarray_name, 'tracking')
+        else:
+            # Update `nshot` (the number of recordings still to be taken)
+            nshot_key = 'coordinator:trigger_mode:{}'.format(subarray_name)
+            # `nshot` is retrieved in the format: `nshot:<n>`
+            nshot = self.redis_server.get(nshot_key).split(':')[1] 
+            self.active_subarrays[subarray_name].nshot = nshot  
+        if(self.active_subarrays[subarray_name].nshot == 0):
+            start_ts = datetime.utcnow()
+            self.active_subarrays[subarray_name].start_ts = start_ts
+            # If this is the last recording before the buffers will be full, 
+            # start a timer for `DWELL` + margin seconds. 
+            duration = self.active_subarrays[subarray_name].dwell + self.margin
+            # The state to transition to after tracking is processing. 
+            self.active_subarrays[subarray_name].timer = threading.Timer(duration, 
+                lambda:self.timeout('tracking', 'processing', subarray_name))
+            self.active_subarrays[subarray_name].timer.start()
 
- 
+    def timeout(self, next_state, subarray_name):
+        """When a timeout happens (for completion of recording or processing,
+        for example), this function initiates the appropriate state transition
+        (if it should take place). 
+
+        For example, the telescope may have stopped recording data before the
+        completion of `DWELL`, in which case the state transition will have 
+        already taken place and this timeout function will never be called.  
+
+        If the transition to the next state is to take place, then the
+        relevant function is called. 
+
+        Args:         
+
+            subarray_name (str): The name of the subarray whose state is 
+            subject to change
+            next_state (str): The state into which the subarray would 
+            transition into after current_state. 
+
+        Returns:
+
+           None
+        """
+        # An additional check may be performed by reading the status of `NETSTAT`
+        # in the Hashpipe-Redis Gateway status buffer. 
+        self.change_state(next_state)(subarray_name)
