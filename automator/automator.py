@@ -4,7 +4,7 @@ import threading
 import numpy
 import subprocess
 
-from logger import log, set_logger
+from logger import log
 from subarray import Subarray
 
 class Automator(object):
@@ -101,7 +101,6 @@ class Automator(object):
 
             None
         """
-        set_logger('DEBUG')
         log.info('Starting Automator:\n'
                  'Redis endpoint: {}\n'
                  'Processing script: {}\n'.format(r_endpt, p_script))
