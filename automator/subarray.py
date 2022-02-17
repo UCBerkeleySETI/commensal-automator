@@ -1,6 +1,6 @@
-from .logger import log
+from logger import log
 
-class Subarray(obj):
+class Subarray(object):
       """Contains all the attributes of a particular subarray. It is also used
       to keep track of the state of the subarray as it changes during an 
       observation.  

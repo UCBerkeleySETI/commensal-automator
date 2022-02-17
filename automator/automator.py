@@ -4,8 +4,8 @@ import threading
 import numpy
 import subprocess
 
-from .logger import log, set_logger
-from .subarray import Subarray
+from logger import log, set_logger
+from subarray import Subarray
 
 class Automator(object):
     """The commensal automator. 
@@ -166,7 +166,7 @@ class Automator(object):
             None
         """ 
         msg_components = msg.split(':')
-        if((len(msg_components) !=  2):
+        if(len(msg_components) !=  2):
             log.warning("Unrecognised message: {}".format(msg))
         else:
             subarray_state = msg_components[0]
@@ -186,17 +186,17 @@ class Automator(object):
             state (str): New subarray state (one of configure, tracking, 
             not-tracking, deconfigure, processing, processing-complete).
 
-       Returns:
+        Returns:
 
-           None
-       """
-       states = {'configure':self.configure, 
-                 'tracking':self.tracking, 
-                 'not-tracking':self.not_tracking, 
-                 'deconfigure':self.deconfigure, 
-                 'processing':self.processing, 
-                 'processing-complete':self.processing_complete}
-       return states.get(state, self.ignored_state)
+            None
+        """
+        states = {'configure':self.configure, 
+                  'tracking':self.tracking, 
+                  'not-tracking':self.not_tracking, 
+                  'deconfigure':self.deconfigure, 
+                  'processing':self.processing, 
+                  'processing-complete':self.processing_complete}
+        return states.get(state, self.ignored_state)
 
     def subarray_init(self, subarray_name, subarray_state):
         """Initialise a subarray. This means retrieving appropriate metadata 
@@ -374,7 +374,6 @@ class Automator(object):
         nshot_msg = self.nshot_msg.format(subarray_name, new_nshot)
         self.redis_server.publish(self.nshot_chan, nshot_msg)        
 
-
     def timeout(self, next_state, subarray_name):
         """When a timeout happens (for completion of recording or processing,
         for example), this function initiates the appropriate state transition
@@ -420,7 +419,7 @@ class Automator(object):
         for host in host_list:
             host_key = '{}://{}/status'.format(self.hpgdomain, host)
             host_status = self.redis_server.hgetall(host_key)
-            if(len(host_status > 0):
+            if(len(host_status > 0)):
                 if('DWELL' in host_status):
                     dwell_values.append(float(host_status['DWELL']))
                 else:
