@@ -304,6 +304,26 @@ class Automator(object):
                 lambda:self.timeout('tracking', 'processing', subarray_name))
             self.active_subarrays[subarray_name].tracking_timer.start()
 
+    def deconfigure(self, subarray_name):
+        """If a deconfigure message is received (indicating that the current
+        subarray has been deconfigured), `nshot` is set to 0 and processing is 
+        continued. 
+
+        Args:
+      
+            subarray_name (str): Name of the current subarray that has just been 
+            deconfigured. 
+
+        Returns:
+ 
+            None
+        """
+        log.info('{} deconfigured. Proceeding'
+                 ' to processing.'.format(subarray_name))
+        nshot_msg = self.nshot_msg.format(subarray_name, 0)
+        self.redis_server.publish(self.nshot_chan, nshot_msg) 
+        self.change_state('processing')(subarray_name)
+
     def not_tracking(self, subarray_name):
         """These actions are taken when an existing subarray has ceased to 
         track a source.  
