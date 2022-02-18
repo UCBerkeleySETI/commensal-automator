@@ -1,4 +1,4 @@
-from logger import log
+from .logger import log
 
 class Subarray(object):
       """Contains all the attributes of a particular subarray. It is also used

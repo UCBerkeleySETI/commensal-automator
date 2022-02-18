@@ -4,8 +4,8 @@ import threading
 import numpy
 import subprocess
 
-from logger import log
-from subarray import Subarray
+from .logger import log
+from .subarray import Subarray
 
 class Automator(object):
     """The commensal automator. 
@@ -75,7 +75,7 @@ class Automator(object):
     7. Returns to the waiting state (see 1).     
  
     """
-    def _init__(self, redis_endpoint, redis_chan, proc_script, proc_env, 
+    def __init__(self, redis_endpoint, redis_chan, proc_script, proc_env, 
         proc_args, margin, hpgdomain, buffer_length, nshot_chan, nshot_msg):
         """Initialise the automator. 
 

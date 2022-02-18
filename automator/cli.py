@@ -1,8 +1,8 @@
 import argparse 
 import sys
 
-from automator import Automator
-from logger import log, set_logger
+from .automator import Automator
+from .logger import log, set_logger
 
 def cli(args = sys.argv[0]):
     """Command line interface for the automator. 
