@@ -164,10 +164,11 @@ class Automator(object):
         Returns:
 
             None
-        """ 
-        msg_components = msg.split(':')
+        """
+        msg_data = msg['data'] 
+        msg_components = msg_data.split(':')
         if(len(msg_components) !=  2):
-            log.warning("Unrecognised message: {}".format(msg))
+            log.warning("Unrecognised message: {}".format(msg_data))
         else:
             subarray_state = msg_components[0]
             subarray_name = msg_components[1]
