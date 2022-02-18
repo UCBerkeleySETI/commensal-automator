@@ -348,7 +348,7 @@ class Automator(object):
             del self.active_subarrays[subarray_name].timer
             if(self.active_subarrays[subarray_name].nshot == 0):
                 log.info('Final recording completed. Moving to processing state.')
-                self.change_state(processing)(subarray_name)
+                self.change_state('processing')(subarray_name)
         else:
            log.info('No active recording for end'
                     'of track for {}'.format(subarray_name)) 
