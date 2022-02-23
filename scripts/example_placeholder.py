@@ -54,10 +54,9 @@ def main(proxy_channel, slack_channel, subarray_name):
         None
     """         
     redis_server = redis.StrictRedis() 
-    slack_message = '{}:Processing placeholder for {}'.format(slack_channel, 
-                                                              subarray_name)
-    redis_server.publish(proxy_channel, slack_message)
-    slack_message = '{}:Processing would happen now.'.format(slack_channel)
+    slack_message = ('{}:```Automator:\n    Processing placeholder for {}.\n'
+        '    Processing would take place now.```').format(slack_channel,
+        subarray_name)
     redis_server.publish(proxy_channel, slack_message)
 
 if(__name__ == '__main__'):
