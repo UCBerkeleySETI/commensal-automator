@@ -19,12 +19,15 @@ def cli(args = sys.argv[0]):
                                      description = description)
     parser.add_argument('--proxy_channel',
                         type = str,
+                        default = 'slack-messages',
                         help = 'Redis channel for the slack proxy process.')
     parser.add_argument('--slack_channel',
                         type = str,
+                        default = 'proxy-test',
                         help = 'Slack channel to publish messages to.')
     parser.add_argument('--subarray_name',
                         type = str,
+                        default = 'test_subarray',
                         help = 'Name of the current active subarray.')
     if(len(sys.argv[1:])==0):
         parser.print_help()
@@ -53,6 +56,8 @@ def main(proxy_channel, slack_channel, subarray_name):
     redis_server = redis.StrictRedis() 
     slack_message = '{}:Processing placeholder for {}'.format(slack_channel, 
                                                               subarray_name)
+    redis_server.publish(proxy_channel, slack_message)
+    slack_message = '{}:Processing would happen now.'.format(slack_channel)
     redis_server.publish(proxy_channel, slack_message)
 
 if(__name__ == '__main__'):

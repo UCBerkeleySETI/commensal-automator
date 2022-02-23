@@ -22,7 +22,7 @@ def cli(args = sys.argv[0]):
                         help = 'Name of the Redis channel to subscribe to')
     parser.add_argument('--script',
                         type = str,
-                        default = '../scripts/example_placeholder.py', 
+                        default = '/opt/virtualenv/bluse3/bin/example_placeholder.py', 
                         help = 'Location of external processing script')
     parser.add_argument('--env',
                         type = str,
@@ -30,9 +30,8 @@ def cli(args = sys.argv[0]):
                         help = 'Virtual environment for processing script')
     parser.add_argument('--args',
                         type = str,
-                        default = '--proxy_channel slack-messages '
-                                  '--slack_channel proxy-test '
-                                  '--subarray_name test_subarray ', 
+                        default = '--proxy_channel=slack-messages,'
+                                  '--slack_channel=proxy-test',
                         help = 'Arguments for the processing script')
     parser.add_argument('--margin',
                         type = float,
@@ -68,7 +67,6 @@ def cli(args = sys.argv[0]):
          buffer_length = args.buffer_length, 
          nshot_chan = args.nshot_chan, 
          nshot_msg = args.nshot_msg)
-
 
 def main(redis_endpoint, redis_channel, proc_script, proc_env, proc_args, 
     margin, hpgdomain, buffer_length, nshot_chan, nshot_msg):

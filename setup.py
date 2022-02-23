@@ -17,9 +17,13 @@ setuptools.setup(
         'automator',
         ],
     install_requires=requires,
-    entry_points={
-        'console_scripts': [
+    entry_points = {
+        'console_scripts':[
             'automator = automator.cli:cli',
             ]
         },
+    scripts = [
+        'scripts/example_placeholder.py'       
+        ]
+
     )

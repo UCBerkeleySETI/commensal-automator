@@ -110,9 +110,8 @@ class Automator(object):
                                               port=redis_port, 
                                               decode_responses=True)
         self.receive_channel = redis_chan
-        self.proc_script = proc_script
-        self.proc_env = proc_env
-        self.proc_args = proc_args
+        proc_args = proc_args.split(',')
+        self.script_cmd = [proc_env, proc_script] + proc_args 
         self.margin = margin
         self.hpgdomain = hpgdomain
         self.buffer_length = buffer_length
@@ -367,11 +366,12 @@ class Automator(object):
         """
         # Future work: add a timeout for the script.
         # Future work: pass host list to script?
-        script_cmd = [self.proc_env, 
-                      self.proc_script, 
-                      self.proc_args]
-        log.info('Running processing script: {}'.format(script_cmd))
-        subprocess.Popen(script_cmd) 
+        proc_cmd = self.script_cmd + ['--subarray={}'.format(subarray_name)]
+        log.info('Running processing script: {}'.format(proc_cmd))
+        try:
+            subprocess.Popen(proc_cmd) 
+        except:
+            log.error('Could not run script for {}'.format(subarray_name))
 
     def processing_complete(self, subarray_name):
         """Actions to be taken once processing is complete for the  current 
