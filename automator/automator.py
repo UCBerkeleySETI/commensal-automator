@@ -221,7 +221,7 @@ class Automator(object):
         # process incoming data from the current subarray. 
         allocated_hosts_key = 'coordinator:allocated_hosts:{}'.format(subarray_name)
         allocated_hosts = self.redis_server.lrange(allocated_hosts_key, 0,
-            self.redis_server.llen(array_key))        
+            self.redis_server.llen(allocated_hosts_key))        
         # DWELL, the duration of a recording in seconds
         dwell = self.retrieve_dwell(self, allocated_hosts)
         # If the subarray state is `tracking` or `processing`, we can simply
