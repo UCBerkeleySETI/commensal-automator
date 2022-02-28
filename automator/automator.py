@@ -223,7 +223,7 @@ class Automator(object):
         allocated_hosts = self.redis_server.lrange(allocated_hosts_key, 0,
             self.redis_server.llen(allocated_hosts_key))        
         # DWELL, the duration of a recording in seconds
-        dwell = self.retrieve_dwell(self, allocated_hosts)
+        dwell = self.retrieve_dwell(allocated_hosts)
         # If the subarray state is `tracking` or `processing`, we can simply
         # assume that this transition has just happened and record `start_ts`
         # as the current time. This is because if the start of a recording
