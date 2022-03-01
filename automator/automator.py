@@ -1,5 +1,5 @@
 import redis
-import datetime
+from datetime import datetime
 import threading
 import numpy
 import subprocess
