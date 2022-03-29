@@ -88,3 +88,15 @@ For use as a daemonised process with `circus`, follow these steps:
 
 -    Run `circusctl --endpoint <endpoint> start automator`
 
+### Processing script
+
+To add a new processing script, the file `etc/automator.ini` should be edited.
+For example, to call a script located at 
+`/home/obs/bin/example_placeholder.py`, the appropriate line in 
+`etc/automator.ini` should be edited:  
+  
+`args = -u $(circus.env.bluse_ve_dir)/bin/automator --args=--proxy_channel=slack-messages,--slack_channel=meerkat-obs-log`  
+  
+should be replaced with:  
+  
+`args = -u $(circus.env.bluse_ve_dir)/bin/automator --script=/home/obs/bin/example_placeholder.py --args=--proxy_channel=slack-messages,--slack_channel=meerkat-obs-log`
