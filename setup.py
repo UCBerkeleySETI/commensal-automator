@@ -23,7 +23,7 @@ setuptools.setup(
             ]
         },
     scripts = [
-        'scripts/example_placeholder.py'       
+        'scripts/processing_example.sh'       
         ]
 
     )

@@ -70,9 +70,8 @@ def main(proxy_channel, slack_channel, subarray_name, redis_host, host_list):
     redis_server = redis.StrictRedis(host=redis_host) 
     slack_message = ('{}:```Automator:\n    Processing placeholder for {}.\n'
         '    Hosts allocated to this subarray: {}\n'
-        '    Processing would take place now.```').format(slack_channel,
+        '    A processing step would take place now.```').format(slack_channel,
         subarray_name, host_list)
-    # slurm do rsync
     redis_server.publish(proxy_channel, slack_message)
 
 if(__name__ == '__main__'):

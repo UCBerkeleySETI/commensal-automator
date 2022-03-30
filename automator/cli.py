@@ -22,17 +22,8 @@ def cli(args = sys.argv[0]):
                         help = 'Name of the Redis channel to subscribe to')
     parser.add_argument('--script',
                         type = str,
-                        default = '/opt/virtualenv/bluse3/bin/example_placeholder.py', 
+                        default = '/opt/virtualenv/bluse3/bin/processing_example.sh', 
                         help = 'Location of external processing script')
-    parser.add_argument('--env',
-                        type = str,
-                        default = '/opt/virtualenv/bluse3/bin/python3.5', 
-                        help = 'Virtual environment for processing script')
-    parser.add_argument('--args',
-                        type = str,
-                        default = '--proxy_channel=slack-messages,'
-                                  '--slack_channel=proxy-test',
-                        help = 'Arguments for the processing script')
     parser.add_argument('--margin',
                         type = float,
                         default = 1.0, 
@@ -60,16 +51,14 @@ def cli(args = sys.argv[0]):
     main(redis_endpoint = args.redis_endpoint, 
          redis_channel = args.redis_channel, 
          proc_script = args.script, 
-         proc_env = args.env, 
-         proc_args = args.args, 
          margin = args.margin, 
          hpgdomain = args.hpgdomain, 
          buffer_length = args.buffer_length, 
          nshot_chan = args.nshot_chan, 
          nshot_msg = args.nshot_msg)
 
-def main(redis_endpoint, redis_channel, proc_script, proc_env, proc_args, 
-    margin, hpgdomain, buffer_length, nshot_chan, nshot_msg):
+def main(redis_endpoint, redis_channel, proc_script, margin, hpgdomain, 
+    buffer_length, nshot_chan, nshot_msg):
     """Starts the automator.
   
     Args: 
@@ -99,8 +88,6 @@ def main(redis_endpoint, redis_channel, proc_script, proc_env, proc_args,
     Automaton = Automator(redis_endpoint, 
                           redis_channel, 
                           proc_script, 
-                          proc_env, 
-                          proc_args, 
                           margin, 
                           hpgdomain, 
                           buffer_length, 

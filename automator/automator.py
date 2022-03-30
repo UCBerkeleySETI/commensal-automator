@@ -75,8 +75,8 @@ class Automator(object):
     7. Returns to the waiting state (see 1).     
  
     """
-    def __init__(self, redis_endpoint, redis_chan, proc_script, proc_env, 
-        proc_args, margin, hpgdomain, buffer_length, nshot_chan, nshot_msg):
+    def __init__(self, redis_endpoint, redis_chan, proc_script, margin, 
+                 hpgdomain, buffer_length, nshot_chan, nshot_msg):
         """Initialise the automator. 
 
         Args: 
@@ -84,10 +84,7 @@ class Automator(object):
             redis_endpoint (str): Redis endpoint (of the form <host IP
             address>:<port>) 
             redis_chan (str): Name of the redis channel
-            proc_script (str): Location of the processing script for the 
-            processing script. 
-            proc_env (str): Virtual environment for processing script. 
-            proc_args (str): Arguments for processing script. 
+            proc_script (str): Location of the processing script.
             margin (float): Safety margin (in seconds) to add to `DWELL`
             when calculating the estimated end of a recording. 
             hpgdomain (str): The Hashpipe-Redis Gateway domain for the instrument
@@ -110,11 +107,10 @@ class Automator(object):
                                               port=redis_port, 
                                               decode_responses=True)
         self.receive_channel = redis_chan
-        proc_args = proc_args.split(',')
-        self.script_cmd = [proc_env, proc_script] + proc_args 
         self.margin = margin
         self.hpgdomain = hpgdomain
         self.buffer_length = buffer_length
+        self.proc_script = proc_script
         # Future work: split off Redis info into its own module
         self.nshot_chan = nshot_chan
         self.nshot_msg = nshot_msg
@@ -372,9 +368,7 @@ class Automator(object):
                                              0, 
                                              self.redis_server.llen(host_key))
         host_list = ','.join(host_list)
-        proc_cmd = self.script_cmd + ['--subarray={}'.format(subarray_name),
-            '--host_list={}'.format(host_list)]
-        slurm_cmd = ['srun', '-w', host_list] + proc_cmd
+        slurm_cmd = ['sbatch', '-w', host_list, self.proc_script]
         log.info('Running processing script: {}'.format(slurm_cmd))
         try:
             subprocess.Popen(slurm_cmd)
