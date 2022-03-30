@@ -8,6 +8,7 @@ running.
 import redis
 import argparse
 import sys
+import time
 
 def cli(args = sys.argv[0]):
     """CLI for placeholder example script.
@@ -33,6 +34,10 @@ def cli(args = sys.argv[0]):
                         type = str,
                         default = 'test_subarray',
                         help = 'Name of the current active subarray.')
+    parser.add_argument('--host_list',
+                        type = str,
+                        default = '',
+                        help = 'List of hosts in the current active subarray')
     if(len(sys.argv[1:])==0):
         parser.print_help()
         parser.exit()
@@ -40,9 +45,10 @@ def cli(args = sys.argv[0]):
     main(proxy_channel = args.proxy_channel, 
          slack_channel = args.slack_channel, 
          subarray_name = args.subarray_name,
-         redis_host = args.redis_host)
+         redis_host = args.redis_host,
+         host_list = args.host_list)
 
-def main(proxy_channel, slack_channel, subarray_name, redis_host):
+def main(proxy_channel, slack_channel, subarray_name, redis_host, host_list):
     """Publishes a message to Slack. 
 
     Args:
@@ -54,6 +60,8 @@ def main(proxy_channel, slack_channel, subarray_name, redis_host):
         subarray_name (str): The current active subarray for which the Slack
         messages are to be published.
         redis_host (str): The host address of the Redis server. 
+        host_list (str): String containing list of hosts in the current 
+        subarray.
 
     Returns:
 
@@ -61,8 +69,10 @@ def main(proxy_channel, slack_channel, subarray_name, redis_host):
     """         
     redis_server = redis.StrictRedis(host=redis_host) 
     slack_message = ('{}:```Automator:\n    Processing placeholder for {}.\n'
+        '    Hosts allocated to this subarray: {}\n'
         '    Processing would take place now.```').format(slack_channel,
-        subarray_name)
+        subarray_name, host_list)
+    # slurm do rsync
     redis_server.publish(proxy_channel, slack_message)
 
 if(__name__ == '__main__'):

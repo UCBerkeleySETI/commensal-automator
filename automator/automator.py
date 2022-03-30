@@ -190,6 +190,7 @@ class Automator(object):
 
             None
         """
+        log.info('New state: {}'.format(state))
         states = {'configure':self.configure, 
                   'tracking':self.tracking, 
                   'not-tracking':self.not_tracking, 
@@ -365,11 +366,17 @@ class Automator(object):
             None
         """
         # Future work: add a timeout for the script.
-        # Future work: pass host list to script?
-        proc_cmd = self.script_cmd + ['--subarray={}'.format(subarray_name)]
+        # Retrieve the list of hosts assigned to the current subarray:
+        host_key = 'coordinator:allocated_hosts:{}'.format(subarray_name)
+        host_list = self.redis_server.lrange(host_key, 
+                                             0, 
+                                             self.redis_server.llen(host_key))
+        proc_cmd = self.script_cmd + ['--subarray={}'.format(subarray_name),
+            '--host_list={}'.format(host_list)]
         log.info('Running processing script: {}'.format(proc_cmd))
         try:
-            subprocess.Popen(proc_cmd) 
+            subprocess.Popen(proc_cmd)
+            subprocess.wait() 
         except:
             log.error('Could not run script for {}'.format(subarray_name))
 
@@ -439,7 +446,9 @@ class Automator(object):
         dwell_values = []
         for host in host_list:
             host_key = '{}://{}/status'.format(self.hpgdomain, host)
+            log.info(host_key)
             host_status = self.redis_server.hgetall(host_key)
+            log.info(host_status)
             if(len(host_status > 0)):
                 if('DWELL' in host_status):
                     dwell_values.append(float(host_status['DWELL']))
