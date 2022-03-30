@@ -17,6 +17,10 @@ def cli(args = sys.argv[0]):
     parser = argparse.ArgumentParser(prog = 'example_placeholder', 
                                      usage = usage, 
                                      description = description)
+    parser.add_argument('--redis_host',
+                        type = str,
+                        default = '127.0.0.1',
+                        help = 'Redis server host address.')
     parser.add_argument('--proxy_channel',
                         type = str,
                         default = 'slack-messages',
@@ -35,9 +39,10 @@ def cli(args = sys.argv[0]):
     args = parser.parse_args()
     main(proxy_channel = args.proxy_channel, 
          slack_channel = args.slack_channel, 
-         subarray_name = args.subarray_name)
+         subarray_name = args.subarray_name,
+         redis_host = args.redis_host)
 
-def main(proxy_channel, slack_channel, subarray_name):
+def main(proxy_channel, slack_channel, subarray_name, redis_host):
     """Publishes a message to Slack. 
 
     Args:
@@ -47,13 +52,14 @@ def main(proxy_channel, slack_channel, subarray_name):
         slack_channel (str): The Slack channel to which messages should be
         published.
         subarray_name (str): The current active subarray for which the Slack
-        messages are to be published. 
+        messages are to be published.
+        redis_host (str): The host address of the Redis server. 
 
     Returns:
 
         None
     """         
-    redis_server = redis.StrictRedis() 
+    redis_server = redis.StrictRedis(host=redis_host) 
     slack_message = ('{}:```Automator:\n    Processing placeholder for {}.\n'
         '    Processing would take place now.```').format(slack_channel,
         subarray_name)
