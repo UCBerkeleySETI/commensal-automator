@@ -371,12 +371,13 @@ class Automator(object):
         host_list = self.redis_server.lrange(host_key, 
                                              0, 
                                              self.redis_server.llen(host_key))
+        host_list = ','.join(host_list)
         proc_cmd = self.script_cmd + ['--subarray={}'.format(subarray_name),
             '--host_list={}'.format(host_list)]
-        log.info('Running processing script: {}'.format(proc_cmd))
+        slurm_cmd = ['srun', '-w', host_list] + proc_cmd
+        log.info('Running processing script: {}'.format(slurm_cmd))
         try:
-            subprocess.Popen(proc_cmd)
-            subprocess.wait() 
+            subprocess.Popen(slurm_cmd)
         except:
             log.error('Could not run script for {}'.format(subarray_name))
 
