@@ -369,6 +369,8 @@ class Automator(object):
         host_list = self.redis_server.lrange(host_key, 
                                              0, 
                                              self.redis_server.llen(host_key))
+        # Format for host name (rather than instance name):
+        host_list =  [host.split('/')[0] for host in host_list]
         host_list = ','.join(host_list)
         slurm_cmd = ['sbatch', '-w', host_list, self.proc_script]
         log.info('Running processing script: {}'.format(slurm_cmd))
