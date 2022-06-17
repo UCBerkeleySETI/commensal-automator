@@ -39,7 +39,7 @@ def proc_sequence(redis_server, domain, subarray_id, proc_script, bfrdir, output
     redis_server.publish(group_chan, 'RAWFILE={}'.format(rawfile))
 
     # Detect completion of processing
-    monitor_proc_status(domain, redis_server, proc_list, PROC_STATUS_KEY, proc_timeout)
+    monitor_proc_status(domain, redis_server, proc_list, PROC_STATUS_KEY, proc_timeout, group_chan)
 
     # Run slurm command
     outcome = slurm_cmd(proc_script)
@@ -48,7 +48,7 @@ def proc_sequence(redis_server, domain, subarray_id, proc_script, bfrdir, output
     log.info('Any other final steps go here')
     redis_server.publish(proc_group, 'leave={}'.format(subarray_id))
 
-def monitor_proc_status(domain, redis_server, proc_list, proc_key, proc_timeout):
+def monitor_proc_status(domain, redis_server, proc_list, proc_key, proc_timeout, group_chan):
     """Need to keep track of proc_status key.
        Mechanism: For now, subscribe to one host from proc_list
        and then retrieve others.
@@ -161,7 +161,7 @@ def main(proc_domain, bfrdir, outdir, inputdir, rawfiles, hosts, slurm_script, p
         log.info('Processing file: {}'.format(rawfile))
         redis_server.publish(group_chan, 'RAWFILE={}'.format(rawfile))
         # Monitor proc status:
-        result = monitor_proc_status(proc_domain, redis_server, hosts, PROC_STATUS_KEY, proc_timeout)
+        result = monitor_proc_status(proc_domain, redis_server, hosts, PROC_STATUS_KEY, proc_timeout, group_chan)
         if(result == 'success'):
             # Uncomment to run slurm commands
             # outcome = slurm_cmd(proc_script)
