@@ -44,15 +44,16 @@ def proc_sequence(redis_server, domain, subarray_id, proc_script, bfrdir):
     log.info('Any other final steps go here')
 
 
-def monitor_proc_status(domain, redis_server, proc_list, proc_key, group_chan):
+def monitor_proc_status(domain, redis_server, proc_list, proc_key, group_chan, proc_timeout):
     """Need to keep track of proc_status key.
        Mechanism: For now, subscribe to one host from proc_list
        and then retrieve others.
+       NOTE: for now, only checks timer when hash is altered. 
     """
     ps = redis_server.pubsub()
     proc_status_hash = '{}://{}/0/status'.format(domain, proc_list[0])
     ps.subscribe('__keyspace@0__:{}'.format(proc_status_hash))
-
+    tstart = time.time()
     for msg in ps.listen():
        #log.info(msg['channel'])
        if(msg['data'] == 'hset'):
@@ -65,14 +66,15 @@ def monitor_proc_status(domain, redis_server, proc_list, proc_key, group_chan):
                full_status = gather_proc_status(3, 1, domain, redis_server, proc_list, proc_key)
                if(full_status == 'busy'):
                    log.info('full status = busy')
-                   continue
                elif(full_status == 'done'):
                    log.info('Upchanneliser/beamformer finished for all nodes')
                    ps.unsubscribe(msg['channel'])
                    # Set procstat to IDLE
                    redis_server.publish(group_chan, 'PROCSTAT=IDLE')
                    return 'success'
-
+           if(time.time() = tstart >= proc_timeout): 
+               log.error('Processing timeout of {} seconds exceeded'.format(proc_timeout))
+               return 'timeout'
 
 def gather_proc_status(retries, timeout, domain, redis_server, proc_list, proc_key):
     for i in range(retries):
@@ -119,7 +121,7 @@ def retrieve_host_list(subarray_id):
     host_list = ','.join(host_list)
     return host_list
 
-def main(proc_domain, bfrdir, outdir, inputdir, rawfiles, hosts, slurm_script):
+def main(proc_domain, bfrdir, outdir, inputdir, rawfiles, hosts, slurm_script, proc_timeout):
     """Run this script separately from the full automator.
     """
     set_logger('DEBUG')
@@ -160,7 +162,7 @@ def main(proc_domain, bfrdir, outdir, inputdir, rawfiles, hosts, slurm_script):
             # Uncomment to run slurm commands
             # outcome = slurm_cmd(proc_script)
             log.info('Would run slurm commands here.')
-        else:
+        elif(result == 'timeout'):
             log.info('Waiting for upchanneliser/beamformer, cannot issue slurm command')
             log.error('Aborting...')
             sys.exit()
@@ -193,10 +195,6 @@ def cli(args = sys.argv[0]):
                         type = str,
                         default = '/buf0ro/20220512/0009/Unknown/GUPPI/',
                         help = 'Input directory for upchanneliser-beamformer')
-    parser.add_argument('--rawfile',
-                        type = str,
-                        default = 'guppi_59712_16307_003760_J1939-6342_0001.0000.raw',
-                        help = 'Location of the first RAW file to be processed')
     parser.add_argument('--slurm_script',
                         type = str,
                         default = '/opt/virtualenv/bluse3/bin/processing_example.sh',
@@ -205,6 +203,10 @@ def cli(args = sys.argv[0]):
                         type = str,
                         default = '/opt/virtualenv/bluse3/bin/processing_example.sh',
                         help = 'Location of the slurm processing script.')
+    parser.add_argument('--proc_timeout',
+                        type = int,
+                        default = 1800,
+                        help = 'Upchanneliser-beamformer processing timeout (s)')
     # Optional args
     parser.add_argument('--hosts',
                         nargs='*',
@@ -227,6 +229,7 @@ def cli(args = sys.argv[0]):
          inputdir = args.inputdir,
          rawfiles = args.rawfiles,
          slurm_script = args.slurm_script,
+         proc_timeout = args.proc_timeout
          hosts = args.hosts)
 
 if(__name__ == '__main__'):
