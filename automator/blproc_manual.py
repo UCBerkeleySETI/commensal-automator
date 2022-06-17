@@ -127,6 +127,7 @@ def main(proc_domain, bfrdir, outdir, inputdir, rawfiles, hosts, slurm_script, p
     """Run this script separately from the full automator.
     """
     set_logger('DEBUG')
+    log.info('Starting blproc_manual')
     redis_server = redis.StrictRedis(decode_responses=True)
  
     # Parsing input:
@@ -157,6 +158,7 @@ def main(proc_domain, bfrdir, outdir, inputdir, rawfiles, hosts, slurm_script, p
 
     # Initiate and track processing by file:
     for rawfile in rawfiles:
+        log.info('Processing file: {}'.format(rawfile))
         redis_server.publish(group_chan, 'RAWFILE={}'.format(rawfile))
         # Monitor proc status:
         result = monitor_proc_status(proc_domain, redis_server, hosts, PROC_STATUS_KEY, proc_timeout)
