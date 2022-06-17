@@ -48,7 +48,7 @@ def proc_sequence(redis_server, domain, subarray_id, proc_script, bfrdir, output
     log.info('Any other final steps go here')
     redis_server.publish(proc_group, 'leave={}'.format(subarray_id))
 
-def monitor_proc_status(domain, redis_server, proc_list, proc_key, proc_timeout, group_chan):
+def monitor_proc_status(status, domain, redis_server, proc_list, proc_key, proc_timeout, group_chan):
     """Need to keep track of proc_status key.
        Mechanism: For now, subscribe to one host from proc_list
        and then retrieve others.
@@ -64,31 +64,27 @@ def monitor_proc_status(domain, redis_server, proc_list, proc_key, proc_timeout,
            # Since keyspace monitoring is not granular at the hkey level:
            proc_status = redis_server.hget(proc_status_hash, proc_key)
            #log.info('hset received')
-           if(proc_status == 'END'):
+           if(proc_status == status):
                # Check others:
-               log.info('END')
-               full_status = gather_proc_status(3, 1, domain, redis_server, proc_list, proc_key)
+               full_status = gather_proc_status(status, 3, 1, domain, redis_server, proc_list, proc_key)
                if(full_status == 'busy'):
                    log.info('full status = busy')
                elif(full_status == 'done'):
                    log.info('Upchanneliser/beamformer finished for all nodes')
                    ps.unsubscribe(msg['channel'])
-                   # Set procstat to IDLE
-                   redis_server.publish(group_chan, 'PROCSTAT=IDLE')
                    return 'success'
            if((time.time() - tstart) >= proc_timeout): 
                log.error('Processing timeout of {} seconds exceeded'.format(proc_timeout))
                return 'timeout'
 
-def gather_proc_status(retries, timeout, domain, redis_server, proc_list, proc_key):
+def gather_proc_status(status, retries, timeout, domain, redis_server, proc_list, proc_key):
     for i in range(retries):
         proc_count = 0
         for host in proc_list:
             proc_status_hash = '{}://{}/0/status'.format(domain, host)
             proc_status = redis_server.hget(proc_status_hash, proc_key)
             log.info('Gathered proc status: {}'.format(proc_status))
-            if(proc_status == 'END'):
-                log.info('gathered END status')
+            if(proc_status == status):
                 proc_count += 1
         if(proc_count != len(proc_list)):
             if(i < retries - 1):
@@ -159,18 +155,22 @@ def main(proc_domain, bfrdir, outdir, inputdir, rawfiles, hosts, slurm_script, p
     # Initiate and track processing by file:
     for rawfile in rawfiles:
         log.info('Processing file: {}'.format(rawfile))
+        # Wait for processing to start:
+        result = monitor_proc_status('START', proc_domain, redis_server, hosts, PROC_STATUS_KEY, proc_timeout, group_chan)
+        if(result == 'timeout'):
+            log.error('Timed out, processing has not started')
+            sys.exit() 
         redis_server.publish(group_chan, 'RAWFILE={}'.format(rawfile))
-        # Monitor proc status:
-        result = monitor_proc_status(proc_domain, redis_server, hosts, PROC_STATUS_KEY, proc_timeout, group_chan)
-        if(result == 'success'):
-            # Uncomment to run slurm commands
-            # outcome = slurm_cmd(proc_script)
-            log.info('Would run slurm commands here.')
-        elif(result == 'timeout'):
-            log.info('Waiting for upchanneliser/beamformer, cannot issue slurm command')
-            log.error('Aborting...')
+        # Waiting for processing to finish:
+        result = monitor_proc_status('END', proc_domain, redis_server, hosts, PROC_STATUS_KEY, proc_timeout, group_chan)
+        if(result == 'timeout'):
+            log.error('Timed out, still waiting for processing to finish')
             sys.exit()
-
+        # Set procstat to IDLE:
+        redis_server.publish(group_chan, 'PROCSTAT=IDLE')
+        # Uncomment to run slurm commands
+        # outcome = slurm_cmd(proc_script)
+        log.info('Would run slurm commands here.')
     log.info('Processing complete. Leaving gateway groups.')
     redis_server.publish(group_chan, 'leave=tmp_group')
 
