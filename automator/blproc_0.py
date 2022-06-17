@@ -123,16 +123,19 @@ def main(proc_domain, bfrdir, outdir, inputdir, rawfiles, hosts, slurm_script):
     """Run this script separately from the full automator.
     """
     set_logger('DEBUG')
-
-    log.info(hosts)
-    log.info(len(hosts))
-    log.info(rawfiles)
-    log.info(len(rawfiles))
-    return
-
-
-
     redis_server = redis.StrictRedis(decode_responses=True)
+ 
+    # Parsing input:
+    if(hosts is None):
+        log.info('Please provide a list of hosts, or \'all\'')
+        sys.exit()
+    elif((len(hosts) == 1) & (hosts[0] == 'all')):
+        hosts = []
+        for i in range(0, 64):
+            hosts.append('blpn{}'.format(i))
+    if(rawfiles is None): 
+        log.info('Please provide a list of rawfiles for processing')
+        sys.exit()
 
     # Join gateway groups:
     for host in hosts:
