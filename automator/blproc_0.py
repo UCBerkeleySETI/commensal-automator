@@ -11,7 +11,7 @@ from logger import log, set_logger
 
 PROC_STATUS_KEY = 'PROCSTAT'
 
-def proc_sequence(redis_server, domain, subarray_id, proc_script, bfrdir):
+def proc_sequence(redis_server, domain, subarray_id, proc_script, bfrdir, outputdir, inputdir, rawfile):
     """Processing for minimal BLUSE SETI survey.
     Use this function to run the processing steps for the minimial BLUSE
     survey.
@@ -30,21 +30,25 @@ def proc_sequence(redis_server, domain, subarray_id, proc_script, bfrdir):
     proc_group = '{}:{}///set'.format(domain, subarray_id)
     proc_list = retrieve_host_list(subarray_id)
 
-    # Starting upchanneliser-beamformer
-    # Need to ensure BFRDIR, OUTDIR, RAWFILE are set
-
+    # Set keys to prepare for processing:
+    redis_server.publish(proc_group, 'BFRDIR={}'.format(bfrdir))
+    redis_server.publish(proc_group, 'OUTDIR={}'.format(outdir))
+    redis_server.publish(proc_group, 'INPUTDIR={}'.format(inputdir))
+    
+    # Initiate processing with rawfile name
+    redis_server.publish(group_chan, 'RAWFILE={}'.format(rawfile))
 
     # Detect completion of processing
-    monitor_proc_status(domain, redis_server, proc_list)
+    monitor_proc_status(domain, redis_server, proc_list, PROC_STATUS_KEY, proc_timeout)
 
     # Run slurm command
     outcome = slurm_cmd(proc_script)
 
     # Final cleanup:
     log.info('Any other final steps go here')
+    redis_server.publish(proc_group, 'leave={}'.format(subarray_id))
 
-
-def monitor_proc_status(domain, redis_server, proc_list, proc_key, group_chan, proc_timeout):
+def monitor_proc_status(domain, redis_server, proc_list, proc_key, proc_timeout):
     """Need to keep track of proc_status key.
        Mechanism: For now, subscribe to one host from proc_list
        and then retrieve others.
@@ -95,8 +99,6 @@ def gather_proc_status(retries, timeout, domain, redis_server, proc_list, proc_k
                 return 'busy'
         else:
             return 'done'
-
-
 
 def slurm_cmd(proc_script):
     slurm_cmd = ['sbatch', '-w', host_list, proc_script]
@@ -157,7 +159,7 @@ def main(proc_domain, bfrdir, outdir, inputdir, rawfiles, hosts, slurm_script, p
     for rawfile in rawfiles:
         redis_server.publish(group_chan, 'RAWFILE={}'.format(rawfile))
         # Monitor proc status:
-        result = monitor_proc_status(proc_domain, redis_server, hosts, PROC_STATUS_KEY, group_chan)
+        result = monitor_proc_status(proc_domain, redis_server, hosts, PROC_STATUS_KEY, proc_timeout)
         if(result == 'success'):
             # Uncomment to run slurm commands
             # outcome = slurm_cmd(proc_script)
@@ -167,8 +169,8 @@ def main(proc_domain, bfrdir, outdir, inputdir, rawfiles, hosts, slurm_script, p
             log.error('Aborting...')
             sys.exit()
 
-     log.info('Processing complete. Leaving gateway groups.')
-     redis_server.publish(group_chan, 'leave=tmp_group')
+    log.info('Processing complete. Leaving gateway groups.')
+    redis_server.publish(group_chan, 'leave=tmp_group')
 
 def cli(args = sys.argv[0]):
     """Command line interface for the processing script.
