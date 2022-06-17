@@ -153,10 +153,11 @@ def main(proc_domain, bfrdir, outdir, inputdir, rawfiles, hosts, slurm_script):
     result = monitor_proc_status(proc_domain, redis_server, hosts, PROC_STATUS_KEY, group_chan)
 
     if(result == 'success'):
-        # Run slurm command
+        # Uncomment to run slurm commands
         # outcome = slurm_cmd(proc_script)
-        log.info('Would run slurm here')
-        
+        log.info('Would run slurm commands here.')
+        log.info('Leaving gateway groups.')
+        redis_server.publish(group_chan, 'leave=tmp_group')
     else:
         log.info('Waiting for upchanneliser/beamformer, cannot issue slurm command')
 
