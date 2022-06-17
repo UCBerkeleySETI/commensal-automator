@@ -127,14 +127,14 @@ def main(proc_domain, bfrdir, outdir, inputdir, rawfiles, hosts, slurm_script):
  
     # Parsing input:
     if(hosts is None):
-        log.info('Please provide a list of hosts, or \'all\'')
+        log.error('Please provide a list of hosts, or \'all\'')
         sys.exit()
     elif((len(hosts) == 1) & (hosts[0] == 'all')):
         hosts = []
         for i in range(0, 64):
             hosts.append('blpn{}'.format(i))
     if(rawfiles is None): 
-        log.info('Please provide a list of rawfiles for processing')
+        log.error('Please provide a list of rawfiles for processing')
         sys.exit()
 
     # Join gateway groups:
@@ -145,24 +145,28 @@ def main(proc_domain, bfrdir, outdir, inputdir, rawfiles, hosts, slurm_script):
     # Sleep to let hosts join tmp_group
     time.sleep(1)
 
-    # Initiate processing:
+    # Set keys to prepare for processing:
     group_chan = '{}:tmp_group///set'.format(proc_domain)
     redis_server.publish(group_chan, 'BFRDIR={}'.format(bfrdir))
     redis_server.publish(group_chan, 'OUTDIR={}'.format(outdir))
     redis_server.publish(group_chan, 'INPUTDIR={}'.format(inputdir))
-    redis_server.publish(group_chan, 'RAWFILE={}'.format(rawfile))
 
-    # Monitor proc status:
-    result = monitor_proc_status(proc_domain, redis_server, hosts, PROC_STATUS_KEY, group_chan)
+    # Initiate and track processing by file:
+    for rawfile in rawfiles:
+        redis_server.publish(group_chan, 'RAWFILE={}'.format(rawfile))
+        # Monitor proc status:
+        result = monitor_proc_status(proc_domain, redis_server, hosts, PROC_STATUS_KEY, group_chan)
+        if(result == 'success'):
+            # Uncomment to run slurm commands
+            # outcome = slurm_cmd(proc_script)
+            log.info('Would run slurm commands here.')
+        else:
+            log.info('Waiting for upchanneliser/beamformer, cannot issue slurm command')
+            log.error('Aborting...')
+            sys.exit()
 
-    if(result == 'success'):
-        # Uncomment to run slurm commands
-        # outcome = slurm_cmd(proc_script)
-        log.info('Would run slurm commands here.')
-        log.info('Leaving gateway groups.')
-        redis_server.publish(group_chan, 'leave=tmp_group')
-    else:
-        log.info('Waiting for upchanneliser/beamformer, cannot issue slurm command')
+     log.info('Processing complete. Leaving gateway groups.')
+     redis_server.publish(group_chan, 'leave=tmp_group')
 
 def cli(args = sys.argv[0]):
     """Command line interface for the processing script.
@@ -193,6 +197,10 @@ def cli(args = sys.argv[0]):
                         type = str,
                         default = 'guppi_59712_16307_003760_J1939-6342_0001.0000.raw',
                         help = 'Location of the first RAW file to be processed')
+    parser.add_argument('--slurm_script',
+                        type = str,
+                        default = '/opt/virtualenv/bluse3/bin/processing_example.sh',
+                        help = 'Location of the slurm processing script.')
     parser.add_argument('--slurm_script',
                         type = str,
                         default = '/opt/virtualenv/bluse3/bin/processing_example.sh',
