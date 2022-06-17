@@ -20,6 +20,7 @@ setuptools.setup(
     entry_points = {
         'console_scripts':[
             'automator = automator.cli:cli',
+            'blproc_manual = automator.blproc_manual:cli', 
             ]
         },
     scripts = [
