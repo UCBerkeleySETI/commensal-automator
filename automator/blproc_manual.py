@@ -4,7 +4,7 @@ import argparse
 import sys
 import ast
 
-from logger import log, set_logger
+from .logger import log, set_logger
 
 """Initial BLPROC minimal pipeline processing control script.
 """
@@ -76,7 +76,7 @@ def monitor_proc_status(domain, redis_server, proc_list, proc_key, proc_timeout)
                    # Set procstat to IDLE
                    redis_server.publish(group_chan, 'PROCSTAT=IDLE')
                    return 'success'
-           if(time.time() = tstart >= proc_timeout): 
+           if((time.time() - tstart) >= proc_timeout): 
                log.error('Processing timeout of {} seconds exceeded'.format(proc_timeout))
                return 'timeout'
 
@@ -201,10 +201,6 @@ def cli(args = sys.argv[0]):
                         type = str,
                         default = '/opt/virtualenv/bluse3/bin/processing_example.sh',
                         help = 'Location of the slurm processing script.')
-    parser.add_argument('--slurm_script',
-                        type = str,
-                        default = '/opt/virtualenv/bluse3/bin/processing_example.sh',
-                        help = 'Location of the slurm processing script.')
     parser.add_argument('--proc_timeout',
                         type = int,
                         default = 1800,
@@ -231,7 +227,7 @@ def cli(args = sys.argv[0]):
          inputdir = args.inputdir,
          rawfiles = args.rawfiles,
          slurm_script = args.slurm_script,
-         proc_timeout = args.proc_timeout
+         proc_timeout = args.proc_timeout,
          hosts = args.hosts)
 
 if(__name__ == '__main__'):
