@@ -119,19 +119,23 @@ def retrieve_host_list(subarray_id):
     host_list = ','.join(host_list)
     return host_list
 
-def main(proc_domain, bfrdir, outdir, inputdir, rawfile, hostlist, slurm_script):
+def main(proc_domain, bfrdir, outdir, inputdir, rawfiles, hosts, slurm_script):
     """Run this script separately from the full automator.
     """
     set_logger('DEBUG')
 
-    hostlist = hostlist.split(',')
+    log.info(hosts)
+    log.info(len(hosts))
+    log.info(rawfiles)
+    log.info(len(rawfiles))
+    return
 
-    log.info(hostlist)
+
 
     redis_server = redis.StrictRedis(decode_responses=True)
 
     # Join gateway groups:
-    for host in hostlist:
+    for host in hosts:
         gateway_chan = '{}://{}/gateway'.format(proc_domain, host)
         redis_server.publish(gateway_chan, 'join=tmp_group')
 
@@ -146,12 +150,13 @@ def main(proc_domain, bfrdir, outdir, inputdir, rawfile, hostlist, slurm_script)
     redis_server.publish(group_chan, 'RAWFILE={}'.format(rawfile))
 
     # Monitor proc status:
-    result = monitor_proc_status(proc_domain, redis_server, hostlist, PROC_STATUS_KEY, group_chan)
+    result = monitor_proc_status(proc_domain, redis_server, hosts, PROC_STATUS_KEY, group_chan)
 
     if(result == 'success'):
         # Run slurm command
         # outcome = slurm_cmd(proc_script)
         log.info('Would run slurm here')
+        
     else:
         log.info('Waiting for upchanneliser/beamformer, cannot issue slurm command')
 
@@ -184,14 +189,22 @@ def cli(args = sys.argv[0]):
                         type = str,
                         default = 'guppi_59712_16307_003760_J1939-6342_0001.0000.raw',
                         help = 'Location of the first RAW file to be processed')
-    parser.add_argument('--hostlist',
-                        type = str,
-                        default = 'blpn24,blpn25',
-                        help = 'Comma-separated list of hosts allocated for processing.')
     parser.add_argument('--slurm_script',
                         type = str,
                         default = '/opt/virtualenv/bluse3/bin/processing_example.sh',
                         help = 'Location of the slurm processing script.')
+    # Optional args
+    parser.add_argument('--hosts',
+                        nargs='*',
+                        action='store',
+                        default = None,
+                        help = 'Hosts allocated for processing.')
+    parser.add_argument('--rawfiles',
+                        nargs='*',
+                        action='store',
+                        default = None,
+                        help = 'Rawfiles to be processed.')
+
     if(len(sys.argv[1:]) == 0):
         parser.print_help()
         parser.exit()
@@ -200,9 +213,9 @@ def cli(args = sys.argv[0]):
          bfrdir = args.bfrdir,
          outdir = args.outdir,
          inputdir = args.inputdir,
-         rawfile = args.rawfile,
-         hostlist = args.hostlist,
-         slurm_script = args.slurm_script)
+         rawfiles = args.rawfiles,
+         slurm_script = args.slurm_script,
+         hosts = args.hosts)
 
 if(__name__ == '__main__'):
   """Run on files locally.
