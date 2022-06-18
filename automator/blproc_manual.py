@@ -155,12 +155,12 @@ def main(proc_domain, bfrdir, outdir, inputdir, rawfiles, hosts, slurm_script, p
     # Initiate and track processing by file:
     for rawfile in rawfiles:
         log.info('Processing file: {}'.format(rawfile))
+        redis_server.publish(group_chan, 'RAWFILE={}'.format(rawfile))
         # Wait for processing to start:
         result = monitor_proc_status('START', proc_domain, redis_server, hosts, PROC_STATUS_KEY, proc_timeout, group_chan)
         if(result == 'timeout'):
             log.error('Timed out, processing has not started')
             sys.exit() 
-        redis_server.publish(group_chan, 'RAWFILE={}'.format(rawfile))
         # Waiting for processing to finish:
         result = monitor_proc_status('END', proc_domain, redis_server, hosts, PROC_STATUS_KEY, proc_timeout, group_chan)
         if(result == 'timeout'):
