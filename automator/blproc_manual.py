@@ -49,10 +49,22 @@ def proc_sequence(redis_server, domain, subarray_id, proc_script, bfrdir, output
     redis_server.publish(proc_group, 'leave={}'.format(subarray_id))
 
 def monitor_proc_status(status, domain, redis_server, proc_list, proc_key, proc_timeout, group_chan):
-    """Need to keep track of proc_status key.
-       Mechanism: For now, subscribe to one host from proc_list
-       and then retrieve others.
-       NOTE: for now, only checks timer when hash is altered. 
+    """Monitors a particular key in the satus hash.
+
+       Args:
+           status (str): Status value for 'success' condition. 
+           redis_server: Redis server via which to access proc hash. 
+           domain (str): Processing domain (for processing nodes). 
+           proc_list (list of str): List of host names for processing nodes.
+           proc_key (str): Specific HKEY for status monitoring. 
+           proc_timeout (int): Time (in seconds) after which the monitor gives up. 
+           group_chan (str): Processing group channel.
+
+       Returns:
+           'success' if all processing nodes exhibit desired status for proc_key.
+           'timeout' if processing nodes have not agreed before proc_timeout seconds
+           have passed.  
+           NOTE: for now, only checks timer when hash is altered. 
     """
     ps = redis_server.pubsub()
     proc_status_hash = '{}://{}/0/status'.format(domain, proc_list[0])
@@ -63,7 +75,6 @@ def monitor_proc_status(status, domain, redis_server, proc_list, proc_key, proc_
        if(msg['data'] == 'hset'):
            # Since keyspace monitoring is not granular at the hkey level:
            proc_status = redis_server.hget(proc_status_hash, proc_key)
-           #log.info('hset received')
            if(proc_status == status):
                # Check others:
                full_status = gather_proc_status(status, 3, 1, domain, redis_server, proc_list, proc_key)
@@ -78,6 +89,21 @@ def monitor_proc_status(status, domain, redis_server, proc_list, proc_key, proc_
                return 'timeout'
 
 def gather_proc_status(status, retries, timeout, domain, redis_server, proc_list, proc_key):
+    """Gather aggregated processing status from across hosts. 
+
+    Args:
+       status (str): Status value for 'success' condition. 
+       redis_server: Redis server via which to access proc hash. 
+       domain (str): Processing domain (for processing nodes). 
+       proc_list (list of str): List of host names for processing nodes.
+       proc_key (str): Specific HKEY for status monitoring. 
+       timeout (int): Time (in seconds) to wait between retries.  
+       retries (int): Number of retries before aborting. 
+        
+    Returns:
+       'busy' if retries exhausted. 
+       'done' if all processing nodes indicate the desired success state.
+    """ 
     for i in range(retries):
         proc_count = 0
         for host in proc_list:
@@ -97,6 +123,15 @@ def gather_proc_status(status, retries, timeout, domain, redis_server, proc_list
             return 'done'
 
 def slurm_cmd(proc_script):
+    """Run slurm processing script.
+
+    Args:
+        proc_script (str): Path to processing shell script. 
+ 
+    Returns:
+        'success' if slurm processing script finished executing. 
+        'failed' if the provided script could not be run. 
+    """
     slurm_cmd = ['sbatch', '-w', host_list, proc_script]
     log.info('Running processing script: {}'.format(slurm_cmd))
     try:
