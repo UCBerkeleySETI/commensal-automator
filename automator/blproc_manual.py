@@ -6,15 +6,14 @@ import ast
 
 from .logger import log, set_logger
 
-"""Initial BLPROC minimal pipeline processing control script.
+"""Manual BLPROC minimal pipeline processing control script.
 """
 
 PROC_STATUS_KEY = 'PROCSTAT'
 
-def proc_sequence(redis_server, domain, subarray_id, proc_script, bfrdir, outputdir, inputdir, rawfile):
+def proc_slurm(redis_server, domain, subarray_id, proc_script, bfrdir, outputdir, inputdir, rawfile):
     """Processing for minimal BLUSE SETI survey.
-    Use this function to run the processing steps for the minimial BLUSE
-    survey.
+    For use with processing stages that do not use the Hashpipe-Redis Gateway.
 
     Currently, adheres to the following sequence:
 
@@ -49,7 +48,8 @@ def proc_sequence(redis_server, domain, subarray_id, proc_script, bfrdir, output
     redis_server.publish(proc_group, 'leave={}'.format(subarray_id))
 
 def monitor_proc_status(status, domain, redis_server, proc_list, proc_key, proc_timeout, group_chan):
-    """Monitors a particular key in the satus hash.
+    """For processes which communicate via the Hashpipe-Redis Gateway. 
+    Monitors a particular key in the satus hash.
 
        Args:
            status (str): Status value for 'success' condition. 
@@ -154,8 +154,9 @@ def retrieve_host_list(subarray_id):
     host_list = ','.join(host_list)
     return host_list
 
-def main(proc_domain, bfrdir, outdir, inputdir, rawfiles, hosts, slurm_script, proc_timeout):
-    """Run this script separately from the full automator.
+def proc_hpguppi(proc_domain, bfrdir, outdir, inputdir, rawfiles, hosts, slurm_script, proc_timeout):
+    """Proc sequence for processing steps which use the Hashpipe-Redis Gateway.
+       This script runs separately from the full automator.
     """
     set_logger('DEBUG')
     log.info('Starting blproc_manual')
@@ -209,6 +210,16 @@ def main(proc_domain, bfrdir, outdir, inputdir, rawfiles, hosts, slurm_script, p
     log.info('Processing complete. Leaving gateway groups.')
     redis_server.publish(group_chan, 'leave=tmp_group')
 
+def main(proc_type, proc_domain, bfrdir, outdir, inputdir, rawfiles, hosts, slurm_script, proc_timeout):
+    """Run processing manually on local files based on processing type. 
+    """
+    if(proc_type == 'slurm'):
+        proc_slurm(proc_domain, bfrdir, outdir, inputdir, rawfiles, hosts, slurm_script, proc_timeout)
+    elif(proc_type == 'hpguppi'):
+        proc_hpguppi(proc_domain, bfrdir, outdir, inputdir, rawfiles, hosts, slurm_script, proc_timeout)
+    else:
+        log.error('Unrecognised processing type')
+
 def cli(args = sys.argv[0]):
     """Command line interface for the processing script.
        proc_domain, bfrdir, outdir, rawfile, hostlist, slurm_script
@@ -218,6 +229,10 @@ def cli(args = sys.argv[0]):
     parser = argparse.ArgumentParser(prog = 'blproc_0',
                                      usage = usage,
                                      description = description)
+    parser.add_argument('--proc_type',
+                        type = str,
+                        default = 'slurm',
+                        help = 'Processing approach: slurm or hashpipe.')
     parser.add_argument('--proc_domain',
                         type = str,
                         default = 'blproc',
@@ -258,7 +273,8 @@ def cli(args = sys.argv[0]):
         parser.print_help()
         parser.exit()
     args = parser.parse_args()
-    main(proc_domain = args.proc_domain,
+    main(proc_type = args.proc_type,
+         proc_domain = args.proc_domain,
          bfrdir = args.bfrdir,
          outdir = args.outdir,
          inputdir = args.inputdir,
