@@ -3,6 +3,7 @@ import time
 import argparse
 import sys
 import ast
+import subprocess
 
 from .logger import log, set_logger
 
@@ -10,42 +11,41 @@ from .logger import log, set_logger
 """
 
 PROC_STATUS_KEY = 'PROCSTAT'
+MAX_DRIFT = 10
+SNR = 8
+TEL_ID = 64
+NUM_BANDS = 16
+FFT_SIZE = 131072
 
-def proc_slurm(redis_server, domain, subarray_id, proc_script, bfrdir, outputdir, inputdir, rawfile):
+def proc_slurm(hosts, bfrdir, outputdir, inputdir):
     """Processing for minimal BLUSE SETI survey.
     For use with processing stages that do not use the Hashpipe-Redis Gateway.
-
-    Currently, adheres to the following sequence:
-
-    1. Knows name of gateway group for current subarray.
-    2. Knows list of hosts in current subarray.
-    3. Starts upchanneliser-beamformer on recorded HPGUPPI RAW data.
-       3a. Retrieves and publishes key-value pairs to initiate start.
-       3b. Waits for responses (this can be blocking here).
-    4. Starts a SETI search on filterbank output of upchanneliser-beamformer,
-       using Slurm.
     """
 
-    proc_group = '{}:{}///set'.format(domain, subarray_id)
-    proc_list = retrieve_host_list(subarray_id)
-
-    # Set keys to prepare for processing:
-    redis_server.publish(proc_group, 'BFRDIR={}'.format(bfrdir))
-    redis_server.publish(proc_group, 'OUTDIR={}'.format(outdir))
-    redis_server.publish(proc_group, 'INPUTDIR={}'.format(inputdir))
+    # Parsing input:
+    if(hosts is None):
+        log.error('Please provide a list of hosts, or \'all\'')
+        sys.exit()
+    elif((len(hosts) == 1) & (hosts[0] == 'all')):
+        hosts = []
+        for i in range(0, 64):
+            hosts.append('blpn{}'.format(i))
     
-    # Initiate processing with rawfile name
-    redis_server.publish(group_chan, 'RAWFILE={}'.format(rawfile))
-
-    # Detect completion of processing
-    monitor_proc_status(domain, redis_server, proc_list, PROC_STATUS_KEY, proc_timeout, group_chan)
+    proc_str = ['/home/lacker/seticore/build/seticore',
+                '--input={}'.format(inputdir),
+                '--output={}'.format(outputdir),
+                '--max_drift={}'.format(MAX_DRIFT),
+                '--snr={}'.format(SNR),
+                '--recipe_dir={}'.format(bfrdir),
+                '--num_bands={}'.format(NUM_BANDS),
+                '--fft_size={}'.format(FFT_SIZE),
+                '--telescope_id={}'.format(TEL_ID)]
 
     # Run slurm command
-    outcome = slurm_cmd(proc_script)
+    outcome = slurm_cmd(hosts, proc_str)
 
     # Final cleanup:
     log.info('Any other final steps go here')
-    redis_server.publish(proc_group, 'leave={}'.format(subarray_id))
 
 def monitor_proc_status(status, domain, redis_server, proc_list, proc_key, proc_timeout, group_chan):
     """For processes which communicate via the Hashpipe-Redis Gateway. 
@@ -122,7 +122,7 @@ def gather_proc_status(status, retries, timeout, domain, redis_server, proc_list
         else:
             return 'done'
 
-def slurm_cmd(proc_script):
+def slurm_cmd(host_list, proc_str):
     """Run slurm processing script.
 
     Args:
@@ -132,23 +132,24 @@ def slurm_cmd(proc_script):
         'success' if slurm processing script finished executing. 
         'failed' if the provided script could not be run. 
     """
-    slurm_cmd = ['sbatch', '-w', host_list, proc_script]
-    log.info('Running processing script: {}'.format(slurm_cmd))
+    slurm_cmd = ['srun', '-w'] + host_list + proc_str
+    log.info('Running processing command: {}'.format(slurm_cmd))
     try:
-        subprocess.Popen(slurm_cmd).wait()
+        subprocess.run(slurm_cmd)
         return 'success'
-    except:
-        log.error('Could not run script for {}'.format(subarray_name))
+    except Exception as e:
+        log.error('Could not run command')
+        log.error(e)
         return 'failed'
 
-def retrieve_host_list(subarray_id):
+def retrieve_host_list(redis_server, subarray_id):
     """Retrieve the current list of processing node host names allocated to
     the subarray `subarray_id`.
     """
     host_key = 'coordinator:allocated_hosts:{}'.format(subarray_id)
-    host_list = self.redis_server.lrange(host_key,
-                                         0,
-                                         self.redis_server.llen(host_key))
+    host_list = redis_server.lrange(host_key,
+                                    0,
+                                    redis_server.llen(host_key))
     # Format for host name (rather than instance name):
     host_list =  [host.split('/')[0] for host in host_list]
     host_list = ','.join(host_list)
@@ -158,8 +159,6 @@ def proc_hpguppi(proc_domain, bfrdir, outdir, inputdir, rawfiles, hosts, slurm_s
     """Proc sequence for processing steps which use the Hashpipe-Redis Gateway.
        This script runs separately from the full automator.
     """
-    set_logger('DEBUG')
-    log.info('Starting blproc_manual')
     redis_server = redis.StrictRedis(decode_responses=True)
  
     # Parsing input:
@@ -213,8 +212,10 @@ def proc_hpguppi(proc_domain, bfrdir, outdir, inputdir, rawfiles, hosts, slurm_s
 def main(proc_type, proc_domain, bfrdir, outdir, inputdir, rawfiles, hosts, slurm_script, proc_timeout):
     """Run processing manually on local files based on processing type. 
     """
+    set_logger('DEBUG')
+    log.info('Starting blproc_manual')
     if(proc_type == 'slurm'):
-        proc_slurm(proc_domain, bfrdir, outdir, inputdir, rawfiles, hosts, slurm_script, proc_timeout)
+        proc_slurm(hosts, bfrdir, outdir, inputdir)
     elif(proc_type == 'hpguppi'):
         proc_hpguppi(proc_domain, bfrdir, outdir, inputdir, rawfiles, hosts, slurm_script, proc_timeout)
     else:
