@@ -32,11 +32,11 @@ class ProcHpguppi(object):
             log.info('Processing file: {}'.format(rawfile))
             self.redis_server.publish(group_chan, 'RAWFILE={}'.format(rawfile))
             # Wait for processing to start:
-            result = self.monitor_proc_status('START', proc_domain, hosts, self.PROC_STATUS_KEY, 30, group_chan)
+            result = self.monitor_proc_status('START', proc_domain, hosts, self.PROC_STATUS_KEY, 600, group_chan)
             if(result == 'timeout'):
                 log.error('Timed out, processing has not started')
             # Waiting for processing to finish:
-            result = self.monitor_proc_status('END', proc_domain, hosts, self.PROC_STATUS_KEY, 30, group_chan)
+            result = self.monitor_proc_status('END', proc_domain, hosts, self.PROC_STATUS_KEY, 600, group_chan)
             if(result == 'timeout'):
                 log.error('Timed out, still waiting for processing to finish')
             # Set procstat to IDLE:
@@ -76,18 +76,18 @@ class ProcHpguppi(object):
                proc_status = self.redis_server.hget(proc_status_hash, proc_key)
                if(proc_status == status):
                    # Check others:
-                   full_status = self.gather_proc_status(status, 3, 1, domain, proc_list, proc_key)
+                   full_status = self.gather_proc_status(status, 3, 1, domain, proc_list, proc_key, 3)
                    if(full_status == 'busy'):
                        log.info('full status = busy')
                    elif(full_status == 'done'):
-                       log.info('Upchanneliser/beamformer finished for all nodes')
+                       log.info('Upchanneliser/beamformer at {}'.format(status))
                        ps.unsubscribe(msg['channel'])
                        return 'success'
                if((time.time() - tstart) >= proc_timeout):
-                   log.error('Processing timeout of {} seconds exceeded'.format(proc_timeout))
+                   log.error('Timeout of {} seconds exceeded'.format(proc_timeout))
                    return 'timeout'
     
-    def gather_proc_status(self, status, retries, timeout, domain, proc_list, proc_key):
+    def gather_proc_status(self, status, retries, timeout, domain, proc_list, proc_key, stragglers):
         """Gather aggregated processing status from across hosts. 
     
         Args:
@@ -97,7 +97,9 @@ class ProcHpguppi(object):
            proc_key (str): Specific HKEY for status monitoring. 
            timeout (int): Time (in seconds) to wait between retries.  
            retries (int): Number of retries before aborting. 
-            
+           stragglers (int): Consider processing complete if at least (n - stragglers)            
+           processing nodes are done.
+
         Returns:
            'busy' if retries exhausted. 
            'done' if all processing nodes indicate the desired success state.
@@ -109,15 +111,17 @@ class ProcHpguppi(object):
                 proc_status = self.redis_server.hget(proc_status_hash, proc_key)
                 if(proc_status == status):
                     proc_count += 1
-            if(proc_count != len(proc_list)):
-                log.info('Gathered proc status: {}'.format(proc_status))
+            if(proc_count < len(proc_list) - 3):
                 if(i < retries - 1):
-                    log.info('Processing incomplete across hosts. Retrying in {}s.'.format(timeout))
+                    log.info('Incomplete agreement of PROCSTAT across hosts. Retrying in {}s.'.format(timeout))
                     time.sleep(timeout)
                 else:
                     log.info('Processing incomplete')
                     return 'busy'
             else:
+                if(proc_count < len(proc_list)):
+                   log.warning('{} straggler(s).'.format(len(proc_list) - proc_count))
+                log.info('Gathered proc status: {}'.format(proc_status))
                 return 'done'
 
 
