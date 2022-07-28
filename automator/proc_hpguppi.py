@@ -18,6 +18,9 @@ class ProcHpguppi(object):
         inputdir = '{}/Unknown/GUPPI'.format(datadir) #TODO: autodetect
         rawfiles = self.redis_server.smembers('bluse_raw_watch:{}'.format(hosts[0])) #TODO: autodetect for each
 
+        # Temporarily remove full file path:
+        rawfiles_only = [rawfile.split('/')[-1] for rawfile in rawfiles]
+
         # Set keys to prepare for processing:
         group_chan = '{}:{}///set'.format(proc_domain, subarray)
         self.redis_server.publish(group_chan, 'BFRDIR={}'.format(bfrdir))
@@ -25,7 +28,7 @@ class ProcHpguppi(object):
         self.redis_server.publish(group_chan, 'INPUTDIR={}'.format(inputdir))
 
         # Initiate and track processing by file:
-        for rawfile in rawfiles:
+        for rawfile in rawfiles_only:
             log.info('Processing file: {}'.format(rawfile))
             self.redis_server.publish(group_chan, 'RAWFILE={}'.format(rawfile))
             # Wait for processing to start:
@@ -37,7 +40,7 @@ class ProcHpguppi(object):
             if(result == 'timeout'):
                 log.error('Timed out, still waiting for processing to finish')
             # Set procstat to IDLE:
-            redis_server.publish(group_chan, 'PROCSTAT=IDLE')
+            self.redis_server.publish(group_chan, 'PROCSTAT=IDLE')
             # Uncomment to run slurm commands
             # outcome = slurm_cmd(proc_script)
             log.info('Would run slurm commands here.')
