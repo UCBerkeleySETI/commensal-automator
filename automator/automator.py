@@ -6,6 +6,18 @@ import subprocess
 
 from .logger import log
 from .subarray import Subarray
+from .proc_hpguppi import ProcHpguppi
+
+#Temporary hard coding:
+MAX_DRIFT = 10.0
+SNR = 10.0
+TEL_ID = 64
+NUM_BANDS = 16
+FFT_SIZE = 131072
+BFRDIR = '/home/obs/bfr5'
+OUTPUTDIR = '/scratch/test.20220728' 
+INPUTDIR = '/buf0ro/20220720/0009/Unknown/GUPPI'
+PROC_DOMAIN = 'blproc'
 
 class Automator(object):
     """The commensal automator. 
@@ -365,19 +377,95 @@ class Automator(object):
         """
         # Future work: add a timeout for the script.
         # Retrieve the list of hosts assigned to the current subarray:
-        host_key = 'coordinator:allocated_hosts:{}'.format(subarray_name)
+#        host_key = 'coordinator:allocated_hosts:{}'.format(subarray_name)
+        host_key = 'coordinator:free_hosts'
         host_list = self.redis_server.lrange(host_key, 
                                              0, 
                                              self.redis_server.llen(host_key))
         # Format for host name (rather than instance name):
         host_list =  [host.split('/')[0] for host in host_list]
-        host_list = ','.join(host_list)
-        slurm_cmd = ['sbatch', '-w', host_list, self.proc_script]
-        log.info('Running processing script: {}'.format(slurm_cmd))
+        #host_list_str = ','.join(host_list)
+
+        processing = ProcHpguppi()
+        processing.process(PROC_DOMAIN, host_list, subarray_name, BFRDIR, OUTPUTDIR)
+
+        # Release hosts:
+        # Get list of currently available hosts:
+        if(self.redis_server.exists('coordinator:free_hosts')):
+            free_hosts = self.redis_server.lrange('coordinator:free_hosts', 0,
+                self.redis_server.llen('coordinator:free_hosts'))
+            self.redis_server.delete('coordinator:free_hosts')
+        else:
+            free_hosts = []
+        # Append released hosts and write 
+        free_hosts = free_hosts + host_list
+        log.info(free_hosts)
+        self.redis_server.rpush('coordinator:free_hosts', *free_hosts)    
+        # Remove resources from current subarray 
+        self.redis_server.delete('coordinator:allocated_hosts:{}'.format(subarray_name))
+        log.info("Released {} hosts; {} hosts available".format(len(host_list),
+                len(free_hosts)))
+
+        #slurm_cmd = ['sbatch', '-w', host_list, self.proc_script]
+        
+        #log.info('Running processing (slurm seticore) for hosts: {}'.format(host_list))
+        #try:
+#            subprocess.Popen(slurm_cmd)
+        #     self.proc_slurm(host_list, BFRDIR, OUTPUTDIR, INPUTDIR)
+        #except:
+        #    log.error('Could not run script for {}'.format(subarray_name))
+
+    def slurm_cmd(self, host_list, proc_str):
+        """Run slurm processing script.
+
+        Args:
+            proc_script (str): Path to processing shell script. 
+ 
+        Returns:
+            'success' if slurm processing script finished executing. 
+            'failed' if the provided script could not be run. 
+        """
+        slurm_cmd = ['srun', '-w'] + host_list + proc_str
+        log.info('Running processing command: {}'.format(slurm_cmd))
         try:
-            subprocess.Popen(slurm_cmd)
-        except:
-            log.error('Could not run script for {}'.format(subarray_name))
+            subprocess.run(slurm_cmd)
+            return 'success'
+        except Exception as e:
+            log.error('Could not run command')
+            log.error(e)
+            return 'failed'
+
+    def proc_slurm(self, hosts, bfrdir, outputdir, inputdir):
+        """Processing for minimal BLUSE SETI survey.
+        For use with processing stages that do not use the Hashpipe-Redis Gateway.
+        """
+
+        # Parsing input:
+        if(hosts is None):
+            log.error('Please provide a list of hosts, or \'all\'')
+            sys.exit()
+        elif((len(hosts) == 1) & (hosts[0] == 'all')):
+            hosts = []
+            for i in range(0, 64):
+                hosts.append('blpn{}'.format(i))
+
+        proc_str = ['/home/lacker/seticore/build/seticore',
+                    '--input={}'.format(inputdir),
+                    '--output={}'.format(outputdir),
+                    '--max_drift={}'.format(MAX_DRIFT),
+                    '--snr={}'.format(SNR),
+                    '--recipe_dir={}'.format(bfrdir),
+                    '--num_bands={}'.format(NUM_BANDS),
+                    '--fft_size={}'.format(FFT_SIZE),
+                    '--telescope_id={}'.format(TEL_ID)]
+
+        # Run slurm command
+        outcome = self.slurm_cmd(hosts, proc_str)
+
+        # Final cleanup:
+        log.info('Any other final steps go here')
+
+
 
     def processing_complete(self, subarray_name):
         """Actions to be taken once processing is complete for the  current 
