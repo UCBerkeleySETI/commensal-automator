@@ -1,6 +1,7 @@
 import redis
 import time
 from .logger import log
+import os
 
 class ProcHpguppi(object):
 
@@ -15,11 +16,11 @@ class ProcHpguppi(object):
         """
         # Find list of files:
         datadir = self.redis_server.get('{}:datadir'.format(subarray))
-        inputdir = '{}/Unknown/GUPPI'.format(datadir) #TODO: autodetect
-        rawfiles = self.redis_server.smembers('bluse_raw_watch:{}'.format(hosts[0])) #TODO: autodetect for each
-
+        rawfiles = self.redis_server.smembers('bluse_raw_watch:{}'.format(hosts[0])) 
         # Temporarily remove full file path:
-        rawfiles_only = [rawfile.split('/')[-1] for rawfile in rawfiles]
+        rawfiles_only = [os.path.basename(rawfile) for rawfile in rawfiles]
+        inputdirs = [os.path.dirname(rawfile) for rawfile in rawfiles] 
+        inputdir = inputdirs[0]
 
         # Set keys to prepare for processing:
         group_chan = '{}:{}///set'.format(proc_domain, subarray)
