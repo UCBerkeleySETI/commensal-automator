@@ -377,15 +377,13 @@ class Automator(object):
         """
         # Future work: add a timeout for the script.
         # Retrieve the list of hosts assigned to the current subarray:
-#        host_key = 'coordinator:allocated_hosts:{}'.format(subarray_name)
-        host_key = 'coordinator:free_hosts'
-        host_list = self.redis_server.lrange(host_key, 
+        host_key = 'coordinator:allocated_hosts:{}'.format(subarray_name)
+        instance_list = self.redis_server.lrange(host_key, 
                                              0, 
                                              self.redis_server.llen(host_key))
         # Format for host name (rather than instance name):
-        host_list =  [host.split('/')[0] for host in host_list]
-        #host_list_str = ','.join(host_list)
-
+         
+        host_list =  [host.split('/')[0] for host in instance_list]
         processing = ProcHpguppi()
         processing.process(PROC_DOMAIN, host_list, subarray_name, BFRDIR, OUTPUTDIR)
 
@@ -398,12 +396,12 @@ class Automator(object):
         else:
             free_hosts = []
         # Append released hosts and write 
-        free_hosts = free_hosts + host_list
+        free_hosts = free_hosts + instance_list
         log.info(free_hosts)
         self.redis_server.rpush('coordinator:free_hosts', *free_hosts)    
         # Remove resources from current subarray 
         self.redis_server.delete('coordinator:allocated_hosts:{}'.format(subarray_name))
-        log.info("Released {} hosts; {} hosts available".format(len(host_list),
+        log.info("Released {} hosts; {} hosts available".format(len(instance_list),
                 len(free_hosts)))
 
         #slurm_cmd = ['sbatch', '-w', host_list, self.proc_script]
