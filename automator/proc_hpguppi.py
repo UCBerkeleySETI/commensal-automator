@@ -1,7 +1,10 @@
 import redis
 import time
-from .logger import log
 import os
+import subprocess
+
+from .logger import log
+
 
 class ProcHpguppi(object):
 
@@ -15,7 +18,7 @@ class ProcHpguppi(object):
 
         """
         # Find list of files:
-        datadir = self.redis_server.get('{}:datadir'.format(subarray))
+        datadir = self.redis_server.get('{}:current_sb_id'.format(subarray))
         rawfiles = self.redis_server.smembers('bluse_raw_watch:{}'.format(hosts[0])) 
         # Temporarily remove full file path:
         rawfiles_only = [os.path.basename(rawfile) for rawfile in rawfiles]
@@ -25,8 +28,14 @@ class ProcHpguppi(object):
         # Set keys to prepare for processing:
         group_chan = '{}:{}///set'.format(proc_domain, subarray)
         self.redis_server.publish(group_chan, 'BFRDIR={}'.format(bfrdir))
-        self.redis_server.publish(group_chan, 'OUTDIR={}'.format(outdir))
+        # Generate new output directory:
+        outputdir = '/scratch/data/{}'.format(datadir)
+        for host in hosts:
+            cmd = ['ssh', host, 'mkdir', '-p', '-m', '1777', outputdir]
+            subprocess.run(cmd)
+        self.redis_server.publish(group_chan, 'OUTDIR={}'.format(outputdir))
         self.redis_server.publish(group_chan, 'INPUTDIR={}'.format(inputdir))
+        log.info('Processing: \ninputdir: {}\noutputdir: {}'.format(inputdir, outputdir))
 
         # Initiate and track processing by file:
         for rawfile in rawfiles_only:

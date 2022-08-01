@@ -11,8 +11,8 @@ from .logger import log, set_logger
 """
 
 PROC_STATUS_KEY = 'PROCSTAT'
-MAX_DRIFT = 10
-SNR = 8
+MAX_DRIFT = 10.0
+SNR = 10.0
 TEL_ID = 64
 NUM_BANDS = 16
 FFT_SIZE = 131072
