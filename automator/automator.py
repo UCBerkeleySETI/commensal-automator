@@ -531,10 +531,8 @@ class Automator(object):
         dwell_values = []
         for host in host_list:
             host_key = '{}://{}/status'.format(self.hpgdomain, host)
-            log.info(host_key)
             host_status = self.redis_server.hgetall(host_key)
-            log.info(host_status)
-            if(len(host_status > 0)):
+            if(len(host_status) > 0):
                 if('DWELL' in host_status):
                     dwell_values.append(float(host_status['DWELL']))
                 else:
