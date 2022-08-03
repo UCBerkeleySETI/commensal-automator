@@ -7,6 +7,7 @@ import subprocess
 from .logger import log
 from .subarray import Subarray
 from .proc_hpguppi import ProcHpguppi
+from .proc_seticore import ProcSeticore
 
 #Temporary hard coding:
 MAX_DRIFT = 10.0
@@ -384,8 +385,10 @@ class Automator(object):
         # Format for host name (rather than instance name):
          
         host_list =  [host.split('/')[0] for host in instance_list]
-        processing = ProcHpguppi()
-        processing.process(PROC_DOMAIN, host_list, subarray_name, BFRDIR, OUTPUTDIR)
+        #processing = ProcHpguppi()
+        #processing.process(PROC_DOMAIN, host_list, subarray_name, BFRDIR, OUTPUTDIR)
+        proc = ProcSeticore()
+        proc.process('/home/lacker/bin/seticore-0.1.7', host_list, BFRDIR, subarray_name)
 
         # Release hosts:
         # Get list of currently available hosts:
