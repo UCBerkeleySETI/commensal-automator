@@ -40,8 +40,8 @@ class ProcSeticore(object):
 
         # Create output directories:
         log.info('Creating output directories...')
-        outputdir = '/scratch/data/{}/seticore_beamformer'.format(datadir)
-        h5dir = '/scratch/data/{}/seticore_search'.format(datadir)
+        outputdir = '/scratch/data/{}/seticore_search'.format(datadir)
+        h5dir = '/scratch/data/{}/seticore_beamformer'.format(datadir)
         for host in hosts:
             cmd = ['ssh', host, 'mkdir', '-p', '-m', '1777', outputdir]
             subprocess.run(cmd)
@@ -58,7 +58,7 @@ class ProcSeticore(object):
                          '--telescope_id', '64',
                          '--recipe_dir', bfrdir]
         
-        cmd = ['srun', '-w'] + hosts + [seticore] + seticore_args
+        cmd = ['srun', '-w'] + [' '.join(hosts)] + [seticore] + seticore_args
         
         log.info('Running seticore: {}'.format(cmd))
         
