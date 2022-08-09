@@ -388,7 +388,7 @@ class Automator(object):
         #processing = ProcHpguppi()
         #processing.process(PROC_DOMAIN, host_list, subarray_name, BFRDIR, OUTPUTDIR)
         proc = ProcSeticore()
-        proc.process('/home/lacker/bin/seticore-0.1.7', host_list, BFRDIR, subarray_name)
+        proc.process('/home/lacker/bin/seticore-0.1.8', host_list, BFRDIR, subarray_name)
 
         # Release hosts:
         # Get list of currently available hosts:
@@ -406,15 +406,6 @@ class Automator(object):
         self.redis_server.delete('coordinator:allocated_hosts:{}'.format(subarray_name))
         log.info("Released {} hosts; {} hosts available".format(len(instance_list),
                 len(free_hosts)))
-
-        #slurm_cmd = ['sbatch', '-w', host_list, self.proc_script]
-        
-        #log.info('Running processing (slurm seticore) for hosts: {}'.format(host_list))
-        #try:
-#            subprocess.Popen(slurm_cmd)
-        #     self.proc_slurm(host_list, BFRDIR, OUTPUTDIR, INPUTDIR)
-        #except:
-        #    log.error('Could not run script for {}'.format(subarray_name))
 
     def slurm_cmd(self, host_list, proc_str):
         """Run slurm processing script.
