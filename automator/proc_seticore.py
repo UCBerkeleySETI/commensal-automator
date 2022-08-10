@@ -5,18 +5,34 @@ import subprocess
 
 from .logger import log
 
-
 class ProcSeticore(object):
+    """This class controls data processing using seticore [1], which performs 
+    upchannelisation, beamforming and narrowband doppler drift searching 
+    all-in-one.
+
+    It is designed to be imported as a processing module by the automator.
+
+    [1] https://github.com/lacker/seticore
+    """   
 
     def __init__(self):
-        
         self.redis_server = redis.StrictRedis(decode_responses=True)
         self.PROC_STATUS_KEY = 'PROCSTAT'
 
     def process(self, seticore, hosts, bfrdir, arrayid):
-        """Process the incoming data via hpguppi proc
-        """
+        """Processes the incoming data using seticore.
 
+        Args:
+            seticore (str): Location of current version of seticore. 
+            hosts (List[str]): List of processing node host names assoctated
+            with the current subarray.
+            bfrdir (str): Directory containing the beamformer recipe files 
+            associated with the data in the NVMe modules. 
+            arrayid (str): Name of the current subarray. 
+
+        Returns:
+            None
+        """
         # Get mode and determine FFT size:
         fenchan = self.redis_server.get('{}:n_channels'.format(arrayid))
         # Change FFT size to achieve roughly 1Hz channel bandwidth
@@ -33,7 +49,6 @@ class ProcSeticore(object):
         # Determine input directory:
         rawfiles = self.redis_server.smembers('bluse_raw_watch:{}'.format(hosts[0])) 
         inputdirs = [os.path.dirname(rawfile) for rawfile in rawfiles]
-        # Temporarily remove full file path:
 
         # SB ID:
         datadir = self.redis_server.get('{}:current_sb_id'.format(arrayid))
@@ -49,7 +64,6 @@ class ProcSeticore(object):
             subprocess.run(cmd)
 
         # Build slurm command:
-
         seticore_args = ['--input', inputdirs[0], 
                          '--output', outputdir, 
                          '--h5_dir', h5dir, 
@@ -59,9 +73,5 @@ class ProcSeticore(object):
                          '--recipe_dir', bfrdir]
         
         cmd = ['srun', '-w'] + [' '.join(hosts)] + [seticore] + seticore_args
-        
         log.info('Running seticore: {}'.format(cmd))
-        
         subprocess.run(cmd)
-
-
