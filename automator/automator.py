@@ -389,24 +389,8 @@ class Automator(object):
         #processing = ProcHpguppi()
         #processing.process(PROC_DOMAIN, host_list, subarray_name, BFRDIR, OUTPUTDIR)
         proc = ProcSeticore()
-        proc.process('/home/lacker/bin/seticore-0.1.9', host_list, BFRDIR, subarray_name)
-
-        # Release hosts:
-        # Get list of currently available hosts:
-        if(self.redis_server.exists('coordinator:free_hosts')):
-            free_hosts = self.redis_server.lrange('coordinator:free_hosts', 0,
-                self.redis_server.llen('coordinator:free_hosts'))
-            self.redis_server.delete('coordinator:free_hosts')
-        else:
-            free_hosts = []
-        # Append released hosts and write 
-        free_hosts = free_hosts + instance_list
-        log.info(free_hosts)
-        self.redis_server.rpush('coordinator:free_hosts', *free_hosts)    
-        # Remove resources from current subarray 
-        self.redis_server.delete('coordinator:allocated_hosts:{}'.format(subarray_name))
-        log.info("Released {} hosts; {} hosts available".format(len(instance_list),
-                len(free_hosts)))
+        proc.process('/home/lacker/bin/seticore-0.1.9', host_list, BFRDIR, subarray_name)        
+        self.change_state('processing-complete')(subarray_name)
 
     def slurm_cmd(self, host_list, proc_str):
         """Run slurm processing script.
@@ -476,6 +460,38 @@ class Automator(object):
       
             None
         """
+        host_key = 'coordinator:allocated_hosts:{}'.format(subarray_name)
+        instance_list = self.redis_server.lrange(host_key, 
+                                             0, 
+                                             self.redis_server.llen(host_key))
+
+        # Empty the NVMe modules
+        # Format for host name (rather than instance name):
+        hosts =  [host.split('/')[0] for host in instance_list]
+        try:
+            cmd = ['srun', '-w', ' '.join(hosts), 'bash', '-c', 'rm -rf /buf0/*']
+            log.info(cmd)
+            subprocess.run(cmd)
+        except Exception as e:
+            log.error('Could not empty all NVMe modules')
+            print(e)
+
+        # Release hosts:
+        # Get list of currently available hosts:
+        if(self.redis_server.exists('coordinator:free_hosts')):
+            free_hosts = self.redis_server.lrange('coordinator:free_hosts', 0,
+                self.redis_server.llen('coordinator:free_hosts'))
+            self.redis_server.delete('coordinator:free_hosts')
+        else:
+            free_hosts = []
+        # Append released hosts and write 
+        free_hosts = free_hosts + instance_list
+        self.redis_server.rpush('coordinator:free_hosts', *free_hosts)    
+        # Remove resources from current subarray 
+        self.redis_server.delete('coordinator:allocated_hosts:{}'.format(subarray_name))
+        log.info("Released {} hosts; {} hosts available".format(len(instance_list),
+                len(free_hosts)))
+
         dwell = self.active_subarrays[subarray_name].dwell
         new_nshot = np.floor(self.buffer_length/dwell)
         # Reset nshot by publishing to the appropriate channel 
