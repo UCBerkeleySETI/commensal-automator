@@ -309,6 +309,7 @@ class Automator(object):
             # start a timer for `DWELL` + margin seconds. 
             duration = self.active_subarrays[subarray_name].dwell + self.margin
             # The state to transition to after tracking is processing. 
+            log.info('Starting tracking timer')
             self.active_subarrays[subarray_name].tracking_timer = threading.Timer(duration, 
                 lambda:self.timeout('tracking', 'processing', subarray_name))
             self.active_subarrays[subarray_name].tracking_timer.start()
@@ -388,7 +389,7 @@ class Automator(object):
         #processing = ProcHpguppi()
         #processing.process(PROC_DOMAIN, host_list, subarray_name, BFRDIR, OUTPUTDIR)
         proc = ProcSeticore()
-        proc.process('/home/lacker/bin/seticore-0.1.8', host_list, BFRDIR, subarray_name)
+        proc.process('/home/lacker/bin/seticore-0.1.9', host_list, BFRDIR, subarray_name)
 
         # Release hosts:
         # Get list of currently available hosts:
