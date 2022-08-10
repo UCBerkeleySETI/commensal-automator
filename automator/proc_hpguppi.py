@@ -5,8 +5,12 @@ import subprocess
 
 from .logger import log
 
-
 class ProcHpguppi(object):
+    """This class controls processing using hpguppi_proc [1], which performs
+    upchannelisation and beamforming on recorded raw data. 
+
+    [1] https://github.com/UCBerkeleySETI/hpguppi_proc/
+    """
 
     def __init__(self):
         
@@ -14,8 +18,20 @@ class ProcHpguppi(object):
         self.PROC_STATUS_KEY = 'PROCSTAT'
 
     def process(self, proc_domain, hosts, subarray, bfrdir, outdir):
-        """Process the incoming data via hpguppi proc
+        """Processes the incoming data via hpguppi proc.
 
+        Args:
+            proc_domain (str): Processing group domain name.
+            hosts (List[str]): List of host names associated with the current
+            subarray. 
+            subarray (str): Name of the current subarray. 
+            bfrdir (str): Directory containing the beamformer recipe files 
+            associated with the recorded raw data.
+            outdir (str): File path to output directory for upchanneliser-
+            beamformer data products. 
+        
+        Returns:
+            None
         """
         # Find list of files:
         datadir = self.redis_server.get('{}:current_sb_id'.format(subarray))
@@ -56,7 +72,6 @@ class ProcHpguppi(object):
             log.info('Would run slurm commands here.')
         log.info('Processing complete. Leaving gateway groups.')
         self.redis_server.publish(group_chan, 'leave={}'.format(subarray))
-
 
     def monitor_proc_status(self, status, domain, proc_list, proc_key, proc_timeout, group_chan):
         """For processes which communicate via the Hashpipe-Redis Gateway. 
