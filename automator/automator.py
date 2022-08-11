@@ -10,14 +10,7 @@ from .proc_hpguppi import ProcHpguppi
 from .proc_seticore import ProcSeticore
 
 #Temporary hard coding:
-MAX_DRIFT = 10.0
-SNR = 10.0
-TEL_ID = 64
-NUM_BANDS = 16
-FFT_SIZE = 131072
 BFRDIR = '/home/obs/bfr5'
-OUTPUTDIR = '/scratch/test.20220728' 
-INPUTDIR = '/buf0ro/20220720/0009/Unknown/GUPPI'
 PROC_DOMAIN = 'blproc'
 
 class Automator(object):
@@ -384,65 +377,12 @@ class Automator(object):
                                              0, 
                                              self.redis_server.llen(host_key))
         # Format for host name (rather than instance name):
-         
         host_list =  [host.split('/')[0] for host in instance_list]
         #processing = ProcHpguppi()
         #processing.process(PROC_DOMAIN, host_list, subarray_name, BFRDIR, OUTPUTDIR)
         proc = ProcSeticore()
         proc.process('/home/lacker/bin/seticore-0.1.9', host_list, BFRDIR, subarray_name)        
         self.change_state('processing-complete')(subarray_name)
-
-    def slurm_cmd(self, host_list, proc_str):
-        """Run slurm processing script.
-
-        Args:
-            proc_script (str): Path to processing shell script. 
- 
-        Returns:
-            'success' if slurm processing script finished executing. 
-            'failed' if the provided script could not be run. 
-        """
-        slurm_cmd = ['srun', '-w'] + host_list + proc_str
-        log.info('Running processing command: {}'.format(slurm_cmd))
-        try:
-            subprocess.run(slurm_cmd)
-            return 'success'
-        except Exception as e:
-            log.error('Could not run command')
-            log.error(e)
-            return 'failed'
-
-    def proc_slurm(self, hosts, bfrdir, outputdir, inputdir):
-        """Processing for minimal BLUSE SETI survey.
-        For use with processing stages that do not use the Hashpipe-Redis Gateway.
-        """
-
-        # Parsing input:
-        if(hosts is None):
-            log.error('Please provide a list of hosts, or \'all\'')
-            sys.exit()
-        elif((len(hosts) == 1) & (hosts[0] == 'all')):
-            hosts = []
-            for i in range(0, 64):
-                hosts.append('blpn{}'.format(i))
-
-        proc_str = ['/home/lacker/seticore/build/seticore',
-                    '--input={}'.format(inputdir),
-                    '--output={}'.format(outputdir),
-                    '--max_drift={}'.format(MAX_DRIFT),
-                    '--snr={}'.format(SNR),
-                    '--recipe_dir={}'.format(bfrdir),
-                    '--num_bands={}'.format(NUM_BANDS),
-                    '--fft_size={}'.format(FFT_SIZE),
-                    '--telescope_id={}'.format(TEL_ID)]
-
-        # Run slurm command
-        outcome = self.slurm_cmd(hosts, proc_str)
-
-        # Final cleanup:
-        log.info('Any other final steps go here')
-
-
 
     def processing_complete(self, subarray_name):
         """Actions to be taken once processing is complete for the  current 
