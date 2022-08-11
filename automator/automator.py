@@ -323,10 +323,8 @@ class Automator(object):
         """
         log.info('{} deconfigured. Proceeding'
                  ' to processing.'.format(subarray_name))
-        log.info('Ordinarily, `nshot` would now be set to 0.')
-        log.info('Leaving `nshot` unaffected for diagnostic purposes.')
-        #nshot_msg = self.nshot_msg.format(subarray_name, 0)
-        #self.redis_server.publish(self.nshot_chan, nshot_msg) 
+        nshot_msg = self.nshot_msg.format(subarray_name, 0)
+        self.redis_server.publish(self.nshot_chan, nshot_msg) 
         self.change_state('processing')(subarray_name)
 
     def not_tracking(self, subarray_name):
