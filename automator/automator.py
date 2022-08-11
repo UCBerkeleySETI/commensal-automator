@@ -1,7 +1,7 @@
 import redis
 from datetime import datetime
 import threading
-import numpy
+import numpy as np
 import subprocess
 
 from .logger import log
