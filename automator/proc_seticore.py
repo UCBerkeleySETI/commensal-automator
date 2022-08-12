@@ -34,9 +34,9 @@ class ProcSeticore(object):
             None
         """
         # Determine input directory:
-        rawfiles = self.redis_server.smembers('bluse_raw_watch:{}'.format(hosts[0])) 
+        rawfiles = self.redis_server.smembers('bluse_raw_watch:{}'.format(hosts[1]))
         inputdirs = [os.path.dirname(rawfile) for rawfile in rawfiles]
-        if(len(inputdirs) >= 0):
+        if(len(inputdirs) > 0):
             # Get mode and determine FFT size:
             fenchan = self.redis_server.get('{}:n_channels'.format(arrayid))
             # Change FFT size to achieve roughly 1Hz channel bandwidth
@@ -71,6 +71,8 @@ class ProcSeticore(object):
             cmd = ['srun', '-w'] + [' '.join(hosts)] + [seticore] + seticore_args
             log.info('Running seticore: {}'.format(cmd))
             subprocess.run(cmd)
+            return True
         else:
             log.info('No data to process')
+            return False
             

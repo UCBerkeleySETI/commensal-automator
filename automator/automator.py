@@ -379,8 +379,11 @@ class Automator(object):
         #processing = ProcHpguppi()
         #processing.process(PROC_DOMAIN, host_list, subarray_name, BFRDIR, OUTPUTDIR)
         proc = ProcSeticore()
-        proc.process('/home/lacker/bin/seticore-0.1.9', host_list, BFRDIR, subarray_name)        
-        self.change_state('processing-complete')(subarray_name)
+        result = proc.process('/home/lacker/bin/seticore-0.1.9', host_list, BFRDIR, subarray_name)        
+        if(result):
+            self.change_state('processing-complete')(subarray_name)
+        else:
+            log.error('Processing failed - not proceeding. Human intervention required.')
 
     def processing_complete(self, subarray_name):
         """Actions to be taken once processing is complete for the  current 
