@@ -430,8 +430,9 @@ class Automator(object):
         log.info("Released {} hosts; {} hosts available".format(len(instance_list),
                 len(free_hosts)))
 
-        dwell = self.active_subarrays[subarray_name].dwell
-        new_nshot = np.floor(self.buffer_length/dwell)
+        #dwell = self.active_subarrays[subarray_name].dwell
+        #new_nshot = np.floor(self.buffer_length/dwell)
+        new_nshot = 1
         # Reset nshot by publishing to the appropriate channel 
         nshot_msg = self.nshot_msg.format(subarray_name, new_nshot)
         self.redis_server.publish(self.nshot_chan, nshot_msg)        
