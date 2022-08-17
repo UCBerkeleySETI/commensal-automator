@@ -389,9 +389,6 @@ class Automator(object):
         """Actions to be taken once processing is complete for the  current 
         subarray. 
 
-        It is assumed that as part of the processing, the NVMe buffers have 
-        been emptied. 
-
         Args:
            
             subarray_name (str): The name of the subarray for which processing
