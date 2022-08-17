@@ -34,9 +34,16 @@ class ProcSeticore(object):
             None
         """
         # Determine input directory:
-        rawfiles = self.redis_server.smembers('bluse_raw_watch:{}'.format(hosts[1]))
-        inputdirs = [os.path.dirname(rawfile) for rawfile in rawfiles]
-        if(len(inputdirs) > 0):
+        # Check for set of files from each node in case one of them
+        # failed to record data. 
+        for host in hosts:
+            rawfiles = self.redis_server.smembers('bluse_raw_watch:{}'.format(host))
+            if(len(rawfiles) > 0):
+                break
+        
+        if(len(rawfiles) > 0):
+            # Take one of the filepaths from which to determine the input directory  
+            inputdirs = os.path.dirname(rawfiles.pop())
             # Get mode and determine FFT size:
             fenchan = self.redis_server.get('{}:n_channels'.format(arrayid))
             # Change FFT size to achieve roughly 1Hz channel bandwidth
