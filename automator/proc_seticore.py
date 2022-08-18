@@ -35,7 +35,8 @@ class ProcSeticore(object):
         """
         # Determine input directory:
         # Check for set of files from each node in case one of them
-        # failed to record data. 
+        # failed to record data.
+        rawfiles = set() 
         for host in hosts:
             rawfiles = self.redis_server.smembers('bluse_raw_watch:{}'.format(host))
             if(len(rawfiles) > 0):
