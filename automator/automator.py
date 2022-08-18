@@ -376,14 +376,15 @@ class Automator(object):
                                              self.redis_server.llen(host_key))
         # Format for host name (rather than instance name):
         host_list =  [host.split('/')[0] for host in instance_list]
-        #processing = ProcHpguppi()
-        #processing.process(PROC_DOMAIN, host_list, subarray_name, BFRDIR, OUTPUTDIR)
         proc = ProcSeticore()
-        result = proc.process('/home/lacker/bin/seticore-0.1.9', host_list, BFRDIR, subarray_name)        
-        if(result):
+        result_seticore = proc.process('/home/lacker/bin/seticore-0.1.9', host_list, BFRDIR, subarray_name)        
+        proc_hpguppi = ProcHpguppi()
+        result_hpguppi = proc_hpguppi.process(PROC_DOMAIN, host_list, subarray_name, BFRDIR)
+        if(result_seticore & result_hpguppi):
             self.change_state('processing-complete')(subarray_name)
         else:
             log.error('Processing failed - not proceeding. Human intervention required.')
+            log.error('seticore: {}, hpguppi: {}'.format(result_seticore, result_hpguppi))
 
     def processing_complete(self, subarray_name):
         """Actions to be taken once processing is complete for the  current 

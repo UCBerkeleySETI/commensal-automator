@@ -17,7 +17,7 @@ class ProcHpguppi(object):
         self.redis_server = redis.StrictRedis(decode_responses=True)
         self.PROC_STATUS_KEY = 'PROCSTAT'
 
-    def process(self, proc_domain, hosts, subarray, bfrdir, outdir):
+    def process(self, proc_domain, hosts, subarray, bfrdir):
         """Processes the incoming data via hpguppi proc.
 
         Args:
@@ -27,8 +27,6 @@ class ProcHpguppi(object):
             subarray (str): Name of the current subarray. 
             bfrdir (str): Directory containing the beamformer recipe files 
             associated with the recorded raw data.
-            outdir (str): File path to output directory for upchanneliser-
-            beamformer data products. 
         
         Returns:
             None
@@ -36,42 +34,55 @@ class ProcHpguppi(object):
         # Find list of files:
         datadir = self.redis_server.get('{}:current_sb_id'.format(subarray))
         rawfiles = self.redis_server.smembers('bluse_raw_watch:{}'.format(hosts[0])) 
-        # Temporarily remove full file path:
-        rawfiles_only = [os.path.basename(rawfile) for rawfile in rawfiles]
-        inputdirs = [os.path.dirname(rawfile) for rawfile in rawfiles] 
-        inputdir = inputdirs[0]
 
-        # Set keys to prepare for processing:
-        group_chan = '{}:{}///set'.format(proc_domain, subarray)
-        self.redis_server.publish(group_chan, 'BFRDIR={}'.format(bfrdir))
-        # Generate new output directory:
-        outputdir = '/scratch/data/{}'.format(datadir)
+        # Determine input directory:
+        # Check for set of files from each node in case one of them
+        # failed to record data.
+        rawfiles = set() 
         for host in hosts:
-            cmd = ['ssh', host, 'mkdir', '-p', '-m', '1777', outputdir]
-            subprocess.run(cmd)
-        self.redis_server.publish(group_chan, 'OUTDIR={}'.format(outputdir))
-        self.redis_server.publish(group_chan, 'INPUTDIR={}'.format(inputdir))
-        log.info('Processing: \ninputdir: {}\noutputdir: {}'.format(inputdir, outputdir))
+            rawfiles = self.redis_server.smembers('bluse_raw_watch:{}'.format(host))
+            if(len(rawfiles) > 0):
+                break
 
-        # Initiate and track processing by file:
-        for rawfile in rawfiles_only:
-            log.info('Processing file: {}'.format(rawfile))
-            self.redis_server.publish(group_chan, 'RAWFILE={}'.format(rawfile))
-            # Wait for processing to start:
-            result = self.monitor_proc_status('START', proc_domain, hosts, self.PROC_STATUS_KEY, 600, group_chan)
-            if(result == 'timeout'):
-                log.error('Timed out, processing has not started')
-            # Waiting for processing to finish:
-            result = self.monitor_proc_status('END', proc_domain, hosts, self.PROC_STATUS_KEY, 600, group_chan)
-            if(result == 'timeout'):
-                log.error('Timed out, still waiting for processing to finish')
-            # Set procstat to IDLE:
-            self.redis_server.publish(group_chan, 'PROCSTAT=IDLE')
-            # Uncomment to run slurm commands
-            # outcome = slurm_cmd(proc_script)
-            log.info('Would run slurm commands here.')
-        log.info('Processing complete. Leaving gateway groups.')
-        self.redis_server.publish(group_chan, 'leave={}'.format(subarray))
+        if(len(rawfiles) > 0):
+
+            # Temporarily remove full file path:
+            rawfiles_only = [os.path.basename(rawfile) for rawfile in rawfiles]
+            inputdirs = [os.path.dirname(rawfile) for rawfile in rawfiles] 
+            inputdir = inputdirs[0]
+
+            # Create output directory:
+            log.info('Creating output directory...')
+            fildir = '/scratch/data/{}/hpguppi_beamformer'.format(datadir)
+            for host in hosts:
+                cmd = ['ssh', host, 'mkdir', '-p', '-m', '1777', fildir]
+                subprocess.run(cmd)
+
+            # Set keys to prepare for processing:
+            group_chan = '{}:{}///set'.format(proc_domain, subarray)
+            self.redis_server.publish(group_chan, 'BFRDIR={}'.format(bfrdir))
+            self.redis_server.publish(group_chan, 'OUTDIR={}'.format(fildir))
+            self.redis_server.publish(group_chan, 'INPUTDIR={}'.format(inputdir))
+            log.info('Processing: \ninputdir: {}\noutputdir: {}'.format(inputdir, fildir))
+
+            # Initiate and track processing by file:
+            for rawfile in rawfiles_only:
+                log.info('Processing file: {}'.format(rawfile))
+                self.redis_server.publish(group_chan, 'RAWFILE={}'.format(rawfile))
+                # Wait for processing to start:
+                result = self.monitor_proc_status('START', proc_domain, hosts, self.PROC_STATUS_KEY, 1200, group_chan)
+                if(result == 'timeout'):
+                    log.error('Timed out, processing has not started')
+                # Waiting for processing to finish:
+                result = self.monitor_proc_status('END', proc_domain, hosts, self.PROC_STATUS_KEY, 1200, group_chan)
+                if(result == 'timeout'):
+                    log.error('Timed out, still waiting for processing to finish')
+                # Set procstat to IDLE:
+                self.redis_server.publish(group_chan, 'PROCSTAT=IDLE')
+            return True
+        else:
+            log.info('No data to process')
+            return False
 
     def monitor_proc_status(self, status, domain, proc_list, proc_key, proc_timeout, group_chan):
         """For processes which communicate via the Hashpipe-Redis Gateway. 
