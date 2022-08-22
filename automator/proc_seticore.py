@@ -70,7 +70,7 @@ class ProcSeticore(object):
                 cmd = ['ssh', host, 'mkdir', '-p', '-m', '1777', h5dir]
                 subprocess.run(cmd)
             # Build slurm command:
-            seticore_args = ['--input', inputdirs[0], 
+            seticore_args = ['--input', inputdirs, 
                              '--output', outputdir, 
                              '--h5_dir', h5dir, 
                              '--num_bands', '16',
