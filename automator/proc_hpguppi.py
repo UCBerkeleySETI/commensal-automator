@@ -33,7 +33,6 @@ class ProcHpguppi(object):
         """
         # Find list of files:
         datadir = self.redis_server.get('{}:current_sb_id'.format(subarray))
-        rawfiles = self.redis_server.smembers('bluse_raw_watch:{}'.format(hosts[0])) 
 
         # Determine input directory:
         # Check for set of files from each node in case one of them
