@@ -60,9 +60,10 @@ class ProcSeticore(object):
             # SB ID:
             datadir = self.redis_server.get('{}:current_sb_id'.format(arrayid))
             # Create output directories:
-            log.info('Creating output directories...')
             outputdir = '/scratch/data/{}/seticore_search'.format(datadir)
             h5dir = '/scratch/data/{}/seticore_beamformer'.format(datadir)
+            log.info('Creating output directories...') 
+            log.info('\nsearch: {}\nbeamformer: {}'.format(outputdir, h5dir))
             for host in hosts:
                 cmd = ['ssh', host, 'mkdir', '-p', '-m', '1777', outputdir]
                 subprocess.run(cmd)
