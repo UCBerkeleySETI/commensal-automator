@@ -377,7 +377,7 @@ class Automator(object):
         # Format for host name (rather than instance name):
         host_list =  [host.split('/')[0] for host in instance_list]
         proc = ProcSeticore()
-        result_seticore = proc.process('/home/lacker/bin/seticore-0.1.9', host_list, BFRDIR, subarray_name)        
+        result_seticore = proc.process('/home/lacker/bin/seticore', host_list, BFRDIR, subarray_name)        
         proc_hpguppi = ProcHpguppi()
         result_hpguppi = proc_hpguppi.process(PROC_DOMAIN, host_list, subarray_name, BFRDIR)
         if(result_seticore & result_hpguppi):
