@@ -417,7 +417,7 @@ class Automator(object):
 
         # Release hosts:
         proc_group = '{}:{}///set'.format(PROC_DOMAIN, subarray_name)
-        redis_server.publish(proc_group, 'leave={}'.format(subarray_name))
+        self.redis_server.publish(proc_group, 'leave={}'.format(subarray_name))
         # Get list of currently available hosts:
         if(self.redis_server.exists('coordinator:free_hosts')):
             free_hosts = self.redis_server.lrange('coordinator:free_hosts', 0,
