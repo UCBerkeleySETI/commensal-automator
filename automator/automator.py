@@ -408,8 +408,13 @@ class Automator(object):
         # Format for host name (rather than instance name):
         hosts =  [host.split('/')[0] for host in instance_list]
         try:
-            cmd = ['srun', '-w', ' '.join(hosts), 'bash', '-c', '/home/obs/bin/cleanmybuf0.sh']
-            log.info(cmd)
+            cmd = ['srun', 
+                   '-w', 
+                   ' '.join(hosts), 
+                   'bash', 
+                   '-c', 
+                   '/home/obs/bin/cleanmybuf0.sh --force']
+            log.info(cmd)      
             subprocess.run(cmd)
         except Exception as e:
             log.error('Could not empty all NVMe modules')
