@@ -383,8 +383,9 @@ class Automator(object):
         if(result_seticore & result_hpguppi):
             self.change_state('processing-complete')(subarray_name)
         else:
-            log.error('Processing failed - not proceeding. Human intervention required.')
             log.error('seticore: {}, hpguppi: {}'.format(result_seticore, result_hpguppi))
+            log.error('Processing failed. Proceeding to next pointing.')
+            self.change_state('processing-complete')(subarray_name)
 
     def processing_complete(self, subarray_name):
         """Actions to be taken once processing is complete for the  current 
