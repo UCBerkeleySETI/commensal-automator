@@ -443,6 +443,7 @@ class Automator(object):
         new_nshot = 1
         # Reset nshot by publishing to the appropriate channel 
         nshot_msg = self.nshot_msg.format(subarray_name, new_nshot)
+        log.info('Resetting nshot after processing: {} {}'.format(self.nshot_chan, nshot_msg))
         self.redis_server.publish(self.nshot_chan, nshot_msg)        
 
     def timeout(self, next_state, subarray_name):
