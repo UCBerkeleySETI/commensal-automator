@@ -12,6 +12,7 @@ from .proc_seticore import ProcSeticore
 #Temporary hard coding:
 BFRDIR = '/home/obs/bfr5'
 PROC_DOMAIN = 'blproc'
+ACQ_DOMAIN = 'bluse'
 
 class Automator(object):
     """The commensal automator. 
@@ -430,8 +431,10 @@ class Automator(object):
 
         # Release hosts if current subarray has already been deconfigured:
         if(self.active_subarrays[subarray_name].state == 'deconfigure'): 
-            proc_group = '{}:{}///set'.format(PROC_DOMAIN, subarray_name)
+            proc_group = '{}:{}///gateway'.format(PROC_DOMAIN, subarray_name)
             self.redis_server.publish(proc_group, 'leave={}'.format(subarray_name))
+            acq_group = '{}:{}///gateway'.format(ACQ_DOMAIN, subarray_name)
+            self.redis_server.publish(acq_group, 'leave={}'.format(subarray_name))
             # Get list of currently available hosts:
             if(self.redis_server.exists('coordinator:free_hosts')):
                 free_hosts = self.redis_server.lrange('coordinator:free_hosts', 0,
