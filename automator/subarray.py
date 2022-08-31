@@ -34,5 +34,6 @@ class Subarray(object):
           self.start_ts = start_ts
           self.margin = margin
           self.allocated_hosts = hosts
+          self.processing = False
           log.info("New subarray object for {}".format(name))
 

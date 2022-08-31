@@ -295,6 +295,7 @@ class Automator(object):
             # `nshot` is retrieved in the format: `nshot:<n>`
             nshot = self.redis_server.get(nshot_key).split(':')[1] 
             self.active_subarrays[subarray_name].nshot = nshot  
+            self.active_subarrays[subarray_name].state = 'tracking'  
         if(self.active_subarrays[subarray_name].nshot == 0):
             start_ts = datetime.utcnow()
             self.active_subarrays[subarray_name].start_ts = start_ts
@@ -321,11 +322,15 @@ class Automator(object):
  
             None
         """
-        log.info('{} deconfigured. Proceeding'
+        self.active_subarrays[subarray_name].state = 'deconfigure'  
+        if(self.active_subarrays[subarray_name].processing):
+            log.info('Processing in progress...')
+        else:
+            log.info('{} deconfigured. Proceeding'
                  ' to processing.'.format(subarray_name))
-        nshot_msg = self.nshot_msg.format(subarray_name, 0)
-        self.redis_server.publish(self.nshot_chan, nshot_msg) 
-        self.change_state('processing')(subarray_name)
+            nshot_msg = self.nshot_msg.format(subarray_name, 0)
+            self.redis_server.publish(self.nshot_chan, nshot_msg) 
+            self.change_state('processing')(subarray_name)
 
     def not_tracking(self, subarray_name):
         """These actions are taken when an existing subarray has ceased to 
@@ -368,6 +373,7 @@ class Automator(object):
       
             None
         """
+        self.active_subarrays[subarray_name].processing = True 
         # Future work: add a timeout for the script.
         # Retrieve the list of hosts assigned to the current subarray:
         host_key = 'coordinator:allocated_hosts:{}'.format(subarray_name)
@@ -384,7 +390,7 @@ class Automator(object):
             self.change_state('processing-complete')(subarray_name)
         else:
             log.error('seticore: {}, hpguppi: {}'.format(result_seticore, result_hpguppi))
-            log.error('Processing failed. Proceeding to next pointing.')
+            log.error('Processing failed. Proceeding.')
             self.change_state('processing-complete')(subarray_name)
 
     def processing_complete(self, subarray_name):
@@ -400,6 +406,7 @@ class Automator(object):
       
             None
         """
+        self.active_subarrays[subarray_name].processing = False 
         host_key = 'coordinator:allocated_hosts:{}'.format(subarray_name)
         instance_list = self.redis_server.lrange(host_key, 
                                              0, 
@@ -421,23 +428,24 @@ class Automator(object):
             log.error('Could not empty all NVMe modules')
             print(e)
 
-        # Release hosts:
-        proc_group = '{}:{}///set'.format(PROC_DOMAIN, subarray_name)
-        self.redis_server.publish(proc_group, 'leave={}'.format(subarray_name))
-        # Get list of currently available hosts:
-        if(self.redis_server.exists('coordinator:free_hosts')):
-            free_hosts = self.redis_server.lrange('coordinator:free_hosts', 0,
-                self.redis_server.llen('coordinator:free_hosts'))
-            self.redis_server.delete('coordinator:free_hosts')
-        else:
-            free_hosts = []
-        # Append released hosts and write 
-        free_hosts = free_hosts + instance_list
-        self.redis_server.rpush('coordinator:free_hosts', *free_hosts)    
-        # Remove resources from current subarray 
-        self.redis_server.delete('coordinator:allocated_hosts:{}'.format(subarray_name))
-        log.info("Released {} hosts; {} hosts available".format(len(instance_list),
-                len(free_hosts)))
+        # Release hosts if current subarray has already been deconfigured:
+        if(self.active_subarrays[subarray_name].state == 'deconfigure'): 
+            proc_group = '{}:{}///set'.format(PROC_DOMAIN, subarray_name)
+            self.redis_server.publish(proc_group, 'leave={}'.format(subarray_name))
+            # Get list of currently available hosts:
+            if(self.redis_server.exists('coordinator:free_hosts')):
+                free_hosts = self.redis_server.lrange('coordinator:free_hosts', 0,
+                    self.redis_server.llen('coordinator:free_hosts'))
+                self.redis_server.delete('coordinator:free_hosts')
+            else:
+                free_hosts = []
+            # Append released hosts and write 
+            free_hosts = free_hosts + instance_list
+            self.redis_server.rpush('coordinator:free_hosts', *free_hosts)    
+            # Remove resources from current subarray 
+            self.redis_server.delete('coordinator:allocated_hosts:{}'.format(subarray_name))
+            log.info("Released {} hosts; {} hosts available".format(len(instance_list),
+                    len(free_hosts)))
 
         #dwell = self.active_subarrays[subarray_name].dwell
         #new_nshot = np.floor(self.buffer_length/dwell)
@@ -490,6 +498,7 @@ class Automator(object):
         dwell = 0
         dwell_values = []
         for host in host_list:
+            log.info(host)
             host_key = '{}://{}/status'.format(self.hpgdomain, host)
             host_status = self.redis_server.hgetall(host_key)
             if(len(host_status) > 0):
@@ -500,10 +509,13 @@ class Automator(object):
             else:
                 log.warning('Cannot access {}'.format(host))
         if(len(dwell_values) > 0):
+            log.info(dwell_values)
             dwell = self.mode_1d(dwell_values)
+            log.info(dwell)
             if(len(np.unique(dwell_values)) > 1):
                 log.warning("DWELL disagreement")    
         else:
+            log.info(dwell_values)
             log.warning("Could not retrieve DWELL")
 
     def mode_1d(self, data_1d):
