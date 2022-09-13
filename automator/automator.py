@@ -227,7 +227,9 @@ class Automator(object):
         allocated_hosts = self.redis_server.lrange(allocated_hosts_key, 0,
             self.redis_server.llen(allocated_hosts_key))        
         # DWELL, the duration of a recording in seconds
-        dwell = self.retrieve_dwell(allocated_hosts)
+        # Set default to 300 seconds here (this will be updated prior
+        # to recording).
+        dwell = 300
         # If the subarray state is `tracking` or `processing`, we can simply
         # assume that this transition has just happened and record `start_ts`
         # as the current time. This is because if the start of a recording
@@ -301,8 +303,10 @@ class Automator(object):
             start_ts = datetime.utcnow()
             self.active_subarrays[subarray_name].start_ts = start_ts
             # If this is the last recording before the buffers will be full, 
-            # start a timer for `DWELL` + margin seconds. 
-            duration = self.active_subarrays[subarray_name].dwell + self.margin
+            # start a timer for `DWELL` + margin seconds.
+            dwell = self.retrieve_dwell(allocated_hosts)
+            self.active_subarrays[subarray_name].dwell = dwell
+            duration = dwell + self.margin
             # The state to transition to after tracking is processing. 
             log.info('Starting tracking timer')
             self.active_subarrays[subarray_name].tracking_timer = threading.Timer(duration, 
