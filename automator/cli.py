@@ -26,7 +26,7 @@ def cli(args = sys.argv[0]):
                         help = 'Location of external processing script')
     parser.add_argument('--margin',
                         type = float,
-                        default = 1.0, 
+                        default = 10.0, 
                         help = 'Safety margin for recording duration (sec)')
     parser.add_argument('--hpgdomain',
                         type = str,
