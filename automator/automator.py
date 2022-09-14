@@ -291,27 +291,35 @@ class Automator(object):
             None
         """
         if(subarray_name not in self.active_subarrays):
-            self.init_subarray(subarray_name, 'tracking')
-        else:
+            log.info('Unexpected subarray tracking event (likely configured
+                     'before the current instance of the automator was 
+                     'started.')
+        elif(self.active_subarrays[subarray_name].processing == False):
             # Update `nshot` (the number of recordings still to be taken)
             nshot_key = 'coordinator:trigger_mode:{}'.format(subarray_name)
             # `nshot` is retrieved in the format: `nshot:<n>`
             nshot = self.redis_server.get(nshot_key).split(':')[1] 
             self.active_subarrays[subarray_name].nshot = nshot  
-            self.active_subarrays[subarray_name].state = 'tracking'  
-        if(self.active_subarrays[subarray_name].nshot == 0):
-            start_ts = datetime.utcnow()
-            self.active_subarrays[subarray_name].start_ts = start_ts
-            # If this is the last recording before the buffers will be full, 
-            # start a timer for `DWELL` + margin seconds.
-            dwell = self.retrieve_dwell(allocated_hosts)
-            self.active_subarrays[subarray_name].dwell = dwell
-            duration = dwell + self.margin
-            # The state to transition to after tracking is processing. 
-            log.info('Starting tracking timer')
-            self.active_subarrays[subarray_name].tracking_timer = threading.Timer(duration, 
-                lambda:self.timeout('tracking', 'processing', subarray_name))
-            self.active_subarrays[subarray_name].tracking_timer.start()
+            self.active_subarrays[subarray_name].state = 'tracking' 
+            log.info('{} in tracking state with nshot = {}'.format(subarray_name, nshot))
+            if(self.active_subarrays[subarray_name].nshot == '0'):
+                log.info('Final track prior to processing.')
+                start_ts = datetime.utcnow()
+                self.active_subarrays[subarray_name].start_ts = start_ts
+                # If this is the last recording before the buffers will be full, 
+                # start a timer for `DWELL` + margin seconds.
+                allocated_hosts = self.active_subarrays[subarray_name].allocated_hosts 
+                dwell = self.retrieve_dwell(allocated_hosts)
+                self.active_subarrays[subarray_name].dwell = dwell
+                duration = dwell + self.margin
+                # The state to transition to after tracking is processing. 
+                log.info('Starting tracking timer for {} seconds'.format(duration))
+                self.active_subarrays[subarray_name].tracking_timer = threading.Timer(duration, 
+                    lambda:self.timeout('processing', subarray_name))
+                self.active_subarrays[subarray_name].tracking_timer.start()
+        elif(self.active_subarrays[subarray_name].processing == True):
+            log.info('Processing still in progress, therefore not recording current track.')
+        
 
     def deconfigure(self, subarray_name):
         """If a deconfigure message is received (indicating that the current
@@ -358,7 +366,7 @@ class Automator(object):
         """
         if(hasattr(self.active_subarrays[subarray_name], 'tracking_timer')):
             self.active_subarrays[subarray_name].tracking_timer.cancel()
-            del self.active_subarrays[subarray_name].timer
+            del self.active_subarrays[subarray_name].tracking_timer
             if(self.active_subarrays[subarray_name].nshot == 0):
                 log.info('Final recording completed. Moving to processing state.')
                 self.change_state('processing')(subarray_name)
@@ -524,6 +532,7 @@ class Automator(object):
         else:
             log.info(dwell_values)
             log.warning("Could not retrieve DWELL")
+        return dwell
 
     def mode_1d(self, data_1d):
         """Calculate the mode of a one-dimensional list. 
