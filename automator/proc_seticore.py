@@ -72,6 +72,7 @@ class ProcSeticore(object):
             # Build slurm command:
             seticore_args = ['--input', inputdirs, 
                              '--output', outputdir, 
+                             '--snr', '6',
                              '--h5_dir', h5dir, 
                              '--num_bands', '16',
                              '--fft_size', fft_size,
