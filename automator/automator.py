@@ -302,21 +302,23 @@ class Automator(object):
             self.active_subarrays[subarray_name].nshot = nshot  
             self.active_subarrays[subarray_name].state = 'tracking' 
             log.info('{} in tracking state with nshot = {}'.format(subarray_name, nshot))
-            if(self.active_subarrays[subarray_name].nshot == '0'):
-                log.info('Final track prior to processing.')
-                start_ts = datetime.utcnow()
-                self.active_subarrays[subarray_name].start_ts = start_ts
-                # If this is the last recording before the buffers will be full, 
-                # start a timer for `DWELL` + margin seconds.
-                allocated_hosts = self.active_subarrays[subarray_name].allocated_hosts 
-                dwell = self.retrieve_dwell(allocated_hosts)
-                self.active_subarrays[subarray_name].dwell = dwell
-                duration = dwell + self.margin
-                # The state to transition to after tracking is processing. 
-                log.info('Starting tracking timer for {} seconds'.format(duration))
-                self.active_subarrays[subarray_name].tracking_timer = threading.Timer(duration, 
-                    lambda:self.timeout('processing', subarray_name))
-                self.active_subarrays[subarray_name].tracking_timer.start()
+            #if(self.active_subarrays[subarray_name].nshot == '1'):
+            log.info('Preparing for processing.')
+            start_ts = datetime.utcnow()
+            self.active_subarrays[subarray_name].start_ts = start_ts
+            # If this is the last recording before the buffers will be full, 
+            # start a timer for `DWELL` + margin seconds.
+            allocated_hosts = self.active_subarrays[subarray_name].allocated_hosts
+            log.info(allocated_hosts) 
+            dwell = self.retrieve_dwell(allocated_hosts)
+            log.info(dwell)
+            self.active_subarrays[subarray_name].dwell = dwell
+            duration = dwell + self.margin
+            # The state to transition to after tracking is processing. 
+            log.info('Starting tracking timer for {} seconds'.format(duration))
+            self.active_subarrays[subarray_name].tracking_timer = threading.Timer(duration, 
+                lambda:self.timeout('processing', subarray_name))
+            self.active_subarrays[subarray_name].tracking_timer.start()
         elif(self.active_subarrays[subarray_name].processing == True):
             log.info('Processing still in progress, therefore not recording current track.')
         
