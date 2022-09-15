@@ -291,9 +291,9 @@ class Automator(object):
             None
         """
         if(subarray_name not in self.active_subarrays):
-            log.info('Unexpected subarray tracking event (likely configured
-                     'before the current instance of the automator was 
-                     'started.')
+            log.info("""Unexpected subarray tracking event (likely configured
+                     before the current instance of the automator was 
+                     started.""")
         elif(self.active_subarrays[subarray_name].processing == False):
             # Update `nshot` (the number of recordings still to be taken)
             nshot_key = 'coordinator:trigger_mode:{}'.format(subarray_name)
