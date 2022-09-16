@@ -502,7 +502,7 @@ class Automator(object):
 
     def retrieve_dwell(self, host_list):
         """Retrieve the current value of `DWELL` from the Hashpipe-Redis 
-        Gateway for a specific set of hosts. 
+        Gateway for a specific set of hosts. Defaults to 300 seconds. 
 
         Args:
 
@@ -513,7 +513,7 @@ class Automator(object):
             DWELL (float): The duration for which the processing nodes will record
             for the current subarray (in seconds). 
         """
-        dwell = 0
+        dwell = 300
         dwell_values = []
         for host in host_list:
             log.info(host)
@@ -534,7 +534,7 @@ class Automator(object):
                 log.warning("DWELL disagreement")    
         else:
             log.info(dwell_values)
-            log.warning("Could not retrieve DWELL")
+            log.warning("Could not retrieve DWELL. Using 300 sec by default.")
         return dwell
 
     def mode_1d(self, data_1d):
