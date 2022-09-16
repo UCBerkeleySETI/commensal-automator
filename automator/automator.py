@@ -399,12 +399,13 @@ class Automator(object):
         host_list =  [host.split('/')[0] for host in instance_list]
         proc = ProcSeticore()
         result_seticore = proc.process('/home/lacker/bin/seticore', host_list, BFRDIR, subarray_name)        
-        proc_hpguppi = ProcHpguppi()
-        result_hpguppi = proc_hpguppi.process(PROC_DOMAIN, host_list, subarray_name, BFRDIR)
-        if(result_seticore & result_hpguppi):
+        #proc_hpguppi = ProcHpguppi()
+        #result_hpguppi = proc_hpguppi.process(PROC_DOMAIN, host_list, subarray_name, BFRDIR)
+        #if(result_seticore & result_hpguppi):
+        if(result_seticore):
             self.change_state('processing-complete')(subarray_name)
         else:
-            log.error('seticore: {}, hpguppi: {}'.format(result_seticore, result_hpguppi))
+            #log.error('seticore: {}, hpguppi: {}'.format(result_seticore, result_hpguppi))
             log.error('Processing failed. Proceeding.')
             self.change_state('processing-complete')(subarray_name)
 
