@@ -69,13 +69,14 @@ class ProcHpguppi(object):
                 log.info('Processing file: {}'.format(rawfile))
                 self.redis_server.publish(group_chan, 'RAWFILE={}'.format(rawfile))
                 # Wait for processing to start:
-                result = self.monitor_proc_status('START', proc_domain, hosts, self.PROC_STATUS_KEY, 2100, group_chan)
+                result = self.monitor_proc_status('START', proc_domain, hosts, self.PROC_STATUS_KEY, 300, group_chan)
                 if(result == 'timeout'):
                     log.error('Timed out, processing has not started')
                 # Waiting for processing to finish:
                 result = self.monitor_proc_status('END', proc_domain, hosts, self.PROC_STATUS_KEY, 2100, group_chan)
                 if(result == 'timeout'):
                     log.error('Timed out, still waiting for processing to finish')
+                    log.info('Giving up and proceeding...')
                 # Set procstat to IDLE:
                 self.redis_server.publish(group_chan, 'PROCSTAT=IDLE')
             return True
