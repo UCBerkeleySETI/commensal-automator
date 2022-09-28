@@ -73,7 +73,7 @@ class ProcHpguppi(object):
                 if(result == 'timeout'):
                     log.error('Timed out, processing has not started')
                 # Waiting for processing to finish:
-                result = self.monitor_proc_status('END', proc_domain, hosts, self.PROC_STATUS_KEY, 2100, group_chan)
+                result = self.monitor_proc_status('END', proc_domain, hosts, self.PROC_STATUS_KEY, 3000, group_chan)
                 if(result == 'timeout'):
                     log.error('Timed out, still waiting for processing to finish')
                     log.info('Giving up and proceeding...')
