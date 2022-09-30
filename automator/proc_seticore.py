@@ -18,6 +18,8 @@ class ProcSeticore(object):
     def __init__(self):
         self.redis_server = redis.StrictRedis(decode_responses=True)
         self.PROC_STATUS_KEY = 'PROCSTAT'
+        self.SLACK_CHANNEL = "meerkat-obs-log"
+        self.SLACK_PROXY_CHANNEL = "slack-messages"
 
     def process(self, seticore, hosts, bfrdir, arrayid):
         """Processes the incoming data using seticore.
@@ -39,6 +41,8 @@ class ProcSeticore(object):
         rawfiles = set() 
         for host in hosts:
             rawfiles = self.redis_server.smembers('bluse_raw_watch:{}'.format(host))
+            log.info(host)
+            log.info(rawfiles)
             if(len(rawfiles) > 0):
                 break
         
@@ -81,8 +85,28 @@ class ProcSeticore(object):
             cmd = ['srun', '-w'] + [' '.join(hosts)] + [seticore] + seticore_args
             log.info('Running seticore: {}'.format(cmd))
             subprocess.run(cmd)
+            # Alert on Slack channel:
+            alert_msg = "New recording processed by seticore. Output data are available in /scratch/data/{}".format(datadir)
+            self.alert(alert_msg, self.SLACK_CHANNEL, self.SLACK_PROXY_CHANNEL)
             return True
         else:
             log.info('No data to process')
+            # Alert on Slack channel:
+            alert_msg = "Seticore attempted processing, but no data were available."
+            self.alert(alert_msg, self.SLACK_CHANNEL, self.SLACK_PROXY_CHANNEL)
             return False
-            
+
+    def alert(self, message, slack_channel, slack_proxy_channel):
+        """Publish a message to the alerts Slack channel. 
+
+        Args:
+            message (str): Message to publish to Slack.  
+            slack_channel (str): Slack channel to publish message to. 
+            slack_proxy_channel (str): Redis channel for the Slack proxy/bridge. 
+
+        Returns:
+            None  
+        """
+        # Format: <Slack channel>:<Slack message text>
+        alert_msg = '{}:{}'.format(slack_channel, message)
+        self.redis_server.publish(slack_proxy_channel, alert_msg)

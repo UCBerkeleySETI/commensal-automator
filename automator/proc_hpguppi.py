@@ -16,6 +16,8 @@ class ProcHpguppi(object):
         
         self.redis_server = redis.StrictRedis(decode_responses=True)
         self.PROC_STATUS_KEY = 'PROCSTAT'
+        self.SLACK_CHANNEL = "meerkat-obs-log"
+        self.SLACK_PROXY_CHANNEL = "slack-messages"
 
     def process(self, proc_domain, hosts, subarray, bfrdir):
         """Processes the incoming data via hpguppi proc.
@@ -79,9 +81,14 @@ class ProcHpguppi(object):
                     log.info('Giving up and proceeding...')
                 # Set procstat to IDLE:
                 self.redis_server.publish(group_chan, 'PROCSTAT=IDLE')
+            # Alert on Slack channel:
+            alert_msg = "New recording processed by hpguppi_proc. Output data are available in /scratch/data/{}".format(datadir)
+            self.alert(alert_msg, self.SLACK_CHANNEL, self.SLACK_PROXY_CHANNEL)
             return True
         else:
             log.info('No data to process')
+            alert_msg = "hpguppi_proc attempted processing, but could not."
+            self.alert(alert_msg, self.SLACK_CHANNEL, self.SLACK_PROXY_CHANNEL)
             return False
 
     def monitor_proc_status(self, status, domain, proc_list, proc_key, proc_timeout, group_chan):
@@ -161,3 +168,17 @@ class ProcHpguppi(object):
                 return 'done'
 
 
+    def alert(self, message, slack_channel, slack_proxy_channel):
+        """Publish a message to the alerts Slack channel. 
+
+        Args:
+            message (str): Message to publish to Slack.  
+            slack_channel (str): Slack channel to publish message to. 
+            slack_proxy_channel (str): Redis channel for the Slack proxy/bridge. 
+
+        Returns:
+            None  
+        """
+        # Format: <Slack channel>:<Slack message text>
+        alert_msg = '{}:{}'.format(slack_channel, message)
+        self.redis_server.publish(slack_proxy_channel, alert_msg)
