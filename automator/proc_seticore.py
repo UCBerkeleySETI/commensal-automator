@@ -83,7 +83,9 @@ class ProcSeticore(object):
                              '--fft_size', fft_size,
                              '--telescope_id', '64',
                              '--recipe_dir', bfrdir]
-            cmd = ['srun', '-w'] + [' '.join(hosts)] + [seticore] + seticore_args
+            err = '/home/obs/seticore_slurm/seticore_%N.err'
+            out = '/home/obs/seticore_slurm/seticore_%N.out'
+            cmd = ['srun', '-e', err, '-o', out, '-w'] + [' '.join(hosts)] + [seticore] + seticore_args
             log.info('Running seticore: {}'.format(cmd))
             result = subprocess.run(cmd).returncode
             if(result != 0):
