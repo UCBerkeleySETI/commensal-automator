@@ -20,6 +20,7 @@ class ProcSeticore(object):
         self.PROC_STATUS_KEY = 'PROCSTAT'
         self.SLACK_CHANNEL = "meerkat-obs-log"
         self.SLACK_PROXY_CHANNEL = "slack-messages"
+        self.CIRCUS_ENDPOINT = "tcp://10.98.81.254:5555"
 
     def process(self, seticore, hosts, bfrdir, arrayid):
         """Processes the incoming data using seticore.
@@ -84,15 +85,23 @@ class ProcSeticore(object):
                              '--recipe_dir', bfrdir]
             cmd = ['srun', '-w'] + [' '.join(hosts)] + [seticore] + seticore_args
             log.info('Running seticore: {}'.format(cmd))
-            subprocess.run(cmd)
-            # Alert on Slack channel:
-            alert_msg = "New recording processed by seticore. Output data are available in /scratch/data/{}".format(datadir)
-            self.alert(alert_msg, self.SLACK_CHANNEL, self.SLACK_PROXY_CHANNEL)
-            return True
+            result = subprocess.run(cmd).returncode
+            if(result != 0):
+                # Alert on Slack channel:
+                alert_msg = "Seticore returned code {}. Stopping automator for debugging.".format(result)
+                self.alert(alert_msg, self.SLACK_CHANNEL, self.SLACK_PROXY_CHANNEL)
+                # Stop automator:
+                log.info("Seticore returned code {}. Stopping automator for debugging.".format(result)
+                stop_cmd = ['circusctl', '--endpoint', self.CIRCUS_ENDPOINT, 'stop', 'automator']
+            else:
+                # Alert on Slack channel:
+                alert_msg = "New recording processed by seticore. Output data are available in /scratch/data/{}".format(datadir)
+                self.alert(alert_msg, self.SLACK_CHANNEL, self.SLACK_PROXY_CHANNEL)
+                return True
         else:
             log.info('No data to process')
             # Alert on Slack channel:
-            alert_msg = "Seticore attempted processing, but no data were available."
+            alert_msg = "No data were available to process (seticore)."
             self.alert(alert_msg, self.SLACK_CHANNEL, self.SLACK_PROXY_CHANNEL)
             return False
 
