@@ -80,6 +80,7 @@ class ProcHpguppi(object):
                     # Stop automator:
                     log.error('Timed out, processing has not started. Stopping automator for debugging.')
                     stop_cmd = ['circusctl', '--endpoint', self.CIRCUS_ENDPOINT, 'stop', 'automator']
+                    subprocess.run(stop_cmd)
                 # Waiting for processing to finish:
                 result = self.monitor_proc_status('END', proc_domain, hosts, self.PROC_STATUS_KEY, 3000, group_chan)
                 if(result == 'timeout'):
@@ -89,6 +90,7 @@ class ProcHpguppi(object):
                     # Stop automator:
                     log.error('hpguppi_proc processing timed out for {}; stopping automator for debugging'.format(datadir))
                     stop_cmd = ['circusctl', '--endpoint', self.CIRCUS_ENDPOINT, 'stop', 'automator']
+                    subprocess.run(stop_cmd)
                 # Set procstat to IDLE:
                 self.redis_server.publish(group_chan, 'PROCSTAT=IDLE')
             # Alert on Slack channel:

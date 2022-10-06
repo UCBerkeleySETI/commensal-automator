@@ -91,8 +91,9 @@ class ProcSeticore(object):
                 alert_msg = "Seticore returned code {}. Stopping automator for debugging.".format(result)
                 self.alert(alert_msg, self.SLACK_CHANNEL, self.SLACK_PROXY_CHANNEL)
                 # Stop automator:
-                log.info("Seticore returned code {}. Stopping automator for debugging.".format(result)
+                log.info("Seticore returned code {}. Stopping automator for debugging.".format(result))
                 stop_cmd = ['circusctl', '--endpoint', self.CIRCUS_ENDPOINT, 'stop', 'automator']
+                subprocess.run(stop_cmd)
             else:
                 # Alert on Slack channel:
                 alert_msg = "New recording processed by seticore. Output data are available in /scratch/data/{}".format(datadir)
