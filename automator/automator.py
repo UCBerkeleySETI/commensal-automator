@@ -3,16 +3,18 @@ from datetime import datetime
 import threading
 import numpy as np
 import subprocess
+import sys
 
 from .logger import log
 from .subarray import Subarray
 from .proc_hpguppi import ProcHpguppi
 from .proc_seticore import ProcSeticore
 
-#Temporary hard coding:
 BFRDIR = '/home/obs/bfr5'
 PROC_DOMAIN = 'blproc'
 ACQ_DOMAIN = 'bluse'
+SLACK_CHANNEL = "meerkat-obs-log"
+SLACK_PROXY_CHANNEL = "slack-messages"
 
 class Automator(object):
     """The commensal automator. 
@@ -397,16 +399,37 @@ class Automator(object):
                                              self.redis_server.llen(host_key))
         # Format for host name (rather than instance name):
         host_list =  [host.split('/')[0] for host in instance_list]
+        # DATADIR
+        datadir = self.redis_server.get('{}:current_sb_id'.format(subarray_name))
+        # seticore processing
         proc = ProcSeticore()
         result_seticore = proc.process('/home/lacker/bin/seticore', host_list, BFRDIR, subarray_name)        
+        if(result_seticore != 0):
+            alert_msg = "Seticore returned code {}. Stopping automator for debugging.".format(result_seticore)
+            log.error(alert_msg)
+            self.alert(alert_msg, SLACK_CHANNEL, SLACK_PROXY_CHANNEL)
+            alert_logs = "Log files available by node: `/home/obs/seticore_slurm/`"
+            log.error(alert_logs)
+            self.alert(alert_logs, SLACK_CHANNEL, SLACK_PROXY_CHANNEL)
+            sys.exit(0)
+        else:
+            alert_msg = "New recording processed by seticore. Output data are available in /scratch/data/{}".format(datadir)
+            log.info(alert_msg)
+            self.alert(alert_msg, SLACK_CHANNEL, SLACK_PROXY_CHANNEL)
+        # hpguppi_processing
         proc_hpguppi = ProcHpguppi()
         result_hpguppi = proc_hpguppi.process(PROC_DOMAIN, host_list, subarray_name, BFRDIR)
-        if(result_seticore & result_hpguppi):
-            self.change_state('processing-complete')(subarray_name)
+        if(result_hpguppi != 0):
+            alert_msg = "hpguppi_proc timed out. Stopping automator for debugging."
+            log.error(alert_msg)
+            self.alert(alert_msg, SLACK_CHANNEL, SLACK_PROXY_CHANNEL)
+            sys.exit(0)
         else:
-            log.error('seticore: {}, hpguppi: {}'.format(result_seticore, result_hpguppi))
-            log.error('Processing failed. Proceeding.')
-            self.change_state('processing-complete')(subarray_name)
+            alert_msg = "New recording processed by hpguppi_proc. Output data are available in /scratch/data/{}".format(datadir)
+            log.info(alert_msg)
+            self.alert(alert_msg, SLACK_CHANNEL, SLACK_PROXY_CHANNEL)
+        log.info("Proceeding to processing-complete")
+        self.change_state('processing-complete')(subarray_name)
 
     def processing_complete(self, subarray_name):
         """Actions to be taken once processing is complete for the  current 
@@ -551,3 +574,18 @@ class Automator(object):
         mode_index = np.argmax(freqs)
         mode_1d = vals[mode_index]
         return mode_1d
+
+    def alert(self, message, slack_channel, slack_proxy_channel):
+        """Publish a message to the alerts Slack channel. 
+
+        Args:
+            message (str): Message to publish to Slack.  
+            slack_channel (str): Slack channel to publish message to. 
+            slack_proxy_channel (str): Redis channel for the Slack proxy/bridge. 
+
+        Returns:
+            None  
+        """
+        # Format: <Slack channel>:<Slack message text>
+        alert_msg = '{}:{}'.format(slack_channel, message)
+        self.redis_server.publish(slack_proxy_channel, alert_msg)

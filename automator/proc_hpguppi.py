@@ -16,9 +16,6 @@ class ProcHpguppi(object):
         
         self.redis_server = redis.StrictRedis(decode_responses=True)
         self.PROC_STATUS_KEY = 'PROCSTAT'
-        self.SLACK_CHANNEL = "meerkat-obs-log"
-        self.SLACK_PROXY_CHANNEL = "slack-messages"
-        self.CIRCUS_ENDPOINT = "tcp://10.98.81.254:5555"
 
     def process(self, proc_domain, hosts, subarray, bfrdir):
         """Processes the incoming data via hpguppi proc.
@@ -74,34 +71,19 @@ class ProcHpguppi(object):
                 # Wait for processing to start:
                 result = self.monitor_proc_status('START', proc_domain, hosts, self.PROC_STATUS_KEY, 300, group_chan)
                 if(result == 'timeout'):
-                    # Alert on Slack channel:
-                    alert_msg = "hpguppi_proc failed to start for {}; stopping automator for debugging".format(datadir)
-                    self.alert(alert_msg, self.SLACK_CHANNEL, self.SLACK_PROXY_CHANNEL)
-                    # Stop automator:
-                    log.error('Timed out, processing has not started. Stopping automator for debugging.')
-                    stop_cmd = ['circusctl', '--endpoint', self.CIRCUS_ENDPOINT, 'stop', 'automator']
-                    subprocess.run(stop_cmd)
+                    log.error('Timed out, processing has not started.')
+                    return 1
                 # Waiting for processing to finish:
                 result = self.monitor_proc_status('END', proc_domain, hosts, self.PROC_STATUS_KEY, 3000, group_chan)
                 if(result == 'timeout'):
-                    # Alert on Slack channel:
-                    alert_msg = "hpguppi_proc processing timed out for {}; stopping automator for debugging".format(datadir)
-                    self.alert(alert_msg, self.SLACK_CHANNEL, self.SLACK_PROXY_CHANNEL)
-                    # Stop automator:
-                    log.error('hpguppi_proc processing timed out for {}; stopping automator for debugging'.format(datadir))
-                    stop_cmd = ['circusctl', '--endpoint', self.CIRCUS_ENDPOINT, 'stop', 'automator']
-                    subprocess.run(stop_cmd)
+                    log.error('hpguppi_proc processing timed out.')
+                    return 1
                 # Set procstat to IDLE:
                 self.redis_server.publish(group_chan, 'PROCSTAT=IDLE')
-            # Alert on Slack channel:
-            alert_msg = "New recording processed by hpguppi_proc. Output data are available in /scratch/data/{}".format(datadir)
-            self.alert(alert_msg, self.SLACK_CHANNEL, self.SLACK_PROXY_CHANNEL)
-            return True
+            return 0
         else:
             log.info('No data to process')
-            alert_msg = "hpguppi_proc attempted processing, but there were no data."
-            self.alert(alert_msg, self.SLACK_CHANNEL, self.SLACK_PROXY_CHANNEL)
-            return False
+            return 1
 
     def monitor_proc_status(self, status, domain, proc_list, proc_key, proc_timeout, group_chan):
         """For processes which communicate via the Hashpipe-Redis Gateway. 
@@ -178,19 +160,3 @@ class ProcHpguppi(object):
                    log.warning('{} straggler(s).'.format(len(proc_list) - proc_count))
                 log.info('Gathered proc status: {}'.format(proc_status))
                 return 'done'
-
-
-    def alert(self, message, slack_channel, slack_proxy_channel):
-        """Publish a message to the alerts Slack channel. 
-
-        Args:
-            message (str): Message to publish to Slack.  
-            slack_channel (str): Slack channel to publish message to. 
-            slack_proxy_channel (str): Redis channel for the Slack proxy/bridge. 
-
-        Returns:
-            None  
-        """
-        # Format: <Slack channel>:<Slack message text>
-        alert_msg = '{}:{}'.format(slack_channel, message)
-        self.redis_server.publish(slack_proxy_channel, alert_msg)
