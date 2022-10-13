@@ -402,9 +402,11 @@ class Automator(object):
         # DATADIR
         datadir = self.redis_server.get('{}:current_sb_id'.format(subarray_name))
         # seticore processing
+        alert_msg = "Initiating processing with seticore..."
+        self.alert(alert_msg, SLACK_CHANNEL, SLACK_PROXY_CHANNEL)
         proc = ProcSeticore()
         result_seticore = proc.process('/home/lacker/bin/seticore', host_list, BFRDIR, subarray_name)        
-        if(result_seticore != 0):
+        if(result_seticore > 1):
             alert_msg = "Seticore returned code {}. Stopping automator for debugging.".format(result_seticore)
             log.error(alert_msg)
             self.alert(alert_msg, SLACK_CHANNEL, SLACK_PROXY_CHANNEL)
@@ -413,10 +415,15 @@ class Automator(object):
             self.alert(alert_logs, SLACK_CHANNEL, SLACK_PROXY_CHANNEL)
             sys.exit(0)
         else:
-            alert_msg = "New recording processed by seticore. Output data are available in /scratch/data/{}".format(datadir)
+            alert_msg = "New recording processed by seticore (code {}).".format(result_seticore) 
             log.info(alert_msg)
             self.alert(alert_msg, SLACK_CHANNEL, SLACK_PROXY_CHANNEL)
+            alert_output = "Output data are available in /scratch/data/{}".format(datadir)
+            log.info(alert_output)
+            self.alert(alert_output, SLACK_CHANNEL, SLACK_PROXY_CHANNEL)
         # hpguppi_processing
+        alert_msg = "Initiating processing with hpguppi_proc..." 
+        self.alert(alert_msg, SLACK_CHANNEL, SLACK_PROXY_CHANNEL)
         proc_hpguppi = ProcHpguppi()
         result_hpguppi = proc_hpguppi.process(PROC_DOMAIN, host_list, subarray_name, BFRDIR)
         if(result_hpguppi != 0):
