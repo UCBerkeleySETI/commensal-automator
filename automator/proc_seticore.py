@@ -81,7 +81,7 @@ class ProcSeticore(object):
                              '--recipe_dir', bfrdir]
             err = '/home/obs/seticore_slurm/seticore_%N.err'
             out = '/home/obs/seticore_slurm/seticore_%N.out'
-            cmd = ['srun', '-e', err, '-o', out, '-w'] + [' '.join(hosts)] + [seticore] + seticore_args
+            cmd = ['srun', '--open-mode=append', '-e', err, '-o', out, '-w'] + [' '.join(hosts)] + [seticore] + seticore_args
             log.info('Running seticore: {}'.format(cmd))
             result = subprocess.run(cmd).returncode
             return result
