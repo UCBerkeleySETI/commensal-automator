@@ -39,8 +39,7 @@ class ProcSeticore(object):
         rawfiles = set() 
         for host in hosts:
             rawfiles = self.redis_server.smembers('bluse_raw_watch:{}'.format(host))
-            log.info(host)
-            log.info(rawfiles)
+            log.info("First rawfile(s) in set: {}".format(rawfiles))
             if(len(rawfiles) > 0):
                 break
         

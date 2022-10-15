@@ -545,7 +545,6 @@ class Automator(object):
         dwell = 300
         dwell_values = []
         for host in host_list:
-            log.info(host)
             host_key = '{}://{}/status'.format(self.hpgdomain, host)
             host_status = self.redis_server.hgetall(host_key)
             if(len(host_status) > 0):
@@ -556,13 +555,10 @@ class Automator(object):
             else:
                 log.warning('Cannot access {}'.format(host))
         if(len(dwell_values) > 0):
-            log.info(dwell_values)
             dwell = self.mode_1d(dwell_values)
-            log.info(dwell)
             if(len(np.unique(dwell_values)) > 1):
                 log.warning("DWELL disagreement")    
         else:
-            log.info(dwell_values)
             log.warning("Could not retrieve DWELL. Using 300 sec by default.")
         return dwell
 
