@@ -58,7 +58,17 @@ numpy >= 1.18.1
 redis >= 3.4.1  
 ```  
 
-### Installation
+### Installation and Deployment (BLUSE)
+
+Instructions for installation and deployment on the BLUSE headnode:
+
+- Clone repository into desired location: `git clone https://github.com/UCBerkeleySETI/commensal-automator.git`
+- `cd commensal-automator`
+- Install into the `bluse3` virtual environment: `sudo /opt/virtualenv/bluse3/bin/python3 setup.py install` 
+- Restart the automator (for now, only when the subarray is deconfigured): `circusctl --endpoint tcp://<IP address>:<port> restart automator`
+- If desired, check the automator logs for errors: `less /var/log/bluse/automator/automator.err`
+
+### Installation (generic)
 
 Consider installing within an appropriate virtual environment. 
 Then:
