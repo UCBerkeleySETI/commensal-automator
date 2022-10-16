@@ -196,7 +196,7 @@ class Automator(object):
             None
         """
         log.info('New state: {}'.format(state))
-        states = {'configure':self.configure, 
+        states = {'conf_complete':self.configure, 
                   'tracking':self.tracking, 
                   'not-tracking':self.not_tracking, 
                   'deconfigure':self.deconfigure, 
@@ -277,7 +277,8 @@ class Automator(object):
         """
         # Since a subarray only exists after configuration, this is the first 
         # possible time a subarray object can have been created. 
-        self.subarray_init(subarray_name, 'configure')
+        # Subarray to be initialised after `conf_complete` message.
+        self.subarray_init(subarray_name, 'conf_complete')
 
     def tracking(self, subarray_name):
         """These actions are taken when an existing subarray has begun to 
