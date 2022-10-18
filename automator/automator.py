@@ -157,12 +157,10 @@ class Automator(object):
 
             Messages that are responded to are as follows:
  
-            - configure
+            - conf_complete
             - tracking
             - not-tracking
             - deconfigure
-            - processing
-            - processing-complete
 
             If the <message> component of msg is one of the above, then the 
             first component of msg is the subarray name. 
@@ -175,37 +173,25 @@ class Automator(object):
         msg_components = msg_data.split(':')
         if(len(msg_components) !=  2):
             log.warning("Unrecognised message: {}".format(msg_data))
+            return
+
+        subarray_state = msg_components[0]
+        subarray_name = msg_components[1]
+
+        log.info('subarray {} is now in state: {}'.format(subarray_name, subarray_state))
+
+        if subarray_state == 'conf_complete':
+            self.configure(subarray_name)
+        elif subarray_state == 'tracking':
+            self.tracking(subarray_name)
+        elif subarray_state == 'not-tracking':
+            self.not_tracking(subarray_name)
+        elif subarray_state == 'deconfigure':
+            self.deconfigure(subarray_name)
         else:
-            subarray_state = msg_components[0]
-            subarray_name = msg_components[1]
-            self.change_state(subarray_state)(subarray_name)
- 
-    def change_state(self, state):
-        """Select and return the function corresponding to the change in state
-        of the subarray. A dictionary is used since Python's `match-case` switch
-        statement implementation is only available in 3.10.
+            log.info('no handler for state {}, ignoring message'.format(subarray_state))
 
-        For all unrecognised states, the same default `ignored_state` function
-        is returned. 
-
-        Args:
-
-            state (str): New subarray state (one of configure, tracking, 
-            not-tracking, deconfigure, processing, processing-complete).
-
-        Returns:
-
-            None
-        """
-        log.info('New state: {}'.format(state))
-        states = {'conf_complete':self.configure, 
-                  'tracking':self.tracking, 
-                  'not-tracking':self.not_tracking, 
-                  'deconfigure':self.deconfigure, 
-                  'processing':self.processing, 
-                  'processing-complete':self.processing_complete}
-        return states.get(state, self.ignored_state)
-
+            
     def subarray_init(self, subarray_name, subarray_state):
         """Initialise a subarray. This means retrieving appropriate metadata 
         for the current subarray. This step must take place before a recording
@@ -250,20 +236,6 @@ class Automator(object):
         log.info('Initialised new subarray object: {}'
                  ' in state {}'.format(subarray_name, subarray_state))
 
-    def ignored_state(self, subarray_name):
-        """This function is to be executed if an unrecognised state (or a 
-        state not relevant to the `automator`) is received.
-
-        Args:
-
-            subarray_name (str): The name of the subarray for which an 
-            unrecognised or ignored state has been received. 
-
-        Returns:
-           
-            None
-        """
-        log.info('Ignoring irrelevant state for {}'.format(subarray_name))
 
     def configure(self, subarray_name):
         """This function is to be run on configuration of a new subarray. 
@@ -324,7 +296,7 @@ class Automator(object):
         # The state to transition to after tracking is processing. 
         log.info('Starting tracking timer for {} seconds'.format(duration))
         self.active_subarrays[subarray_name].tracking_timer = threading.Timer(duration, 
-            lambda:self.timeout('processing', subarray_name))
+            lambda: self.processing(subarray_name))
         self.active_subarrays[subarray_name].tracking_timer.start()
         
 
@@ -353,7 +325,7 @@ class Automator(object):
                  ' to processing.'.format(subarray_name))
             nshot_msg = self.nshot_msg.format(subarray_name, 0)
             self.redis_server.publish(self.nshot_chan, nshot_msg) 
-            self.change_state('processing')(subarray_name)
+            self.processing(subarray_name)
 
     def not_tracking(self, subarray_name):
         """These actions are taken when an existing subarray has ceased to 
@@ -376,17 +348,22 @@ class Automator(object):
         """
         if subarray_name not in self.active_subarrays:
             self.subarray_init(subarray_name, 'not-tracking')
-        
-        if(hasattr(self.active_subarrays[subarray_name], 'tracking_timer')):
-            self.active_subarrays[subarray_name].tracking_timer.cancel()
-            del self.active_subarrays[subarray_name].tracking_timer
-            if(self.active_subarrays[subarray_name].nshot == 0):
-                log.info('Final recording completed. Moving to processing state.')
-                self.change_state('processing')(subarray_name)
+        subarray = self.active_subarrays[subarray_name]
+            
+        if hasattr(subarray, 'tracking_timer'):
+            subarray.tracking_timer.cancel()
+            del subarray.tracking_timer
+            if subarray.nshot == 0:
+                log.info(subarray_name + ' has nshot = 0, so it is ready to process.')
+                self.processing(subarray_name)
+            else:
+                log.info('{} has nshot = {}, so it is not ready to process.'.format(
+                    subarray_name, subarray.nshot))
         else:
-           log.info('No active recording for end'
-                    'of track for {}'.format(subarray_name)) 
+           log.info('We are not recording for {}, so there is nothing to process.'.format(
+               subarray_name))
 
+           
     def processing(self, subarray_name):
         """Initiate processing across processing nodes in the current subarray. 
 
@@ -399,7 +376,13 @@ class Automator(object):
       
             None
         """
-        self.active_subarrays[subarray_name].processing = True 
+        subarray = self.active_subarrays[subarray_name]
+        log.info(subarray_name + " is now processing.")
+        if subarray.processing:
+            log.error("we are already processing {} - we cannot double-process it.".format(
+                subarray_name))
+            return
+        subarray.processing = True 
         # Future work: add a timeout for the script.
         # Retrieve the list of hosts assigned to the current subarray:
         host_key = 'coordinator:allocated_hosts:{}'.format(subarray_name)
@@ -444,23 +427,19 @@ class Automator(object):
             alert_msg = "New recording processed by hpguppi_proc. Output data are available in /scratch/data/{}".format(datadir)
             log.info(alert_msg)
             self.alert(alert_msg)
-        log.info("Proceeding to processing-complete")
-        self.change_state('processing-complete')(subarray_name)
+        self.cleanup(subarray_name)
 
-    def processing_complete(self, subarray_name):
-        """Actions to be taken once processing is complete for the  current 
-        subarray. 
+    def cleanup(self, subarray_name):
+        """The last part of processing, removing files and getting ready for future recordings.
 
         Args:
            
-            subarray_name (str): The name of the subarray for which processing
-            has completed. 
+            subarray_name (str): The name of the subarray we are cleaning up.
 
         Returns:
       
             None
         """
-        self.active_subarrays[subarray_name].processing = False 
         host_key = 'coordinator:allocated_hosts:{}'.format(subarray_name)
         instance_list = self.redis_server.lrange(host_key, 
                                              0, 
@@ -510,34 +489,10 @@ class Automator(object):
         nshot_msg = self.nshot_msg.format(subarray_name, new_nshot)
         log.info('Resetting nshot after processing: {} {}'.format(self.nshot_chan, nshot_msg))
         self.redis_server.publish(self.nshot_chan, nshot_msg)        
+        self.active_subarrays[subarray_name].processing = False 
+        log.info(subarray_name + ' is done processing.')
 
-    def timeout(self, next_state, subarray_name):
-        """When a timeout happens (for completion of recording or processing,
-        for example), this function initiates the appropriate state transition
-        (if it should take place). 
-
-        For example, the telescope may have stopped recording data before the
-        completion of `DWELL`, in which case the state transition will have 
-        already taken place and this timeout function will never be called.  
-
-        If the transition to the next state is to take place, then the
-        relevant function is called. 
-
-        Args:         
-
-            subarray_name (str): The name of the subarray whose state is 
-            subject to change
-            next_state (str): The state into which the subarray would 
-            transition into after current_state. 
-
-        Returns:
-
-           None
-        """
-        # An additional check may be performed by reading the status of `NETSTAT`
-        # in the Hashpipe-Redis Gateway status buffer. 
-        self.change_state(next_state)(subarray_name)
-
+        
     def retrieve_dwell(self, host_list):
         """Retrieve the current value of `DWELL` from the Hashpipe-Redis 
         Gateway for a specific set of hosts. Defaults to 300 seconds. 

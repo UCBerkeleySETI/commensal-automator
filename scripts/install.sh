@@ -2,4 +2,4 @@
 SCRIPTS_DIR=$(dirname $0)
 cd $SCRIPTS_DIR/..
 scripts/check_env.sh
-sudo python setup.py install
+sudo /opt/virtualenv/bluse3/bin/python setup.py install
