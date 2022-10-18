@@ -22,8 +22,8 @@ def cli(args = sys.argv[0]):
                         help = 'Name of the Redis channel to subscribe to')
     parser.add_argument('--script',
                         type = str,
-                        default = '/opt/virtualenv/bluse3/bin/processing_example.sh', 
-                        help = 'Location of external processing script')
+                        default = '',
+                        help = 'Meaningless argument for backward compatibility')
     parser.add_argument('--margin',
                         type = float,
                         default = 10.0, 
@@ -50,14 +50,13 @@ def cli(args = sys.argv[0]):
     args = parser.parse_args()
     main(redis_endpoint = args.redis_endpoint, 
          redis_channel = args.redis_channel, 
-         proc_script = args.script, 
          margin = args.margin, 
          hpgdomain = args.hpgdomain, 
          buffer_length = args.buffer_length, 
          nshot_chan = args.nshot_chan, 
          nshot_msg = args.nshot_msg)
 
-def main(redis_endpoint, redis_channel, proc_script, margin, hpgdomain, 
+def main(redis_endpoint, redis_channel, margin, hpgdomain, 
     buffer_length, nshot_chan, nshot_msg):
     """Starts the automator.
   
@@ -66,8 +65,6 @@ def main(redis_endpoint, redis_channel, proc_script, margin, hpgdomain,
         redis_endpoint (str): Redis endpoint (of the form <host IP
         address>:<port>) 
         redis_chan (str): Name of the redis channel
-        proc_script (str): Location of the processing script for the 
-        processing script. 
         proc_env (str): Virtual environment for processing script. 
         proc_args (str): Arguments for processing script. 
         margin (float): Safety margin (in seconds) to add to `DWELL`
@@ -87,7 +84,6 @@ def main(redis_endpoint, redis_channel, proc_script, margin, hpgdomain,
     set_logger('DEBUG')
     Automaton = Automator(redis_endpoint, 
                           redis_channel, 
-                          proc_script, 
                           margin, 
                           hpgdomain, 
                           buffer_length, 

@@ -19,15 +19,10 @@ SLACK_PROXY_CHANNEL = "slack-messages"
 class Automator(object):
     """The commensal automator. 
       
-    The purpose of the commensal automator is to automate commensal observing,
-    end-to-end. The automator must be started before a recording has started. 
-    If it is not, then the current recording will be skipped. 
-
     In practice, the commensal automator operates as follows:
 
-    1. Waits for the start of a recording. When a recording starts, the list 
-       of processing nodes and their Hashpipe-Redis Gateway group address are 
-       retrieved. 
+    1. The first time it gets an event for a subarray, the list of processing
+       nodes and their Hashpipe-Redis Gateway group address are retrieved. 
 
     2. Waits for the end of a recording. Observational parameters like `DWELL`
        (the duration for which incoming data are to be recorded for the 
@@ -84,7 +79,7 @@ class Automator(object):
     7. Returns to the waiting state (see 1).     
  
     """
-    def __init__(self, redis_endpoint, redis_chan, proc_script, margin, 
+    def __init__(self, redis_endpoint, redis_chan, margin, 
                  hpgdomain, buffer_length, nshot_chan, nshot_msg):
         """Initialise the automator. 
 
@@ -93,7 +88,6 @@ class Automator(object):
             redis_endpoint (str): Redis endpoint (of the form <host IP
             address>:<port>) 
             redis_chan (str): Name of the redis channel
-            proc_script (str): Location of the processing script.
             margin (float): Safety margin (in seconds) to add to `DWELL`
             when calculating the estimated end of a recording. 
             hpgdomain (str): The Hashpipe-Redis Gateway domain for the instrument
@@ -108,9 +102,7 @@ class Automator(object):
 
             None
         """
-        log.info('Starting Automator:\n'
-                 'Redis endpoint: {}\n'
-                 'Processing script: {}\n'.format(redis_endpoint, proc_script))
+        log.info('starting the automator. redis = {}'.format(redis_endpoint))
         redis_host, redis_port = redis_endpoint.split(':')
         self.redis_server = redis.StrictRedis(host=redis_host, 
                                               port=redis_port, 
@@ -119,12 +111,10 @@ class Automator(object):
         self.margin = margin
         self.hpgdomain = hpgdomain
         self.buffer_length = buffer_length
-        self.proc_script = proc_script
-        # Future work: split off Redis info into its own module
         self.nshot_chan = nshot_chan
         self.nshot_msg = nshot_msg
         self.active_subarrays = {}
-        self.alert("restarting the automator at " +
+        self.alert("starting the automator at " +
                    datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d %H:%M:%S %Z"))
         
     def start(self):
