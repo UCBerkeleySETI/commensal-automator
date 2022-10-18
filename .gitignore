@@ -1,3 +1,4 @@
 automator.egg-info/
 build/
 dist/
+*~
