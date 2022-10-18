@@ -55,28 +55,16 @@ class Automator(object):
        margin have passed, `nshot` is set to 0 and processing (in 3 below) 
        is commenced. 
   
-    3. Initiates processing tasks. Processing does not take place if 
+    3. Runs processing tasks. Processing does not take place if 
        `nshot > 0`. In general, this means that processing will only
        take place once the buffers are full.
+       Processing involves first analyzing the raw files in /buf0, and then
+       deleting the files when we are finished.
 
-       A script is called which runs all processing across the processing
-       nodes assigned to the current subarray. Multiple processing steps
-       may take place simultaneously and/or sequentially. 
-      
-       The location of the script is retrieved from Redis. 
-
-    4. Waits for all processing tasks to finish (once the script has finished
-       running or a timeout duration is reached). 
-    
-    5. Clearing the buffers. Essentially, this is just another processing
-       task (which only takes place at the end of all other processing 
-       tasks). Circus or slurm or ssh could be used to accomplish this across
-       processing nodes.
-
-    6. Resets `nshot` to re-enable recording (for the current processing nodes
+    4. Resets `nshot` to re-enable recording (for the current processing nodes
        allocated to the current subarray). 
 
-    7. Returns to the waiting state (see 1).     
+    5. Returns to the waiting state (see 1).     
  
     """
     def __init__(self, redis_endpoint, redis_chan, margin, 
@@ -114,6 +102,7 @@ class Automator(object):
         self.nshot_chan = nshot_chan
         self.nshot_msg = nshot_msg
         self.active_subarrays = {}
+        self.paused = False
         self.alert("starting the automator at " +
                    datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d %H:%M:%S %Z"))
         
@@ -169,7 +158,10 @@ class Automator(object):
         subarray_name = msg_components[1]
 
         log.info('subarray {} is now in state: {}'.format(subarray_name, subarray_state))
-
+        if self.paused:
+            log.info('the automator is paused, so do nothing')
+            return
+        
         if subarray_state == 'conf_complete':
             self.configure(subarray_name)
         elif subarray_state == 'tracking':
@@ -181,6 +173,23 @@ class Automator(object):
         else:
             log.info('no handler for state {}, ignoring message'.format(subarray_state))
 
+
+    def get_nshot(self, subarray_name):
+        """Get the current value of nshot from redis.
+        """
+        nshot_key = 'coordinator:trigger_mode:{}'.format(subarray_name)
+        nshot = int(self.redis_server.get(nshot_key).split(':')[1])
+        log.info("fetched nshot = {} from redis, for {}".format(nshot, subarray_name))
+
+    
+    def set_nshot(self, subarray_name, nshot):
+        """Set the value of nshot in redis.
+        """
+        nshot_msg = self.nshot_msg.format(subarray_name, nshot)
+        self.redis_server.publish(self.nshot_chan, nshot_msg)
+        log.info("published nshot = {} to redis, for {}".format(nshot, subarray_name))
+
+    
             
     def subarray_init(self, subarray_name, subarray_state):
         """Initialise a subarray. This means retrieving appropriate metadata 
@@ -197,10 +206,16 @@ class Automator(object):
 
             None
         """
-        # `nshot`, the number of recordings still to be taken
-        nshot_key = 'coordinator:trigger_mode:{}'.format(subarray_name)
-        # `nshot` is retrieved in the format: `nshot:<n>`
-        nshot = int(self.redis_server.get(nshot_key).split(':')[1])
+        if subarray_name not in self.active_subarrays:
+            # We are just starting up. Probably we need to set nshot = 1,
+            # so that we do anything. This is not The Right Thing To Do because
+            # it may mistakenly try to record additional data if we are
+            # seeing a new subarray name. But I don't think we are handling new
+            # subarray names correctly anyway.
+            self.set_nshot(subarray_name, 1)
+            
+        nshot = self.get_nshot(subarray_name)
+
         # `allocated_hosts` is the list of host names assigned to record and
         # process incoming data from the current subarray. 
         allocated_hosts_key = 'coordinator:allocated_hosts:{}'.format(subarray_name)
@@ -210,16 +225,10 @@ class Automator(object):
         # Set default to 300 seconds here (this will be updated prior
         # to recording).
         dwell = 300
-        # If the subarray state is `tracking` or `processing`, we can simply
-        # assume that this transition has just happened and record `start_ts`
-        # as the current time. This is because if the start of a recording
-        # has been missed, it will be ignored by the `automator`.  
-        start_ts = datetime.utcnow()
         subarray_obj = Subarray(subarray_name, 
                                 subarray_state, 
                                 nshot, 
                                 dwell, 
-                                start_ts, 
                                 self.margin, 
                                 allocated_hosts)
         self.active_subarrays[subarray_name] = subarray_obj
@@ -244,6 +253,7 @@ class Automator(object):
         # Subarray to be initialised after `conf_complete` message.
         self.subarray_init(subarray_name, 'conf_complete')
 
+        
     def tracking(self, subarray_name):
         """These actions are taken when an existing subarray has begun to 
         track a source.  
@@ -264,17 +274,12 @@ class Automator(object):
             log.info('The backend is still processing, so no action taken.')
             return
             
-        # Update `nshot` (the number of recordings still to be taken)
-        nshot_key = 'coordinator:trigger_mode:{}'.format(subarray_name)
-        # `nshot` is retrieved in the format: `nshot:<n>`
-        nshot = int(self.redis_server.get(nshot_key).split(':')[1])
+        nshot = self.get_nshot(subarray_name)
         self.active_subarrays[subarray_name].nshot = nshot  
         self.active_subarrays[subarray_name].state = 'tracking' 
         log.info('{} in tracking state with nshot = {}'.format(subarray_name, nshot))
-        #if(self.active_subarrays[subarray_name].nshot == '1'):
+
         log.info('Preparing for processing.')
-        start_ts = datetime.utcnow()
-        self.active_subarrays[subarray_name].start_ts = start_ts
         # If this is the last recording before the buffers will be full, 
         # start a timer for `DWELL` + margin seconds.
         allocated_hosts = self.active_subarrays[subarray_name].allocated_hosts
@@ -289,7 +294,7 @@ class Automator(object):
             lambda: self.processing(subarray_name))
         self.active_subarrays[subarray_name].tracking_timer.start()
         
-
+        
     def deconfigure(self, subarray_name):
         """If a deconfigure message is received (indicating that the current
         subarray has been deconfigured), `nshot` is set to 0 and processing is 
@@ -309,12 +314,11 @@ class Automator(object):
         
         self.active_subarrays[subarray_name].state = 'deconfigure'  
         if(self.active_subarrays[subarray_name].processing):
-            log.info('Processing in progress...')
+            log.info('Processing is already in progress.')
         else:
             log.info('{} deconfigured. Proceeding'
                  ' to processing.'.format(subarray_name))
-            nshot_msg = self.nshot_msg.format(subarray_name, 0)
-            self.redis_server.publish(self.nshot_chan, nshot_msg) 
+            self.set_nshot(subarray_name, 0)
             self.processing(subarray_name)
 
     def not_tracking(self, subarray_name):
@@ -389,36 +393,40 @@ class Automator(object):
         proc = ProcSeticore()
         result_seticore = proc.process('/home/lacker/bin/seticore', host_list, BFRDIR, subarray_name)        
         if(result_seticore > 1):
-            alert_msg = "Seticore returned code {}. Stopping automator for debugging.".format(result_seticore)
+            alert_msg = "Seticore returned code {}. Pausing automator for debugging.".format(result_seticore)
             log.error(alert_msg)
             self.alert(alert_msg)
             alert_logs = "Log files available by node: `/home/obs/seticore_slurm/`"
             log.error(alert_logs)
             self.alert(alert_logs)
-            sys.exit(0)
-        else:
-            alert_msg = "New recording processed by seticore (code {}).".format(result_seticore) 
-            log.info(alert_msg)
-            self.alert(alert_msg)
-            alert_output = "Output data are available in /scratch/data/{}".format(datadir)
-            log.info(alert_output)
-            self.alert(alert_output)
+            self.paused = True
+            return
+
+        alert_msg = "New recording processed by seticore (code {}).".format(result_seticore) 
+        log.info(alert_msg)
+        self.alert(alert_msg)
+        alert_output = "Output data are available in /scratch/data/{}".format(datadir)
+        log.info(alert_output)
+        self.alert(alert_output)
+
         # hpguppi_processing
         alert_msg = "Initiating processing with hpguppi_proc..." 
         self.alert(alert_msg)
         proc_hpguppi = ProcHpguppi()
         result_hpguppi = proc_hpguppi.process(PROC_DOMAIN, host_list, subarray_name, BFRDIR)
         if(result_hpguppi != 0):
-            alert_msg = "hpguppi_proc timed out. Stopping automator for debugging."
+            alert_msg = "hpguppi_proc timed out. Pausing automator for debugging."
             log.error(alert_msg)
             self.alert(alert_msg)
-            sys.exit(0)
-        else:
-            alert_msg = "New recording processed by hpguppi_proc. Output data are available in /scratch/data/{}".format(datadir)
-            log.info(alert_msg)
-            self.alert(alert_msg)
+            self.paused = True
+            return
+
+        alert_msg = "New recording processed by hpguppi_proc. Output data are available in /scratch/data/{}".format(datadir)
+        log.info(alert_msg)
+        self.alert(alert_msg)
         self.cleanup(subarray_name)
 
+        
     def cleanup(self, subarray_name):
         """The last part of processing, removing files and getting ready for future recordings.
 
@@ -472,13 +480,7 @@ class Automator(object):
             log.info("Released {} hosts; {} hosts available".format(len(instance_list),
                     len(free_hosts)))
 
-        #dwell = self.active_subarrays[subarray_name].dwell
-        #new_nshot = np.floor(self.buffer_length/dwell)
-        new_nshot = 1
-        # Reset nshot by publishing to the appropriate channel 
-        nshot_msg = self.nshot_msg.format(subarray_name, new_nshot)
-        log.info('Resetting nshot after processing: {} {}'.format(self.nshot_chan, nshot_msg))
-        self.redis_server.publish(self.nshot_chan, nshot_msg)        
+        self.set_nshot(subarray_name, 1)
         self.active_subarrays[subarray_name].processing = False 
         log.info(subarray_name + ' is done processing.')
 
