@@ -1,5 +1,5 @@
 import redis
-from datetime import datetime
+from datetime import datetime, timezone
 import threading
 import numpy as np
 import subprocess
@@ -124,7 +124,9 @@ class Automator(object):
         self.nshot_chan = nshot_chan
         self.nshot_msg = nshot_msg
         self.active_subarrays = {}
-
+        self.alert("restarting the automator at " +
+                   datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d %H:%M:%S %Z"))
+        
     def start(self):
         """Start the automator. Actions to be taken depend on the incoming 
         observational stage messages on the appropriate Redis channel.  
@@ -293,37 +295,37 @@ class Automator(object):
       
             None
         """
-        if(subarray_name not in self.active_subarrays):
-            log.info("""Unexpected subarray tracking event (likely configured
-                     before the current instance of the automator was 
-                     started.""")
-        elif(self.active_subarrays[subarray_name].processing == False):
-            # Update `nshot` (the number of recordings still to be taken)
-            nshot_key = 'coordinator:trigger_mode:{}'.format(subarray_name)
-            # `nshot` is retrieved in the format: `nshot:<n>`
-            nshot = self.redis_server.get(nshot_key).split(':')[1] 
-            self.active_subarrays[subarray_name].nshot = nshot  
-            self.active_subarrays[subarray_name].state = 'tracking' 
-            log.info('{} in tracking state with nshot = {}'.format(subarray_name, nshot))
-            #if(self.active_subarrays[subarray_name].nshot == '1'):
-            log.info('Preparing for processing.')
-            start_ts = datetime.utcnow()
-            self.active_subarrays[subarray_name].start_ts = start_ts
-            # If this is the last recording before the buffers will be full, 
-            # start a timer for `DWELL` + margin seconds.
-            allocated_hosts = self.active_subarrays[subarray_name].allocated_hosts
-            log.info(allocated_hosts) 
-            dwell = self.retrieve_dwell(allocated_hosts)
-            log.info(dwell)
-            self.active_subarrays[subarray_name].dwell = dwell
-            duration = dwell + self.margin
-            # The state to transition to after tracking is processing. 
-            log.info('Starting tracking timer for {} seconds'.format(duration))
-            self.active_subarrays[subarray_name].tracking_timer = threading.Timer(duration, 
-                lambda:self.timeout('processing', subarray_name))
-            self.active_subarrays[subarray_name].tracking_timer.start()
-        elif(self.active_subarrays[subarray_name].processing == True):
-            log.info('Processing still in progress, therefore not recording current track.')
+        if subarray_name not in self.active_subarrays:
+            self.subarray_init(subarray_name, 'tracking')
+
+        if self.active_subarrays[subarray_name].processing:
+            log.info('The backend is still processing, so no action taken.')
+            return
+            
+        # Update `nshot` (the number of recordings still to be taken)
+        nshot_key = 'coordinator:trigger_mode:{}'.format(subarray_name)
+        # `nshot` is retrieved in the format: `nshot:<n>`
+        nshot = self.redis_server.get(nshot_key).split(':')[1] 
+        self.active_subarrays[subarray_name].nshot = nshot  
+        self.active_subarrays[subarray_name].state = 'tracking' 
+        log.info('{} in tracking state with nshot = {}'.format(subarray_name, nshot))
+        #if(self.active_subarrays[subarray_name].nshot == '1'):
+        log.info('Preparing for processing.')
+        start_ts = datetime.utcnow()
+        self.active_subarrays[subarray_name].start_ts = start_ts
+        # If this is the last recording before the buffers will be full, 
+        # start a timer for `DWELL` + margin seconds.
+        allocated_hosts = self.active_subarrays[subarray_name].allocated_hosts
+        log.info(allocated_hosts) 
+        dwell = self.retrieve_dwell(allocated_hosts)
+        log.info(dwell)
+        self.active_subarrays[subarray_name].dwell = dwell
+        duration = dwell + self.margin
+        # The state to transition to after tracking is processing. 
+        log.info('Starting tracking timer for {} seconds'.format(duration))
+        self.active_subarrays[subarray_name].tracking_timer = threading.Timer(duration, 
+            lambda:self.timeout('processing', subarray_name))
+        self.active_subarrays[subarray_name].tracking_timer.start()
         
 
     def deconfigure(self, subarray_name):
@@ -340,6 +342,9 @@ class Automator(object):
  
             None
         """
+        if subarray_name not in self.active_subarrays:
+            self.subarray_init(subarray_name, 'deconfigure')
+        
         self.active_subarrays[subarray_name].state = 'deconfigure'  
         if(self.active_subarrays[subarray_name].processing):
             log.info('Processing in progress...')
@@ -369,6 +374,9 @@ class Automator(object):
       
             None
         """
+        if subarray_name not in self.active_subarrays:
+            self.subarray_init(subarray_name, 'not-tracking')
+        
         if(hasattr(self.active_subarrays[subarray_name], 'tracking_timer')):
             self.active_subarrays[subarray_name].tracking_timer.cancel()
             del self.active_subarrays[subarray_name].tracking_timer
@@ -404,38 +412,38 @@ class Automator(object):
         datadir = self.redis_server.get('{}:current_sb_id'.format(subarray_name))
         # seticore processing
         alert_msg = "Initiating processing with seticore..."
-        self.alert(alert_msg, SLACK_CHANNEL, SLACK_PROXY_CHANNEL)
+        self.alert(alert_msg)
         proc = ProcSeticore()
         result_seticore = proc.process('/home/lacker/bin/seticore', host_list, BFRDIR, subarray_name)        
         if(result_seticore > 1):
             alert_msg = "Seticore returned code {}. Stopping automator for debugging.".format(result_seticore)
             log.error(alert_msg)
-            self.alert(alert_msg, SLACK_CHANNEL, SLACK_PROXY_CHANNEL)
+            self.alert(alert_msg)
             alert_logs = "Log files available by node: `/home/obs/seticore_slurm/`"
             log.error(alert_logs)
-            self.alert(alert_logs, SLACK_CHANNEL, SLACK_PROXY_CHANNEL)
+            self.alert(alert_logs)
             sys.exit(0)
         else:
             alert_msg = "New recording processed by seticore (code {}).".format(result_seticore) 
             log.info(alert_msg)
-            self.alert(alert_msg, SLACK_CHANNEL, SLACK_PROXY_CHANNEL)
+            self.alert(alert_msg)
             alert_output = "Output data are available in /scratch/data/{}".format(datadir)
             log.info(alert_output)
-            self.alert(alert_output, SLACK_CHANNEL, SLACK_PROXY_CHANNEL)
+            self.alert(alert_output)
         # hpguppi_processing
         alert_msg = "Initiating processing with hpguppi_proc..." 
-        self.alert(alert_msg, SLACK_CHANNEL, SLACK_PROXY_CHANNEL)
+        self.alert(alert_msg)
         proc_hpguppi = ProcHpguppi()
         result_hpguppi = proc_hpguppi.process(PROC_DOMAIN, host_list, subarray_name, BFRDIR)
         if(result_hpguppi != 0):
             alert_msg = "hpguppi_proc timed out. Stopping automator for debugging."
             log.error(alert_msg)
-            self.alert(alert_msg, SLACK_CHANNEL, SLACK_PROXY_CHANNEL)
+            self.alert(alert_msg)
             sys.exit(0)
         else:
             alert_msg = "New recording processed by hpguppi_proc. Output data are available in /scratch/data/{}".format(datadir)
             log.info(alert_msg)
-            self.alert(alert_msg, SLACK_CHANNEL, SLACK_PROXY_CHANNEL)
+            self.alert(alert_msg)
         log.info("Proceeding to processing-complete")
         self.change_state('processing-complete')(subarray_name)
 
@@ -579,7 +587,8 @@ class Automator(object):
         mode_1d = vals[mode_index]
         return mode_1d
 
-    def alert(self, message, slack_channel, slack_proxy_channel):
+    def alert(self, message, slack_channel=SLACK_CHANNEL,
+              slack_proxy_channel=SLACK_PROXY_CHANNEL):
         """Publish a message to the alerts Slack channel. 
 
         Args:
