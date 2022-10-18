@@ -370,6 +370,9 @@ class Automator(object):
       
             None
         """
+        if self.paused:
+            log.info("we are paused so we do not want to process.")
+            return
         subarray = self.active_subarrays[subarray_name]
         log.info(subarray_name + " is now processing.")
         if subarray.processing:
