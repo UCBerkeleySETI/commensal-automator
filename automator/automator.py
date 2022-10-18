@@ -210,7 +210,7 @@ class Automator(object):
         # `nshot`, the number of recordings still to be taken
         nshot_key = 'coordinator:trigger_mode:{}'.format(subarray_name)
         # `nshot` is retrieved in the format: `nshot:<n>`
-        nshot = self.redis_server.get(nshot_key).split(':')[1] 
+        nshot = int(self.redis_server.get(nshot_key).split(':')[1])
         # `allocated_hosts` is the list of host names assigned to record and
         # process incoming data from the current subarray. 
         allocated_hosts_key = 'coordinator:allocated_hosts:{}'.format(subarray_name)
@@ -277,7 +277,7 @@ class Automator(object):
         # Update `nshot` (the number of recordings still to be taken)
         nshot_key = 'coordinator:trigger_mode:{}'.format(subarray_name)
         # `nshot` is retrieved in the format: `nshot:<n>`
-        nshot = self.redis_server.get(nshot_key).split(':')[1] 
+        nshot = int(self.redis_server.get(nshot_key).split(':')[1])
         self.active_subarrays[subarray_name].nshot = nshot  
         self.active_subarrays[subarray_name].state = 'tracking' 
         log.info('{} in tracking state with nshot = {}'.format(subarray_name, nshot))
