@@ -208,13 +208,7 @@ class Automator(object):
 
             None
         """
-        if subarray_name not in self.active_subarrays:
-            # We are just starting up. Probably we need to set nshot = 1,
-            # so that we do anything. This is not The Right Thing To Do because
-            # it may mistakenly try to record additional data if we are
-            # seeing a new subarray name. But I don't think we are handling new
-            # subarray names correctly anyway.
-            self.set_nshot(subarray_name, 1)
+        initial_startup = (subarray_name not in self.active_subarrays)
             
         # `allocated_hosts` is the list of host names assigned to record and
         # process incoming data from the current subarray. 
@@ -230,6 +224,15 @@ class Automator(object):
         log.info('Initialised new subarray object: {}'
                  ' in state {}'.format(subarray_name, subarray_state))
 
+        if initial_startup:
+            rawmap = redis_util.raw_files(self.redis_server)
+            if set(rawmap.keys()).intersection(allocated_hosts):
+                log.info("subarray {} has leftover work from a previous run. processing...".format(subarray_name))
+                self.processing(subarray_name)
+            else:
+                log.info("subarray {} is ready for recording".format(subarray_name))
+                self.set_nshot(subarray_name, 1)
+        
 
     def configure(self, subarray_name):
         """This function is to be run on configuration of a new subarray. 

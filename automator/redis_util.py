@@ -7,10 +7,10 @@ import sys
 
 def raw_files(r):
     """Returns a dict mapping host name to a list of raw files on the host."""
-    hosts = r.keys("bluse_raw_watch:*")
+    hosts = [key.split(":")[-1] for key in r.keys("bluse_raw_watch:*")]
     pipe = r.pipeline()
     for host in hosts:
-        pipe.set("smembers", "bluse_raw_watch:" + host)
+        pipe.smembers("bluse_raw_watch:" + host)
     results = pipe.execute()
     answer = {}
     for host, result in zip(hosts, results):
@@ -32,8 +32,8 @@ def main():
     r = redis.StrictRedis(decode_responses=True)
 
     if command == "raw_files":
-        hosts = ["blpn{}".format(i) for i in range(64)]
-        for host, result in raw_files(r):
+        rawmap = raw_files(r)
+        for host, result in sorted(rawmap.items()):
             for r in result:
                 print(host, r)
         return
