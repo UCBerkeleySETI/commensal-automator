@@ -215,21 +215,14 @@ class Automator(object):
             # subarray names correctly anyway.
             self.set_nshot(subarray_name, 1)
             
-        nshot = self.get_nshot(subarray_name)
-
         # `allocated_hosts` is the list of host names assigned to record and
         # process incoming data from the current subarray. 
         allocated_hosts_key = 'coordinator:allocated_hosts:{}'.format(subarray_name)
         allocated_hosts = self.redis_server.lrange(allocated_hosts_key, 0,
             self.redis_server.llen(allocated_hosts_key))        
-        # DWELL, the duration of a recording in seconds
-        # Set default to 300 seconds here (this will be updated prior
-        # to recording).
-        dwell = 300
+
         subarray_obj = Subarray(subarray_name, 
                                 subarray_state, 
-                                nshot, 
-                                dwell, 
                                 self.margin, 
                                 allocated_hosts)
         self.active_subarrays[subarray_name] = subarray_obj
@@ -276,21 +269,18 @@ class Automator(object):
             return
             
         nshot = self.get_nshot(subarray_name)
-        self.active_subarrays[subarray_name].nshot = nshot  
         self.active_subarrays[subarray_name].state = 'tracking' 
         log.info('{} in tracking state with nshot = {}'.format(subarray_name, nshot))
 
-        log.info('Preparing for processing.')
         # If this is the last recording before the buffers will be full, 
         # start a timer for `DWELL` + margin seconds.
         allocated_hosts = self.active_subarrays[subarray_name].allocated_hosts
         log.info(allocated_hosts) 
         dwell = self.retrieve_dwell(allocated_hosts)
-        log.info(dwell)
-        self.active_subarrays[subarray_name].dwell = dwell
+        log.info("dwell: {}".format(dwell))
         duration = dwell + self.margin
         # The state to transition to after tracking is processing. 
-        log.info('Starting tracking timer for {} seconds'.format(duration))
+        log.info('starting tracking timer for {} seconds'.format(duration))
         self.active_subarrays[subarray_name].tracking_timer = threading.Timer(duration, 
             lambda: self.processing(subarray_name))
         self.active_subarrays[subarray_name].tracking_timer.start()
@@ -322,19 +312,12 @@ class Automator(object):
             self.processing(subarray_name)
 
     def not_tracking(self, subarray_name):
-        """These actions are taken when an existing subarray has ceased to 
-        track a source.  
-
-
-        If a timer has previously been set (and therefore tracking of the 
-        current source has ended prematurely), cancel the timer and (if 
-        `nshot > 0`), wait for the next source to be tracked. If 
-        `nshot == 0`, then transition to the processing state.  
+        """not_tracking is called when an existing subarray has ceased to 
+        track a source. This method decides whether to begin processing or not.
 
         Args:
            
-            subarray_name (str): The name of the subarray which has just
-            ceased to track a specific source. 
+            subarray_name (str): The name of the subarray,
 
         Returns:
       
@@ -343,19 +326,35 @@ class Automator(object):
         if subarray_name not in self.active_subarrays:
             self.subarray_init(subarray_name, 'not-tracking')
         subarray = self.active_subarrays[subarray_name]
-            
-        if hasattr(subarray, 'tracking_timer'):
-            subarray.tracking_timer.cancel()
-            del subarray.tracking_timer
-            if subarray.nshot == 0:
-                log.info(subarray_name + ' has nshot = 0, so it is ready to process.')
-                self.processing(subarray_name)
-            else:
-                log.info('{} has nshot = {}, so it is not ready to process.'.format(
-                    subarray_name, subarray.nshot))
-        else:
-           log.info('We are not recording for {}, so there is nothing to process.'.format(
-               subarray_name))
+
+        if not hasattr(subarray, 'tracking_timer'):
+            # If there's no tracking timer, that could mean it already expired, and
+            # we should have handled any recording at that time.
+            # It could also mean the telescope is "scanning", where it sends lots of
+            # not-tracking events, and we don't do any recording in the first place.
+            # Either way we don't have data to process.
+            log.info('we are not recording for {}, so there is no action to take.'.format(
+                subarray_name))
+            return
+
+        log.info('canceling tracking timer for ' + subarray_name)
+        subarray.tracking_timer.cancel()
+        del subarray.tracking_timer
+
+        nshot = self.get_nshot(subarray_name)
+        if nshot == 0:
+            # nshot is set back to zero when a recording starts.
+            # We're assuming that the timer was long enough so that the recording
+            # also successfully ended.
+            log.info('timer expired for {} and nshot = 0, so we are ready to process.'.format(subarray_name))
+            self.processing(subarray_name)
+            return
+
+        # A recording never started. Sometimes this happens when the coordinator
+        # did not have all the metadata it needed to record, like when the telescope is
+        # in scanning mode.
+        log.info('time expired for {} but nshot = {}, so there is no recorded data.'.format(
+            subarray_name, nshot))
 
            
     def processing(self, subarray_name):
