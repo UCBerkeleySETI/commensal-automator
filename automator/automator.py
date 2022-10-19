@@ -319,7 +319,6 @@ class Automator(object):
         else:
             log.info('{} deconfigured. Proceeding'
                  ' to processing.'.format(subarray_name))
-            self.set_nshot(subarray_name, 0)
             self.processing(subarray_name)
 
     def not_tracking(self, subarray_name):
