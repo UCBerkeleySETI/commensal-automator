@@ -356,7 +356,13 @@ class Automator(object):
         log.info('time expired for {} but nshot = {}, so there is no recorded data.'.format(
             subarray_name, nshot))
 
-           
+
+    def pause(self, message):
+        full_message = message + "; pausing automator for debugging."
+        self.alert(full_message)
+        self.paused = True
+
+        
     def processing(self, subarray_name):
         """Initiate processing across processing nodes in the current subarray. 
 
@@ -379,7 +385,7 @@ class Automator(object):
                 subarray_name))
             return
         subarray.processing = True 
-        # Future work: add a timeout for the script.
+
         # Retrieve the list of hosts assigned to the current subarray:
         host_key = 'coordinator:allocated_hosts:{}'.format(subarray_name)
         instance_list = self.redis_server.lrange(host_key, 
@@ -390,41 +396,28 @@ class Automator(object):
         # DATADIR
         datadir = self.redis_server.get('{}:current_sb_id'.format(subarray_name))
         # seticore processing
-        alert_msg = "Initiating processing with seticore..."
-        self.alert(alert_msg)
+        self.alert("running seticore...")
         proc = ProcSeticore()
         result_seticore = proc.process('/home/lacker/bin/seticore', host_list, BFRDIR, subarray_name)        
-        if(result_seticore > 1):
-            alert_msg = "Seticore returned code {}. Pausing automator for debugging.".format(result_seticore)
-            log.error(alert_msg)
-            self.alert(alert_msg)
-            alert_logs = "Log files available by node: `/home/obs/seticore_slurm/`"
-            log.error(alert_logs)
-            self.alert(alert_logs)
-            self.paused = True
+        if result_seticore > 1:
+            if result_seticore > 128:
+                self.pause("seticore killed with signal {}".format(result_seticore - 128))
+            else:
+                self.pause("the seticore slurm job failed with code {}".format(
+                    result_seticore))
             return
 
-        alert_msg = "New recording processed by seticore (code {}).".format(result_seticore) 
-        log.info(alert_msg)
+        alert_msg = "seticore completed with code {}. output in /scratch/data/{}".format(result_seticore, datadir)
         self.alert(alert_msg)
-        alert_output = "Output data are available in /scratch/data/{}".format(datadir)
-        log.info(alert_output)
-        self.alert(alert_output)
 
-        # hpguppi_processing
-        alert_msg = "Initiating processing with hpguppi_proc..." 
-        self.alert(alert_msg)
+        self.alert("initiating processing with hpguppi_proc...")
         proc_hpguppi = ProcHpguppi()
         result_hpguppi = proc_hpguppi.process(PROC_DOMAIN, host_list, subarray_name, BFRDIR)
-        if(result_hpguppi != 0):
-            alert_msg = "hpguppi_proc timed out. Pausing automator for debugging."
-            log.error(alert_msg)
-            self.alert(alert_msg)
-            self.paused = True
+        if result_hpguppi != 0:
+            self.pause("hpguppi_proc timed out")
             return
 
-        alert_msg = "New recording processed by hpguppi_proc. Output data are available in /scratch/data/{}".format(datadir)
-        log.info(alert_msg)
+        alert_msg = "hpguppi_proc completed. output in /scratch/data/{}".format(datadir)
         self.alert(alert_msg)
         self.cleanup(subarray_name)
 
@@ -548,6 +541,7 @@ class Automator(object):
         Returns:
             None  
         """
+        log.info(message)
         # Format: <Slack channel>:<Slack message text>
         alert_msg = '{}:{}'.format(slack_channel, message)
         self.redis_server.publish(slack_proxy_channel, alert_msg)
