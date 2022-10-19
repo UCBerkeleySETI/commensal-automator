@@ -180,7 +180,8 @@ class Automator(object):
         nshot_key = 'coordinator:trigger_mode:{}'.format(subarray_name)
         nshot = int(self.redis_server.get(nshot_key).split(':')[1])
         log.info("fetched nshot = {} from redis, for {}".format(nshot, subarray_name))
-
+        return nshot
+        
     
     def set_nshot(self, subarray_name, nshot):
         """Set the value of nshot in redis.
