@@ -5,6 +5,7 @@ import numpy as np
 import subprocess
 import sys
 
+from automator import redis_util
 from .logger import log
 from .subarray import Subarray
 from .proc_hpguppi import ProcHpguppi
@@ -103,7 +104,7 @@ class Automator(object):
         self.nshot_msg = nshot_msg
         self.active_subarrays = {}
         self.paused = False
-        self.alert("starting the automator at " +
+        self.alert("starting at " +
                    datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d %H:%M:%S %Z"))
         
     def start(self):
@@ -358,7 +359,7 @@ class Automator(object):
 
 
     def pause(self, message):
-        full_message = message + "; pausing automator for debugging."
+        full_message = message + "; pausing for debugging."
         self.alert(full_message)
         self.paused = True
 
@@ -393,12 +394,43 @@ class Automator(object):
                                              self.redis_server.llen(host_key))
         # Format for host name (rather than instance name):
         host_list =  [host.split('/')[0] for host in instance_list]
-        # DATADIR
-        datadir = self.redis_server.get('{}:current_sb_id'.format(subarray_name))
+
+        # Check that raw files are where we expect them to be
+        datadir = redis_util.sb_id(self.redis_server, subarray_name)
+        raw_files = redis_util.raw_files(self.redis_server)
+        hosts_with_no_files = []
+        inputdir = None
+        for host in host_list:
+            filenames = raw_files.get(host, [])
+            dirnames = sorted(set(os.path.dirname(filename) for filename in filenames))
+            if not dirnames:
+                hosts_with_no_files.append(host)
+                continue
+            if len(dirnames > 1):
+                self.pause("multiple raw files directories on {}: {}".format(host, dirnames))
+                return
+            dirname = dirnames[0]
+            if not dirname.endswith(datadir):
+                self.pause("sb id is {} but raw files are in {}:{}".format(datadir, host, dirname))
+                return
+            if not inputdir:
+                inputdir = datadir
+
+        if inputdir is None:
+            self.alert("there were no input files when we expected input files.")
+            subarray.processing = False
+            return
+                
+        if len(hosts_with_no_files) > len(host_list) / 2:
+            self.pause("many hosts have no files: {}".format(hosts_with_no_files))
+            return
+                
+
         # seticore processing
         self.alert("running seticore...")
-        proc = ProcSeticore()
-        result_seticore = proc.process('/home/lacker/bin/seticore', host_list, BFRDIR, subarray_name)        
+        proc = ProcSeticore(self.redis_server)
+        result_seticore = proc.process('/home/lacker/bin/seticore', host_list, BFRDIR,
+                                       subarray_name, inputdir, datadir)
         if result_seticore > 1:
             if result_seticore > 128:
                 self.pause("seticore killed with signal {}".format(result_seticore - 128))
@@ -543,5 +575,5 @@ class Automator(object):
         """
         log.info(message)
         # Format: <Slack channel>:<Slack message text>
-        alert_msg = '{}:{}'.format(slack_channel, message)
+        alert_msg = '{}:automator: {}'.format(slack_channel, message)
         self.redis_server.publish(slack_proxy_channel, alert_msg)
