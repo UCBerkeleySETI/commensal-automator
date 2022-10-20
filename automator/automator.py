@@ -2,6 +2,7 @@ import redis
 from datetime import datetime, timezone
 import threading
 import numpy as np
+import os
 import subprocess
 import sys
 
@@ -106,6 +107,7 @@ class Automator(object):
         self.paused = False
         self.alert("starting at " +
                    datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d %H:%M:%S %Z"))
+
         
     def start(self):
         """Start the automator. Actions to be taken depend on the incoming 
@@ -119,11 +121,15 @@ class Automator(object):
 
             None
         """
+        for subarray_name in redis_util.active_subarrays(self.redis_server):
+            self.subarray_init(subarray_name, "unknown")
+            
         ps = self.redis_server.pubsub(ignore_subscribe_messages=True)
         ps.subscribe(self.receive_channel)
         for msg in ps.listen():
             self.parse_msg(msg)
 
+            
     def parse_msg(self, msg):
         """Examines an incoming message (from the appropriate Redis channel)
         and determines whether or not it is relevant to the automator. If it is
@@ -145,13 +151,15 @@ class Automator(object):
             If the <message> component of msg is one of the above, then the 
             first component of msg is the subarray name. 
 
+            The other telescope state is "unknown", but that can't be set via message.
+
         Returns:
 
             None
         """
         msg_data = msg['data'] 
         msg_components = msg_data.split(':')
-        if(len(msg_components) !=  2):
+        if len(msg_components) != 2:
             log.warning("Unrecognised message: {}".format(msg_data))
             return
 
@@ -164,7 +172,7 @@ class Automator(object):
             return
         
         if subarray_state == 'conf_complete':
-            self.configure(subarray_name)
+            self.conf_complete(subarray_name)
         elif subarray_state == 'tracking':
             self.tracking(subarray_name)
         elif subarray_state == 'not-tracking':
@@ -195,8 +203,8 @@ class Automator(object):
             
     def subarray_init(self, subarray_name, subarray_state):
         """Initialise a subarray. This means retrieving appropriate metadata 
-        for the current subarray. This step must take place before a recording
-        has started. 
+        for the current subarray. This happens either when configuration completes,
+        or when the automator starts up.
 
         Args:
 
@@ -208,25 +216,15 @@ class Automator(object):
 
             None
         """
-        initial_startup = (subarray_name not in self.active_subarrays)
-            
-        # `allocated_hosts` is the list of host names assigned to record and
-        # process incoming data from the current subarray. 
-        allocated_hosts_key = 'coordinator:allocated_hosts:{}'.format(subarray_name)
-        allocated_hosts = self.redis_server.lrange(allocated_hosts_key, 0,
-            self.redis_server.llen(allocated_hosts_key))        
-
-        subarray_obj = Subarray(subarray_name, 
-                                subarray_state, 
-                                self.margin, 
-                                allocated_hosts)
+        subarray_obj = Subarray(subarray_name, subarray_state)
         self.active_subarrays[subarray_name] = subarray_obj
-        log.info('Initialised new subarray object: {}'
-                 ' in state {}'.format(subarray_name, subarray_state))
+        log.info('initialized subarray {} in state {}'.format(subarray_name, subarray_state))
 
-        if initial_startup:
+        if subarray_state == "unknown":
+            # This is initial startup, so we may have leftover files to process.
             rawmap = redis_util.raw_files(self.redis_server)
-            if set(rawmap.keys()).intersection(allocated_hosts):
+            hosts = redis_util.allocated_hosts(self.redis_server, subarray_name)
+            if set(rawmap.keys()).intersection(hosts):
                 log.info("subarray {} has leftover work from a previous run. processing...".format(subarray_name))
                 self.processing(subarray_name)
             else:
@@ -234,7 +232,7 @@ class Automator(object):
                 self.set_nshot(subarray_name, 1)
         
 
-    def configure(self, subarray_name):
+    def conf_complete(self, subarray_name):
         """This function is to be run on configuration of a new subarray. 
 
         Args:
@@ -265,9 +263,6 @@ class Automator(object):
       
             None
         """
-        if subarray_name not in self.active_subarrays:
-            self.subarray_init(subarray_name, 'tracking')
-
         if self.active_subarrays[subarray_name].processing:
             log.info('The backend is still processing, so no action taken.')
             return
@@ -278,8 +273,8 @@ class Automator(object):
 
         # If this is the last recording before the buffers will be full, 
         # start a timer for `DWELL` + margin seconds.
-        allocated_hosts = self.active_subarrays[subarray_name].allocated_hosts
-        log.info(allocated_hosts) 
+        allocated_hosts = redis_util.allocated_hosts(self.redis_server, subarray_name)
+        log.info("allocated hosts for {}:".format(subarray_name), allocated_hosts) 
         dwell = self.retrieve_dwell(allocated_hosts)
         log.info("dwell: {}".format(dwell))
         duration = dwell + self.margin
@@ -304,17 +299,15 @@ class Automator(object):
  
             None
         """
-        if subarray_name not in self.active_subarrays:
-            self.subarray_init(subarray_name, 'deconfigure')
-        
         self.active_subarrays[subarray_name].state = 'deconfigure'  
-        if(self.active_subarrays[subarray_name].processing):
+        if self.active_subarrays[subarray_name].processing:
             log.info('Processing is already in progress.')
         else:
             log.info('{} deconfigured. Proceeding'
                  ' to processing.'.format(subarray_name))
             self.processing(subarray_name)
 
+            
     def not_tracking(self, subarray_name):
         """not_tracking is called when an existing subarray has ceased to 
         track a source. This method decides whether to begin processing or not.
@@ -327,8 +320,6 @@ class Automator(object):
       
             None
         """
-        if subarray_name not in self.active_subarrays:
-            self.subarray_init(subarray_name, 'not-tracking')
         subarray = self.active_subarrays[subarray_name]
 
         if not hasattr(subarray, 'tracking_timer'):
@@ -390,16 +381,10 @@ class Automator(object):
             return
         subarray.processing = True 
 
-        # Retrieve the list of hosts assigned to the current subarray:
-        host_key = 'coordinator:allocated_hosts:{}'.format(subarray_name)
-        instance_list = self.redis_server.lrange(host_key, 
-                                             0, 
-                                             self.redis_server.llen(host_key))
-        # Format for host name (rather than instance name):
-        host_list =  [host.split('/')[0] for host in instance_list]
+        host_list = redis_util.allocated_hosts(self.redis_server, subarray_name)
 
         # Check that raw files are where we expect them to be
-        datadir = redis_util.sb_id(self.redis_server, subarray_name)
+        sb_id = redis_util.sb_id(self.redis_server, subarray_name)
         raw_files = redis_util.raw_files(self.redis_server)
         hosts_with_no_files = []
         inputdir = None
@@ -409,15 +394,15 @@ class Automator(object):
             if not dirnames:
                 hosts_with_no_files.append(host)
                 continue
-            if len(dirnames > 1):
+            if len(dirnames) > 1:
                 self.pause("multiple raw files directories on {}: {}".format(host, dirnames))
                 return
             dirname = dirnames[0]
-            if not dirname.endswith(datadir):
-                self.pause("sb id is {} but raw files are in {}:{}".format(datadir, host, dirname))
+            if sb_id not in dirname:
+                self.pause("sb id is {} but raw files are in {}:{}".format(sb_id, host, dirname))
                 return
             if not inputdir:
-                inputdir = datadir
+                inputdir = dirname
 
         if inputdir is None:
             self.alert("there were no input files when we expected input files.")
@@ -433,7 +418,7 @@ class Automator(object):
         self.alert("running seticore...")
         proc = ProcSeticore(self.redis_server)
         result_seticore = proc.process('/home/lacker/bin/seticore', host_list, BFRDIR,
-                                       subarray_name, inputdir, datadir)
+                                       subarray_name, inputdir, sb_id)
         if result_seticore > 1:
             if result_seticore > 128:
                 self.pause("seticore killed with signal {}".format(result_seticore - 128))
@@ -490,13 +475,13 @@ class Automator(object):
             print(e)
 
         # Release hosts if current subarray has already been deconfigured:
-        if(self.active_subarrays[subarray_name].state == 'deconfigure'): 
+        if self.active_subarrays[subarray_name].state == 'deconfigure':
             proc_group = '{}:{}///gateway'.format(PROC_DOMAIN, subarray_name)
             self.redis_server.publish(proc_group, 'leave={}'.format(subarray_name))
             acq_group = '{}:{}///gateway'.format(ACQ_DOMAIN, subarray_name)
             self.redis_server.publish(acq_group, 'leave={}'.format(subarray_name))
             # Get list of currently available hosts:
-            if(self.redis_server.exists('coordinator:free_hosts')):
+            if self.redis_server.exists('coordinator:free_hosts'):
                 free_hosts = self.redis_server.lrange('coordinator:free_hosts', 0,
                     self.redis_server.llen('coordinator:free_hosts'))
                 self.redis_server.delete('coordinator:free_hosts')
@@ -508,7 +493,7 @@ class Automator(object):
             # Remove resources from current subarray 
             self.redis_server.delete('coordinator:allocated_hosts:{}'.format(subarray_name))
             log.info("Released {} hosts; {} hosts available".format(len(instance_list),
-                    len(free_hosts)))
+                                                                    len(free_hosts)))
 
         self.set_nshot(subarray_name, 1)
         self.active_subarrays[subarray_name].processing = False 
@@ -518,6 +503,7 @@ class Automator(object):
     def retrieve_dwell(self, host_list):
         """Retrieve the current value of `DWELL` from the Hashpipe-Redis 
         Gateway for a specific set of hosts. Defaults to 300 seconds. 
+        Note that this assumes all instances are host/0.
 
         Args:
 
@@ -531,18 +517,18 @@ class Automator(object):
         dwell = 300
         dwell_values = []
         for host in host_list:
-            host_key = '{}://{}/status'.format(self.hpgdomain, host)
+            host_key = '{}://{}/0/status'.format(self.hpgdomain, host)
             host_status = self.redis_server.hgetall(host_key)
-            if(len(host_status) > 0):
-                if('DWELL' in host_status):
+            if len(host_status) > 0:
+                if 'DWELL' in host_status:
                     dwell_values.append(float(host_status['DWELL']))
                 else:
                     log.warning('Cannot retrieve DWELL for {}'.format(host))
             else:
                 log.warning('Cannot access {}'.format(host))
-        if(len(dwell_values) > 0):
+        if len(dwell_values) > 0:
             dwell = self.mode_1d(dwell_values)
-            if(len(np.unique(dwell_values)) > 1):
+            if len(np.unique(dwell_values)) > 1:
                 log.warning("DWELL disagreement")    
         else:
             log.warning("Could not retrieve DWELL. Using 300 sec by default.")

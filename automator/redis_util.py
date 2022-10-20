@@ -22,6 +22,17 @@ def sb_id(r, subarray):
     return r.get('{}:current_sb_id'.format(subarray))
 
 
+def active_subarrays(r):
+    """Returns a list of all subarrays that have hosts allocated to them."""
+    return sorted(key.split(":")[-1] for key in r.keys("coordinator:allocated_hosts:*"))
+
+
+def allocated_hosts(r, subarray):
+    """Returns the hosts allocated to a particular subarray."""
+    results = r.lrange("coordinator:allocated_hosts:" + subarray, 0, -1)
+    return sorted(s.split("/")[0] for s in results)
+
+
 def main():
     if len(sys.argv) < 2:
         print("no command specified")
@@ -41,6 +52,18 @@ def main():
     if command == "sb_id":
         arr = args[0]
         print(sb_id(r, arr))
+        return
+
+    if command == "active_subarrays":
+        for subarray in active_subarrays(r):
+            print(subarray)
+        return
+
+    if command == "allocated_hosts":
+        subarray = args[0]
+        hosts = allocated_hosts(r, subarray)
+        print(subarray, "has", len(hosts), "allocated hosts:")
+        print(" ".join(hosts))
         return
     
     print("unrecognized command:", command)
