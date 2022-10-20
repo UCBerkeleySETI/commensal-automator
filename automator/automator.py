@@ -186,8 +186,7 @@ class Automator(object):
     def get_nshot(self, subarray_name):
         """Get the current value of nshot from redis.
         """
-        nshot_key = 'coordinator:trigger_mode:{}'.format(subarray_name)
-        nshot = int(self.redis_server.get(nshot_key).split(':')[1])
+        nshot = redis_util.get_nshot(self.redis_server, subarray_name)
         log.info("fetched nshot = {} from redis, for {}".format(nshot, subarray_name))
         return nshot
         
