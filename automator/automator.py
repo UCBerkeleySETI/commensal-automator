@@ -453,6 +453,9 @@ class Automator(object):
       
             None
         """
+
+        # Get list of hashpipe acquisition pipeline instances for the 
+        # current subarray:
         host_key = 'coordinator:allocated_hosts:{}'.format(subarray_name)
         instance_list = self.redis_server.lrange(host_key, 
                                              0, 
@@ -474,27 +477,7 @@ class Automator(object):
             log.error('Could not empty all NVMe modules')
             print(e)
 
-        # Release hosts if current subarray has already been deconfigured:
-        if self.active_subarrays[subarray_name].state == 'deconfigure':
-            proc_group = '{}:{}///gateway'.format(PROC_DOMAIN, subarray_name)
-            self.redis_server.publish(proc_group, 'leave={}'.format(subarray_name))
-            acq_group = '{}:{}///gateway'.format(ACQ_DOMAIN, subarray_name)
-            self.redis_server.publish(acq_group, 'leave={}'.format(subarray_name))
-            # Get list of currently available hosts:
-            if self.redis_server.exists('coordinator:free_hosts'):
-                free_hosts = self.redis_server.lrange('coordinator:free_hosts', 0,
-                    self.redis_server.llen('coordinator:free_hosts'))
-                self.redis_server.delete('coordinator:free_hosts')
-            else:
-                free_hosts = []
-            # Append released hosts and write 
-            free_hosts = free_hosts + instance_list
-            self.redis_server.rpush('coordinator:free_hosts', *free_hosts)    
-            # Remove resources from current subarray 
-            self.redis_server.delete('coordinator:allocated_hosts:{}'.format(subarray_name))
-            log.info("Released {} hosts; {} hosts available".format(len(instance_list),
-                                                                    len(free_hosts)))
-
+        # Reset nshot (enable new recordings):
         self.set_nshot(subarray_name, 1)
         self.active_subarrays[subarray_name].processing = False 
         log.info(subarray_name + ' is done processing.')
