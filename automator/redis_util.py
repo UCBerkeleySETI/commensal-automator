@@ -73,7 +73,7 @@ def coordinator_hosts(r):
         pktidx, pktstart, pktstop = map(int, strkeys)
         if pktstart > 0 and pktidx < pktstop:
             answer.add(host)
-    return sorted(hosts)
+    return sorted(answer)
     
 
 def main():
