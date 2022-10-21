@@ -8,7 +8,6 @@ import sys
 
 from automator import redis_util
 from .logger import log
-from .subarray import Subarray
 from .proc_hpguppi import ProcHpguppi
 from .proc_seticore import run_seticore
 
@@ -17,6 +16,7 @@ PROC_DOMAIN = 'blproc'
 ACQ_DOMAIN = 'bluse'
 SLACK_CHANNEL = "meerkat-obs-log"
 SLACK_PROXY_CHANNEL = "slack-messages"
+
 
 class Automator(object):
     """The automator controls when the system is recording raw files, when
@@ -54,24 +54,18 @@ class Automator(object):
                  hpgdomain, buffer_length, nshot_chan, nshot_msg):
         """Initialise the automator. 
 
-        Args: 
-
-            redis_endpoint (str): Redis endpoint (of the form <host IP
-            address>:<port>) 
-            redis_chan (str): Name of the redis channel
-            margin (float): Safety margin (in seconds) to add to `DWELL`
-            when calculating the estimated end of a recording. 
-            hpgdomain (str): The Hashpipe-Redis Gateway domain for the instrument
-            in question. 
-            buffer_length (float): Maximum duration of recording (in seconds)
-            for the maximum possible incoming data rate. 
-            nshot_chan (str): The Redis channel for resetting nshot.
-            nshot_msg (str): The base form of the Redis message for resetting
-            nshot. For example, `coordinator:trigger_mode:<subarray_name>:nshot:<n>`
-
-        Returns:
-
-            None
+        redis_endpoint (str): Redis endpoint (of the form <host IP
+        address>:<port>) 
+        redis_chan (str): Name of the redis channel
+        margin (float): Safety margin (in seconds) to add to `DWELL`
+        when calculating the estimated end of a recording. 
+        hpgdomain (str): The Hashpipe-Redis Gateway domain for the instrument
+        in question. 
+        buffer_length (float): Maximum duration of recording (in seconds)
+        for the maximum possible incoming data rate. 
+        nshot_chan (str): The Redis channel for resetting nshot.
+        nshot_msg (str): The base form of the Redis message for resetting
+        nshot. For example, `coordinator:trigger_mode:<subarray_name>:nshot:<n>`
         """
         log.info('starting the automator. redis = {}'.format(redis_endpoint))
         redis_host, redis_port = redis_endpoint.split(':')
@@ -84,17 +78,26 @@ class Automator(object):
         self.buffer_length = buffer_length
         self.nshot_chan = nshot_chan
         self.nshot_msg = nshot_msg
-        self.active_subarrays = {}
+
+        # A set of all hosts that are currently processing
+        self.processing = set()
+
+        # Timers maps subarray name to a timer for when we should check if it's
+        # ready to process
+        self.timers = {}
+        
+        # Setting this to True should stop all subsequent actions while we manually debug
         self.paused = False
+
         self.alert("starting at " +
                    datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d %H:%M:%S %Z"))
 
         
     def start(self):
         """Start the automator."""
-        for subarray_name in redis_util.active_subarrays(self.redis_server):
-            self.subarray_init(subarray_name, "unknown")
-            
+        self.maybe_start_recording()
+        self.maybe_start_processing()
+        
         ps = self.redis_server.pubsub(ignore_subscribe_messages=True)
         ps.subscribe(self.receive_channel)
         for msg in ps.listen():
@@ -104,22 +107,14 @@ class Automator(object):
     def parse_msg(self, msg):
         """Handles an incoming message sent from the telescope about its state.
 
-        Args:
+        msg (str): A message of format "<telescope state>:<subarray_name>"
 
-            msg (str): A message of format "<telescope state>:<subarray_name>"
+        We handle these telescope states:
 
-            We handle these telescope states:
- 
-            - conf_complete
-            - tracking
-            - not-tracking
-            - deconfigure
-
-            The other telescope state is "unknown", but that can't be set via message.
-
-        Returns:
-
-            None
+        - conf_complete
+        - tracking
+        - not-tracking
+        - deconfigure
         """
         msg_data = msg['data'] 
         msg_components = msg_data.split(':')
@@ -133,17 +128,14 @@ class Automator(object):
         if self.paused:
             log.info('the automator is paused, so do nothing')
             return
+
+        self.maybe_start_recording()
+        self.maybe_start_processing()
         
-        if subarray_state == 'conf_complete':
-            self.conf_complete(subarray_name)
-        elif subarray_state == 'tracking':
+        if subarray_state == 'tracking':
             self.tracking(subarray_name)
         elif subarray_state == 'not-tracking':
             self.not_tracking(subarray_name)
-        elif subarray_state == 'deconfigure':
-            self.deconfigure(subarray_name)
-        else:
-            log.info('no handler for state {}, ignoring message'.format(subarray_state))
 
 
     def get_nshot(self, subarray_name):
@@ -160,226 +152,92 @@ class Automator(object):
         nshot_msg = self.nshot_msg.format(subarray_name, nshot)
         self.redis_server.publish(self.nshot_chan, nshot_msg)
         log.info("published nshot = {} to redis, for {}".format(nshot, subarray_name))
-
     
             
-    def subarray_init(self, subarray_name, subarray_state):
-        """Initialise a subarray. This means retrieving appropriate metadata 
-        for the current subarray. This happens either when configuration completes,
-        or when the automator starts up.
-
-        Args:
-
-            subarray_name (str): The name of the subarray
-            subarray_state (str): The state of the subarray
-
-        Returns:
-
-            None
-        """
-        subarray_obj = Subarray(subarray_name, subarray_state)
-        self.active_subarrays[subarray_name] = subarray_obj
-        log.info('initialized subarray {} in state {}'.format(subarray_name, subarray_state))
-
-        if subarray_state == "unknown":
-            # This is initial startup, so we may have leftover files to process.
-            rawmap = redis_util.raw_files(self.redis_server)
-            hosts = redis_util.allocated_hosts(self.redis_server, subarray_name)
-            if set(rawmap.keys()).intersection(hosts):
-                log.info("subarray {} has leftover work from a previous run. "
-                         "processing...".format(subarray_name))
-                self.processing(subarray_name)
-            else:
-                log.info("subarray {} is ready for recording".format(subarray_name))
-                self.set_nshot(subarray_name, 1)
-        
-
-    def conf_complete(self, subarray_name):
-        """This function is to be run on configuration of a new subarray. 
-
-        Args:
-           
-            subarray_name (str): The name of the subarray which has just been
-            configured. 
-
-        Returns:
-      
-            None
-        """
-        # Since a subarray only exists after configuration, this is the first 
-        # possible time a subarray object can have been created. 
-        # Subarray to be initialised after `conf_complete` message.
-        self.subarray_init(subarray_name, 'conf_complete')
-
-        
     def tracking(self, subarray_name):
-        """These actions are taken when an existing subarray has begun to 
-        track a source.  
-
-        Args:
+        """Handle the telescope going into a tracking state.
            
-            subarray_name (str): The name of the subarray which has just begun
-            to track a new source. 
-
-        Returns:
-      
-            None
+        We don't take any action immediately, but we do want to set a timer to check
+        back later to see if we are ready to process.
         """
-        if self.active_subarrays[subarray_name].processing:
-            log.info('The backend is still processing, so no action taken.')
-            return
-            
         nshot = self.get_nshot(subarray_name)
-        self.active_subarrays[subarray_name].state = 'tracking' 
         log.info('{} in tracking state with nshot = {}'.format(subarray_name, nshot))
 
         # If this is the last recording before the buffers will be full, 
-        # start a timer for `DWELL` + margin seconds.
+        # we may want to process in about `DWELL` + margin seconds.
         allocated_hosts = redis_util.allocated_hosts(self.redis_server, subarray_name)
-        log.info("allocated hosts for {}:".format(subarray_name), allocated_hosts) 
+        log.info("allocated hosts for {}: {}".format(subarray_name, allocated_hosts))
         dwell = self.retrieve_dwell(allocated_hosts)
         log.info("dwell: {}".format(dwell))
         duration = dwell + self.margin
-        # The state to transition to after tracking is processing. 
+
+        # Start a timer to check for processing
         log.info('starting tracking timer for {} seconds'.format(duration))
-        self.active_subarrays[subarray_name].tracking_timer = threading.Timer(duration, 
-            lambda: self.processing(subarray_name))
-        self.active_subarrays[subarray_name].tracking_timer.start()
-        
-        
-    def deconfigure(self, subarray_name):
-        """If a deconfigure message is received (indicating that the current
-        subarray has been deconfigured), `nshot` is set to 0 and processing is 
-        continued. 
+        t = threading.Timer(duration, lambda: self.maybe_start_processing())
+        t.start()
+        self.timers[subarray_name] = t
 
-        Args:
-      
-            subarray_name (str): Name of the current subarray that has just been 
-            deconfigured. 
 
-        Returns:
- 
-            None
-        """
-        self.active_subarrays[subarray_name].state = 'deconfigure'  
-        if self.active_subarrays[subarray_name].processing:
-            log.info('Processing is already in progress.')
-        else:
-            log.info('{} deconfigured. Proceeding'
-                 ' to processing.'.format(subarray_name))
-            self.processing(subarray_name)
-
-            
     def not_tracking(self, subarray_name):
-        """not_tracking is called when an existing subarray has ceased to 
-        track a source. This method decides whether to begin processing or not.
+        """Handle the telescope going into a not-tracking state.
 
-        Args:
-           
-            subarray_name (str): The name of the subarray,
-
-        Returns:
-      
-            None
+        If we had a timer waiting on the tracking event, we don't need it any more.
         """
-        subarray = self.active_subarrays[subarray_name]
-
-        if not hasattr(subarray, 'tracking_timer'):
-            # If there's no tracking timer, that could mean it already expired, and
-            # we should have handled any recording at that time.
-            # It could also mean the telescope is "scanning", where it sends lots of
-            # not-tracking events, and we don't do any recording in the first place.
-            # Either way we don't have data to process.
-            log.info('we are not recording for {}, so there is no action to take.'.format(
-                subarray_name))
+        if subarray_name not in self.timers:
             return
-
-        log.info('canceling tracking timer for ' + subarray_name)
-        subarray.tracking_timer.cancel()
-        del subarray.tracking_timer
-
-        nshot = self.get_nshot(subarray_name)
-        if nshot == 0:
-            # nshot is set back to zero when a recording starts.
-            # We're assuming that the timer was long enough so that the recording
-            # also successfully ended.
-            log.info('timer expired for {} and nshot = 0, so we are ready to process.'.format(subarray_name))
-            self.processing(subarray_name)
-            return
-
-        # A recording never started. Sometimes this happens when the coordinator
-        # did not have all the metadata it needed to record, like when the telescope is
-        # in scanning mode.
-        log.info('time expired for {} but nshot = {}, so there is no recorded data.'.format(
-            subarray_name, nshot))
-
-
+        t = self.timers.pop(subarray_name)
+        t.cancel()
+        
+        
     def pause(self, message):
         full_message = message + "; pausing for debugging."
         self.alert(full_message)
         self.paused = True
 
+
+    def maybe_start_processing(self):
+        """Checks if any data is ready to be processed, running processing if there is.
+
+        This method will not return until all processing is done.
+        """
+        dirmap = redis_util.suggest_processing(self.redis_server,
+                                               processing=self.processing)
+        if not dirmap:
+            return
+
+        # Process one directory at a time to avoid race conditions
+        input_dir, hosts = list(dirmap.items())[0]
+        self.process(input_dir, hosts)
+        self.maybe_start_processing()
         
-    def processing(self, subarray_name):
-        """Initiate processing across processing nodes in the current subarray. 
+        
+    def process(self, input_dir, hosts):
+        """Process raw files in the given directory and hosts. Handles the stages:
 
-        Args:
-           
-            subarray_name (str): The name of the subarray for which data is to 
-            be processed. 
+        * run seticore
+        * run hpguppi_proc
+        * delete the raw files
 
-        Returns:
-      
-            None
+        The caller should verify that it's possible to process before calling this.
         """
         if self.paused:
             log.info("we are paused so we do not want to process.")
             return
 
-        subarray = self.active_subarrays[subarray_name]
-        log.info(subarray_name + " is now processing.")
-        if subarray.processing:
-            log.error("we are already processing {} - we cannot double-process it.".format(
-                subarray_name))
+        if self.processing.intersection(hosts):
+            log.error("currently processing {} so cannot double-process {}".format(
+                self.processing, hosts))
             return
-        subarray.processing = True 
+        self.processing = self.processing.union(hosts)
 
-        host_list = redis_util.allocated_hosts(self.redis_server, subarray_name)
-
-        # Check that raw files are where we expect them to be
-        sb_id = redis_util.sb_id(self.redis_server, subarray_name)
-        raw_files = redis_util.raw_files(self.redis_server)
-        hosts_with_no_files = []
-        inputdir = None
-        for host in host_list:
-            filenames = raw_files.get(host, [])
-            dirnames = sorted(set(os.path.dirname(filename) for filename in filenames))
-            if not dirnames:
-                hosts_with_no_files.append(host)
-                continue
-            if len(dirnames) > 1:
-                self.pause("multiple raw files directories on {}: {}".format(host, dirnames))
-                return
-            dirname = dirnames[0]
-            if sb_id not in dirname:
-                self.pause("sb id is {} but raw files are in {}:{}".format(sb_id, host, dirname))
-                return
-            if not inputdir:
-                inputdir = dirname
-
-        if inputdir is None:
-            self.alert("there were no input files when we expected input files.")
-            subarray.processing = False
+        sb_id = redis_util.sb_id_from_filename(input_dir)
+        if sb_id is None:
+            self.pause("unexpected directory name: {}".format(input_dir))
             return
-                
-        if len(hosts_with_no_files) > len(host_list) / 2:
-            self.pause("many hosts have no files: {}".format(hosts_with_no_files))
-            return
-                
-
-        # seticore processing
+        
+        # Run seticore
         self.alert("running seticore...")
-        result_seticore = run_seticore(host_list, BFRDIR, inputdir, sb_id)
+        result_seticore = run_seticore(hosts, BFRDIR, input_dir, sb_id)
         if result_seticore > 1:
             if result_seticore > 128:
                 self.pause("seticore killed with signal {}".format(result_seticore - 128))
@@ -387,44 +245,26 @@ class Automator(object):
                 self.pause("the seticore slurm job failed with code {}".format(
                     result_seticore))
             return
+        self.alert("seticore completed with code {}. output in /scratch/data/{}".format(
+            result_seticore, sb_id))
 
-        alert_msg = "seticore completed with code {}. output in /scratch/data/{}".format(result_seticore, datadir)
-        self.alert(alert_msg)
+        # Run hpguppi_proc
+        subarray = redis_util.infer_subarray(self.redis_server, hosts)
+        if subarray is None:
+            self.alert("cannot run hpguppi_proc: no subarray exists for data in {}".format(
+                input_dir))
+        else:
+            self.alert("running hpguppi_proc...")
+            proc_hpguppi = ProcHpguppi()
+            result_hpguppi = proc_hpguppi.process(PROC_DOMAIN, hosts, subarray, BFRDIR)
+            if result_hpguppi != 0:
+                self.pause("hpguppi_proc timed out")
+                return
 
-        self.alert("initiating processing with hpguppi_proc...")
-        proc_hpguppi = ProcHpguppi()
-        result_hpguppi = proc_hpguppi.process(PROC_DOMAIN, host_list, subarray_name, BFRDIR)
-        if result_hpguppi != 0:
-            self.pause("hpguppi_proc timed out")
-            return
+            self.alert("hpguppi_proc completed. output in /scratch/data/{}".format(datadir))
 
-        alert_msg = "hpguppi_proc completed. output in /scratch/data/{}".format(datadir)
-        self.alert(alert_msg)
-        self.cleanup(subarray_name)
-
-        
-    def cleanup(self, subarray_name):
-        """The last part of processing, removing files and getting ready for future recordings.
-
-        Args:
-           
-            subarray_name (str): The name of the subarray we are cleaning up.
-
-        Returns:
-      
-            None
-        """
-
-        # Get list of hashpipe acquisition pipeline instances for the 
-        # current subarray:
-        host_key = 'coordinator:allocated_hosts:{}'.format(subarray_name)
-        instance_list = self.redis_server.lrange(host_key, 
-                                             0, 
-                                             self.redis_server.llen(host_key))
-
-        # Empty the NVMe modules
-        # Format for host name (rather than instance name):
-        hosts =  [host.split('/')[0] for host in instance_list]
+        # Clean up
+        self.alert("removing raw files...")
         try:
             cmd = ['srun', 
                    '-w', 
@@ -435,14 +275,27 @@ class Automator(object):
             log.info(cmd)      
             subprocess.run(cmd)
         except Exception as e:
-            log.error('Could not empty all NVMe modules')
-            print(e)
+            self.pause("cleanmybuf0.sh failed")
+            return
+            
+        self.processing = self.processing.difference(hosts)
+        self.alert("processing complete.")
+        self.maybe_start_recording()
 
-        # Reset nshot (enable new recordings):
-        self.set_nshot(subarray_name, 1)
-        self.active_subarrays[subarray_name].processing = False 
-        log.info(subarray_name + ' is done processing.')
 
+    def maybe_start_recording(self):
+        """Checks if any subarrays are ready to start recording, and tells the
+        coordinator to start for any subarrays that are ready.
+
+        TODO: avoid having a race condition here where we start a recording
+        multiple times.
+        """
+        subarrays = redis_util.suggest_recording(self.redis_server,
+                                                 processing=self.processing)
+        for subarray in subarrays:
+            log.info("subarray {} is ready for recording".format(subarray))            
+            self.set_nshot(subarray, 1)
+        
         
     def retrieve_dwell(self, host_list):
         """Retrieve the current value of `DWELL` from the Hashpipe-Redis 
@@ -478,6 +331,7 @@ class Automator(object):
             log.warning("Could not retrieve DWELL. Using 300 sec by default.")
         return dwell
 
+    
     def mode_1d(self, data_1d):
         """Calculate the mode of a one-dimensional list. 
 
@@ -494,6 +348,7 @@ class Automator(object):
         mode_1d = vals[mode_index]
         return mode_1d
 
+    
     def alert(self, message, slack_channel=SLACK_CHANNEL,
               slack_proxy_channel=SLACK_PROXY_CHANNEL):
         """Publish a message to the alerts Slack channel. 
