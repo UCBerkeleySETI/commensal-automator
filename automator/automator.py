@@ -10,7 +10,7 @@ from automator import redis_util
 from .logger import log
 from .subarray import Subarray
 from .proc_hpguppi import ProcHpguppi
-from .proc_seticore import ProcSeticore
+from .proc_seticore import run_seticore
 
 BFRDIR = '/home/obs/bfr5'
 PROC_DOMAIN = 'blproc'
@@ -19,55 +19,36 @@ SLACK_CHANNEL = "meerkat-obs-log"
 SLACK_PROXY_CHANNEL = "slack-messages"
 
 class Automator(object):
-    """The commensal automator. 
+    """The automator controls when the system is recording raw files, when
+    the system is processing raw files, and when it's doing neither.
       
-    In practice, the commensal automator operates as follows:
+    The recording is more directly controlled by the coordinator.
+    The automator instructs the coordinator when it can record by setting
+    an `nshot` key in redis.
 
-    1. The first time it gets an event for a subarray, the list of processing
-       nodes and their Hashpipe-Redis Gateway group address are retrieved. 
+    Processing is done with slurm wrapping seticore and hpguppi_proc.
 
-    2. Waits for the end of a recording. Observational parameters like `DWELL`
-       (the duration for which incoming data are to be recorded for the 
-       current pointing) are retrieved, allowing the expected end-time of the 
-       current recording to be calculated.  
+    The general sequence of events is:
 
-       It is possible for a recording to end, or for the current subarray to 
-       be deconfigured, before `DWELL` seconds have passed. The automator is 
-       notified of these eventualities via Redis channels. 
+    1. When a new subarray gets configured, the coordinator will notice on its
+    own and allocate hosts to it. Allocating hosts doesn't necessarily mean
+    the coordinator is using a lot of resources on those machines - they
+    could still be intensively processing a different subarray.
 
-       The automator also retrieves the current state of `nshot` (the number 
-       of recordings of length `DWELL` to take prior to processing). 
-       Currently, `nshot` is decremented independently by another process (in  
-       the case of MeerKAT, the `coordinator`) each time a recording has been 
-       made successfully.
+    2. When the automator isn't doing any processing on a set of machines that
+    the coordinator has allocated to a subarray, it uses `nshot` to
+    tell the coordinator it can record on them.
 
-       `nshot` can also be set manually - see the `coordinator` documentation
-       for further information on how this is implemented at MeerKAT. 
+    3. When the automator notices the coordinator is done recording, it runs
+    processing. When processing finishes, the automator has deleted the raw files.
 
-       If one of the following is met, and `nshot > 0`:
-       
-           - `DWELL` and an additional safety margin of time has passed. 
-           - The recording ends before `DWELL` + the safety margin has passed.
+    4. Go back to step 2.
 
-       Then, the automator waits for the next recording (as in 1 above). If
-       one of the above takes place and `nshot` is 0, then processing (in 3 
-       below) takes place. 
+    In theory, this design should work for multiple subarrays simultaneously,
+    although it is pretty untested at the moment so it probably doesn't work.
 
-       If the current subarray is deconfigured before `DWELL` and the safety 
-       margin have passed, `nshot` is set to 0 and processing (in 3 below) 
-       is commenced. 
-  
-    3. Runs processing tasks. Processing does not take place if 
-       `nshot > 0`. In general, this means that processing will only
-       take place once the buffers are full.
-       Processing involves first analyzing the raw files in /buf0, and then
-       deleting the files when we are finished.
-
-    4. Resets `nshot` to re-enable recording (for the current processing nodes
-       allocated to the current subarray). 
-
-    5. Returns to the waiting state (see 1).     
- 
+    Ideally, the automator would be safe to restart at any time. This also
+    does not generally work yet.
     """
     def __init__(self, redis_endpoint, redis_chan, margin, 
                  hpgdomain, buffer_length, nshot_chan, nshot_msg):
@@ -110,17 +91,7 @@ class Automator(object):
 
         
     def start(self):
-        """Start the automator. Actions to be taken depend on the incoming 
-        observational stage messages on the appropriate Redis channel.  
-    
-        Args:
-
-            None
- 
-        Returns:
-
-            None
-        """
+        """Start the automator."""
         for subarray_name in redis_util.active_subarrays(self.redis_server):
             self.subarray_init(subarray_name, "unknown")
             
@@ -131,25 +102,18 @@ class Automator(object):
 
             
     def parse_msg(self, msg):
-        """Examines an incoming message (from the appropriate Redis channel)
-        and determines whether or not it is relevant to the automator. If it is
-        relevent, the appropriate state-change function is called. 
+        """Handles an incoming message sent from the telescope about its state.
 
         Args:
 
-            msg (str): A message to be processed (as would arrive from the 
-            appropriate Redis pub/sub channel. Desired messages are of the 
-            format <message>:<subarray_name>.
+            msg (str): A message of format "<telescope state>:<subarray_name>"
 
-            Messages that are responded to are as follows:
+            We handle these telescope states:
  
             - conf_complete
             - tracking
             - not-tracking
             - deconfigure
-
-            If the <message> component of msg is one of the above, then the 
-            first component of msg is the subarray name. 
 
             The other telescope state is "unknown", but that can't be set via message.
 
@@ -163,8 +127,7 @@ class Automator(object):
             log.warning("Unrecognised message: {}".format(msg_data))
             return
 
-        subarray_state = msg_components[0]
-        subarray_name = msg_components[1]
+        subarray_state, subarray_name = msg_components
 
         log.info('subarray {} is now in state: {}'.format(subarray_name, subarray_state))
         if self.paused:
@@ -207,9 +170,8 @@ class Automator(object):
 
         Args:
 
-            subarray_name (str): The name of the new subarray whose state is
-            to be tracked.
-            subarray_state (str): The current state of the new subarray. 
+            subarray_name (str): The name of the subarray
+            subarray_state (str): The state of the subarray
 
         Returns:
 
@@ -224,7 +186,8 @@ class Automator(object):
             rawmap = redis_util.raw_files(self.redis_server)
             hosts = redis_util.allocated_hosts(self.redis_server, subarray_name)
             if set(rawmap.keys()).intersection(hosts):
-                log.info("subarray {} has leftover work from a previous run. processing...".format(subarray_name))
+                log.info("subarray {} has leftover work from a previous run. "
+                         "processing...".format(subarray_name))
                 self.processing(subarray_name)
             else:
                 log.info("subarray {} is ready for recording".format(subarray_name))
@@ -372,6 +335,7 @@ class Automator(object):
         if self.paused:
             log.info("we are paused so we do not want to process.")
             return
+
         subarray = self.active_subarrays[subarray_name]
         log.info(subarray_name + " is now processing.")
         if subarray.processing:
@@ -415,9 +379,7 @@ class Automator(object):
 
         # seticore processing
         self.alert("running seticore...")
-        proc = ProcSeticore(self.redis_server)
-        result_seticore = proc.process('/home/lacker/bin/seticore', host_list, BFRDIR,
-                                       subarray_name, inputdir, sb_id)
+        result_seticore = run_seticore(host_list, BFRDIR, inputdir, sb_id)
         if result_seticore > 1:
             if result_seticore > 128:
                 self.pause("seticore killed with signal {}".format(result_seticore - 128))

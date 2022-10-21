@@ -97,8 +97,8 @@ def main():
         print(sb_id(r, arr))
         return
 
-    if command == "active_subarrays":
-        for subarray in active_subarrays(r):
+    if command == "coordinator_subarrays":
+        for subarray in coordinator_subarrays(r):
             print(subarray)
         return
 
