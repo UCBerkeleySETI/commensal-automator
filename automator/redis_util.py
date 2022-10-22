@@ -191,7 +191,7 @@ def suggest_processing(r, processing=None, verbose=False):
 
     # Filter for input directories where none of the hosts are busy
     answer = {}
-    for dirname, hosts in potential:
+    for dirname, hosts in potential.items():
         inter = hosts.intersection(busy)
         if inter:
             if verbose:
