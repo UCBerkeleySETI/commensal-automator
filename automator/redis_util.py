@@ -6,7 +6,7 @@ import os
 import redis
 import sys
 
-from .logger import log
+from automator.logger import log
 
 def raw_files(r):
     """Returns a dict mapping host name to a list of raw files on the host."""
@@ -89,9 +89,9 @@ def sb_id_from_filename(filename):
     Returns None if the filename doesn't fit the pattern.
     """
     parts = filename.strip("/").split("/")
-    if len(parts) < 2:
+    if len(parts) < 3:
         return None
-    x, y = parts[:2]
+    x, y = parts[1:3]
     if len(x) != 8 or not x.isnumeric() or not y.isnumeric():
         return None
     return "{}/{}".format(x, y)
@@ -302,7 +302,7 @@ def main():
         dirmap = suggest_processing(r, verbose=True)
         print(sorted(dirmap.keys()))
         return
-    
+
     print("unrecognized command:", command)
 
     
