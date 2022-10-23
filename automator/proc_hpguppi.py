@@ -56,8 +56,12 @@ class ProcHpguppi(object):
                 cmd = ['ssh', host, 'mkdir', '-p', '-m', '1777', fildir]
                 subprocess.run(cmd)
 
+            # We have one instance per host at the moment. If this changes in future, 
+            # we will need to handle this differently. 
+            instances = ['{}/0'.format(host) for host in hosts]
+
             # have the hpguppi_proc instances join gateway group:
-            redis_util.join_gateway_group(self.redis_server, hosts, subarray, proc_domain)
+            redis_util.join_gateway_group(self.redis_server, instances, subarray, proc_domain)
 
             # Set keys to prepare for processing:
             redis_util.set_group_key(self.redis_server, subarray, proc_domain, 'BFRDIR', bfrdir)

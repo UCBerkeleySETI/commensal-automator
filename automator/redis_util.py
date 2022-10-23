@@ -204,26 +204,26 @@ def suggest_processing(r, processing=None, verbose=False):
 
     return answer
             
-def join_gateway_group(r, hosts, group_name, gateway_domain):
+def join_gateway_group(r, instances, group_name, gateway_domain):
     """Instruct hashpipe instances to join a hashpipe-redis gateway group.
     
     Hashpipe-redis gateway keys can be published for all these nodes
     simultaneously by publishing to the Redis channel:
     <gateway_domain>:<group_name>///set
     """
-    # Instruct each host to join specified group:
-    for i in range(len(allocated_hosts)):
-        node_gateway_channel = '{}://{}/gateway'.format(gateway_domain, hosts[i])
+    # Instruct each instance to join specified group:
+    for i in range(len(instances)):
+        node_gateway_channel = '{}://{}/gateway'.format(gateway_domain, instances[i])
         msg = 'join={}'.format(group_name)
         r.publish(node_gateway_channel, msg)
-    log.info('Hosts {} instructed to join gateway group: {}'.format(hosts, group_name))
+    log.info('Instances {} instructed to join gateway group: {}'.format(instances, group_name))
 
 def leave_gateway_group(r, group_name, gateway_domain):
     """Instruct hashpipe instances to leave a hashpipe-redis gateway group.
     """
     message = 'leave={}'.format(group_name)
     publish_gateway_message(r, group_name, gateway_domain, message)
-    log.info('Hosts instructed to leave the gateway group: {}'.format(group_name))
+    log.info('Instances instructed to leave the gateway group: {}'.format(group_name))
 
 def publish_gateway_message(r, group_name, gateway_domain, message):
     """Publish a message to a hashpipe-redis group gateway <group_name>.
