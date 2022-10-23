@@ -6,6 +6,7 @@ import os
 import redis
 import sys
 
+from .logger import log
 
 def raw_files(r):
     """Returns a dict mapping host name to a list of raw files on the host."""
@@ -203,6 +204,27 @@ def suggest_processing(r, processing=None, verbose=False):
 
     return answer
             
+def join_gateway_group(r, hosts, group_name, gateway_domain):
+    """Instruct hashpipe instances to join a hashpipe-redis gateway group.
+    
+    Hashpipe-redis gateway keys can be published for all these nodes
+    simultaneously by publishing to the Redis channel:
+    <gateway_domain>:<group_name>///set
+    """
+    # Instruct each host to join specified group:
+    for i in range(len(allocated_hosts)):
+        node_gateway_channel = '{}://{}/gateway'.format(gateway_domain, hosts[i])
+        msg = 'join={}'.format(group_name)
+        r.publish(node_gateway_channel, msg)
+    log.info('Hosts {} instructed to join gateway group: {}'.format(hosts, group_name))
+
+def leave_gateway_group(r, group_name, gateway_domain):
+    """Instruct hashpipe instances to leave a hashpipe-redis gateway group.
+    """
+    group_gateway_channel = '{}:{}///gateway'.format(gateway_domain, group_name)
+    msg = 'leave={}'.format(group_name)
+    r.publish(group_gateway_channel, msg)
+    log.info('Hosts instructed to leave the gateway group: {}'.format(group_name))
 
 def main():
     if len(sys.argv) < 2:
