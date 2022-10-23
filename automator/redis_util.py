@@ -222,15 +222,27 @@ def leave_gateway_group(r, group_name, gateway_domain):
     """Instruct hashpipe instances to leave a hashpipe-redis gateway group.
     """
     message = 'leave={}'.format(group_name)
-    publish_group_message(r, group_name, gateway_domain, message)
+    publish_gateway_message(r, group_name, gateway_domain, message)
     log.info('Hosts instructed to leave the gateway group: {}'.format(group_name))
 
-def publish_group_message(r, group_name, gateway_domain, message):
-    """Publish a message to a hashpipe-redis gateway group <group_name>.
+def publish_gateway_message(r, group_name, gateway_domain, message):
+    """Publish a message to a hashpipe-redis group gateway <group_name>.
     """
     group_gateway_channel = '{}:{}///gateway'.format(gateway_domain, group_name)
     r.publish(group_gateway_channel, message)
-    log.info('Message: {} published to gateway group: {}'.format(message, group_name))
+
+def set_group_key(r, group_name, gateway_domain, key, value):
+    """Set a hashpipe-redis gateway key for a specified hashpipe-redis gateway
+    group.
+    """
+    group_channel = '{}:{}///set'.format(gateway_domain, group_name)
+    # Message to set key:
+    message = '{}={}'.format(key, value)
+    r.publish(group_channel, message)
+    log.info('Set {} to {} for {} instances in group {}'.format(key, 
+                                                                value, 
+                                                                gateway_domain,
+                                                                group_name))
 
 def main():
     if len(sys.argv) < 2:
