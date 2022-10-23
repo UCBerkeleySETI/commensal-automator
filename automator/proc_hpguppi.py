@@ -4,6 +4,7 @@ import os
 import subprocess
 
 from .logger import log
+from automator import redis_util
 
 class ProcHpguppi(object):
     """This class controls processing using hpguppi_proc [1], which performs
@@ -55,11 +56,13 @@ class ProcHpguppi(object):
                 cmd = ['ssh', host, 'mkdir', '-p', '-m', '1777', fildir]
                 subprocess.run(cmd)
 
+            # have the hpguppi_proc instances join gateway group:
+            redis_util.join_gateway_group(self.redis_server, hosts, subarray, proc_domain)
+
             # Set keys to prepare for processing:
-            group_chan = '{}:{}///set'.format(proc_domain, subarray)
-            self.redis_server.publish(group_chan, 'BFRDIR={}'.format(bfrdir))
-            self.redis_server.publish(group_chan, 'OUTDIR={}'.format(fildir))
-            self.redis_server.publish(group_chan, 'INPUTDIR={}'.format(inputdir))
+            redis_util.set_group_key(self.redis_server, subarray, proc_domain, 'BFRDIR', bfrdir)
+            redis_util.set_group_key(self.redis_server, subarray, proc_domain, 'OUTDIR', fildir)
+            redis_util.set_group_key(self.redis_server, subarray, proc_domain, 'INPUTDIR', inputdir)
             log.info('Processing: \ninputdir: {}\noutputdir: {}'.format(inputdir, fildir))
 
             # Initiate and track processing by file:
@@ -78,6 +81,9 @@ class ProcHpguppi(object):
                     return 1
                 # Set procstat to IDLE:
                 self.redis_server.publish(group_chan, 'PROCSTAT=IDLE')
+            
+            # have the hpguppi_proc instances leave the gateway group:
+            redis_util.leave_gateway_group(self.redis_server, subarray, proc_domain)
             return 0
         else:
             log.info('No data to process')
