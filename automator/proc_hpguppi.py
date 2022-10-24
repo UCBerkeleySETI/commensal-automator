@@ -113,7 +113,7 @@ class ProcHpguppi(object):
                NOTE: for now, only checks timer when hash is altered. 
         """
         ps = self.redis_server.pubsub()
-        proc_status_hash = '{}://{}/0/status'.format(domain, proc_list[0])
+        proc_status_hash = '{}://{}/0/status'.format(domain, proc_list.pop())
         ps.subscribe('__keyspace@0__:{}'.format(proc_status_hash))
         tstart = time.time()
         for msg in ps.listen():
