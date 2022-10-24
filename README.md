@@ -23,9 +23,6 @@ optional arguments:
   --redis_channel REDIS_CHANNEL
                         Name of the Redis channel to subscribe to
 
-  --script SCRIPT       
-                        Location of external processing script
-
   --env ENV             
                         Virtual environment for processing script
 

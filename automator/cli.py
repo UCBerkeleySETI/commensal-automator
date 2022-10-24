@@ -20,10 +20,6 @@ def cli(args = sys.argv[0]):
                         type = str,
                         default = 'alerts', 
                         help = 'Name of the Redis channel to subscribe to')
-    parser.add_argument('--script',
-                        type = str,
-                        default = '',
-                        help = 'Meaningless argument for backward compatibility')
     parser.add_argument('--margin',
                         type = float,
                         default = 10.0, 
