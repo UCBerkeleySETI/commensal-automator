@@ -17,20 +17,15 @@ Start the Commensal Automator
 
 optional arguments:
 
+  -h, --help            show this help message and exit
+
   --redis_endpoint REDIS_ENDPOINT
                         Local Redis endpoint
 
   --redis_channel REDIS_CHANNEL
                         Name of the Redis channel to subscribe to
 
-  --env ENV             
-                        Virtual environment for processing script
-
-  --args ARGS           
-                        Arguments for the processing script
-
-  --margin MARGIN       
-                        Safety margin for recording duration (sec)
+  --margin MARGIN       Safety margin for recording duration (sec)
 
   --hpgdomain HPGDOMAIN
                         Hashpipe-Redis gateway domain
@@ -43,6 +38,7 @@ optional arguments:
 
   --nshot_msg NSHOT_MSG
                         Format of message for changing nshot
+
 ```
 
 ### Dependencies
@@ -94,16 +90,3 @@ For use as a daemonised process with `circus`, follow these steps:
 -    Run `circusctl --endpoint <endpoint> reloadconfig`
 
 -    Run `circusctl --endpoint <endpoint> start automator`
-
-### Processing scripts
-
-To add a new processing script, the file `etc/automator.ini` should be edited.
-For example, to call a Slurm SBATCH script located at 
-`/home/obs/bin/processing_example.sh`, the appropriate line in 
-`etc/automator.ini` should be edited:  
-  
-`args = -u $(circus.env.bluse_ve_dir)/bin/automator --args=--proxy_channel=slack-messages,--slack_channel=meerkat-obs-log`  
-  
-should be replaced with:  
-  
-`args = -u $(circus.env.bluse_ve_dir)/bin/automator --script=/home/obs/bin/example_placeholder.py --args=--proxy_channel=slack-messages,--slack_channel=meerkat-obs-log`

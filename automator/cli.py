@@ -60,9 +60,7 @@ def main(redis_endpoint, redis_channel, margin, hpgdomain,
 
         redis_endpoint (str): Redis endpoint (of the form <host IP
         address>:<port>) 
-        redis_chan (str): Name of the redis channel
-        proc_env (str): Virtual environment for processing script. 
-        proc_args (str): Arguments for processing script. 
+        redis_channel (str): Name of the redis channel
         margin (float): Safety margin (in seconds) to add to `DWELL`
         when calculating the estimated end of a recording. 
         hpgdomain (str): The Hashpipe-Redis Gateway domain for the instrument
