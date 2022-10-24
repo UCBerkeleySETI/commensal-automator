@@ -304,8 +304,8 @@ def show_status(r):
         print("no hosts have raw files")
     for d, hosts in sorted(dirmap.items()):
         print()
-        print(len(hosts), "have raw files in", d, ":")
-        print(hosts)
+        print(len(hosts), "hosts have raw files in", d, ":")
+        print(sorted(hosts))
     for stat, hosts in sorted(hpguppi_procstat(r).items()):
         if stat is None:
             continue
