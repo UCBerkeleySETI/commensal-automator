@@ -83,8 +83,6 @@ class ProcHpguppi(object):
                 if(result == 'timeout'):
                     log.error('hpguppi_proc processing timed out.')
                     return 1
-                # Set procstat to IDLE:
-                self.redis_server.publish(group_chan, 'PROCSTAT=IDLE')
             
             # have the hpguppi_proc instances leave the gateway group:
             redis_util.leave_gateway_group(self.redis_server, subarray, proc_domain)
