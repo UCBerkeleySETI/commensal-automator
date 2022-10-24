@@ -72,7 +72,10 @@ class ProcHpguppi(object):
             # Initiate and track processing by file:
             for rawfile in rawfiles_only:
                 log.info('Processing file: {}'.format(rawfile))
-                self.redis_server.publish(group_chan, 'RAWFILE={}'.format(rawfile))
+                # Set RAWFILE key to initiate processing
+                redis_util.set_group_key(self.redis_server, subarray, proc_domain, 'RAWFILE', rawfile)
+                # gateway group channel - will move out of proc_hpguppi
+                group_chan = '{}:{}///set'.format(proc_domain, subarray)
                 # Wait for processing to start:
                 result = self.monitor_proc_status('START', proc_domain, hosts, self.PROC_STATUS_KEY, 600, group_chan)
                 if(result == 'timeout'):
