@@ -49,6 +49,36 @@ def all_hosts(r):
                   for key in r.keys("bluse://*/0/status"))
 
 
+def multicast_subscribed(r):
+    """Returns a list of the hosts that are subscribed to F-engine multicast groups.
+    """
+    return [host for (host, destip) in  get_status(r, "bluse", "DESTIP")
+            if destip != "0.0.0.0"]
+
+
+def multiget_status(r, domain, keys):
+    """Fetches status from hashpipe processes.
+    domain is "bluse" or "blproc".
+
+    Returns a list of (host, value-list) tuples.
+    """
+    hosts = all_hosts(r)
+    pipe = r.pipeline()
+    for host in hosts:
+        redis_key = "{}://{}/0/status".format(domain, host)
+        pipe.hmget(redis_key, keys)
+    results = pipe.execute()
+    return list(zip(hosts, results))
+
+
+def get_status(r, domain, key):
+    """Like multiget_status but just one key.
+
+    Returns a list of (host, value) tuples.
+    """
+    return [(host, results[0]) for (host, results) in multiget_status(r, domain, [key])]
+
+
 def coordinator_hosts(r):
     """Returns a list of all hosts the coordinator is using.
 
@@ -66,13 +96,7 @@ def coordinator_hosts(r):
         if nshot > 0:
             answer = answer.union(allocated_hosts(r, subarray))
 
-    pipe = r.pipeline()
-    hosts = all_hosts(r)
-    for host in hosts:
-        key = "bluse://{}/0/status".format(host)
-        pipe.hmget(key, ["PKTIDX", "PKTSTART", "PKTSTOP"])
-    results = pipe.execute()
-    for host, strkeys in zip(hosts, results):
+    for host, strkeys in multiget_status(r, "bluse", ["PKTIDX", "PKTSTART", "PKTSTOP"]):
         if None in strkeys:
             # This seems to happen sometimes during recording.
             # Let's treat it as "in use"
@@ -155,6 +179,19 @@ def suggest_recording(r, processing=None, verbose=False):
     return answer
 
 
+def hosts_by_dir(filemap):
+    """Create a map of input directory to a set of hosts, given a map of host to files
+    """
+    answer = {}
+    for host, filenames in filemap.items():
+        for filename in filenames:
+            dirname = os.path.dirname(filename)
+            if dirname not in answer:
+                answer[dirname] = set()
+            answer[dirname].add(host)
+    return answer
+
+
 def suggest_processing(r, processing=None, verbose=False):
     """Returns a map of (input dir, set of hosts) tuples that we could process.
 
@@ -180,15 +217,7 @@ def suggest_processing(r, processing=None, verbose=False):
         if verbose:
             print("there are no raw files anywhere, so we can't process")
         return {}
-
-    # Create a map of input directory to a set of hosts, without checking busy
-    potential = {}
-    for host, filenames in filemap.items():
-        for filename in filenames:
-            dirname = os.path.dirname(filename)
-            if dirname not in potential:
-                potential[dirname] = set()
-            potential[dirname].add(host)
+    potential = hosts_by_dir(filemap)
 
     # Filter for input directories where none of the hosts are busy
     answer = {}
@@ -203,7 +232,8 @@ def suggest_processing(r, processing=None, verbose=False):
             answer[dirname] = hosts
 
     return answer
-            
+
+
 def join_gateway_group(r, instances, group_name, gateway_domain):
     """Instruct hashpipe instances to join a hashpipe-redis gateway group.
     
@@ -218,6 +248,7 @@ def join_gateway_group(r, instances, group_name, gateway_domain):
         r.publish(node_gateway_channel, msg)
     log.info('Instances {} instructed to join gateway group: {}'.format(instances, group_name))
 
+    
 def leave_gateway_group(r, group_name, gateway_domain):
     """Instruct hashpipe instances to leave a hashpipe-redis gateway group.
     """
@@ -225,12 +256,14 @@ def leave_gateway_group(r, group_name, gateway_domain):
     publish_gateway_message(r, group_name, gateway_domain, message)
     log.info('Instances instructed to leave the gateway group: {}'.format(group_name))
 
+    
 def publish_gateway_message(r, group_name, gateway_domain, message):
     """Publish a message to a hashpipe-redis group gateway <group_name>.
     """
     group_gateway_channel = '{}:{}///gateway'.format(gateway_domain, group_name)
     r.publish(group_gateway_channel, message)
 
+    
 def set_group_key(r, group_name, gateway_domain, key, value):
     """Set a hashpipe-redis gateway key for a specified hashpipe-redis gateway
     group.
@@ -244,6 +277,42 @@ def set_group_key(r, group_name, gateway_domain, key, value):
                                                                 gateway_domain,
                                                                 group_name))
 
+def hpguppi_procstat(r):
+    """Returns a map from hpguppi states to a list of hosts in them.
+
+    Expected states: IDLE, START, END, None
+    """
+    answer = {}
+    for host, procstat in get_status(r, "blproc", "PROCSTAT"):
+        if procstat not in answer:
+            answer[procstat] = []
+        answer[procstat].append(host)
+    return answer
+
+    
+def show_status(r):
+    coord_using = coordinator_hosts(r)
+    print("the coordinator is using", len(coord_using), "hosts:")
+    print(coord_using)
+    print()
+    subbed = multicast_subscribed(r)
+    print(len(subbed), "hosts are subscribed to F-engine multicast:")
+    print(subbed)
+    dirmap = hosts_by_dir(raw_files(r))
+    if not dirmap:
+        print()
+        print("no hosts have raw files")
+    for d, hosts in sorted(dirmap.items()):
+        print()
+        print(len(hosts), "have raw files in", d, ":")
+        print(hosts)
+    for stat, hosts in sorted(hpguppi_procstat(r).items()):
+        if stat is None:
+            continue
+        print()
+        print(len(hosts), "hosts are in hpguppi_proc state", stat, ":")
+        print(hosts)
+        
 def main():
     if len(sys.argv) < 2:
         print("no command specified")
@@ -303,6 +372,10 @@ def main():
         print(sorted(dirmap.keys()))
         return
 
+    if command == "status":
+        show_status(r)
+        return
+    
     print("unrecognized command:", command)
 
     
