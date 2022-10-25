@@ -248,11 +248,18 @@ class Automator(object):
         self.alert("seticore completed with code {}. output in /scratch/data/{}".format(
             result_seticore, sb_id))
 
-        # Run hpguppi_proc
+        # Run hpguppi_proc if we can
         subarray = redis_util.infer_subarray(self.redis_server, hosts)
+        procstatmap = redis_util.hpguppi_procstat(self.redis_server)
+        usable_hosts = set()
+        for key in ["IDLE", "END"]:
+            usable_hosts = usable_hosts.union(procstatmap.get(key, []))
+
         if subarray is None:
             self.alert("cannot run hpguppi_proc: no subarray exists for data in {}".format(
                 input_dir))
+        elif not usable_hosts.issuperset(hosts):
+            self.alert("cannot run hpguppi_proc: some instances are stuck")
         else:
             self.alert("running hpguppi_proc...")
             proc_hpguppi = ProcHpguppi()
