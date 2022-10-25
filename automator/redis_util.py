@@ -79,24 +79,28 @@ def get_status(r, domain, key):
     return [(host, results[0]) for (host, results) in multiget_status(r, domain, [key])]
 
 
-def coordinator_hosts(r):
-    """Returns a list of all hosts the coordinator is using.
-
-    These are the hosts that the coordinator may write more files to, even if it
-    receives no further instructions from us.
-    We don't want to start processing on a host while the coordinator is still using it.
-
-    TODO: carefully avoid all race conditions here
+def ready_to_record(r):
+    """Returns a sorted list of all hosts that are ready to record.
+    This means they will start recording on the next tracking event.
     """
-    # First find all the hosts that have nshot=1
     answer = set()
     subarrays = coordinator_subarrays(r)
     for subarray in subarrays:
         nshot = get_nshot(r, subarray)
         if nshot > 0:
             answer = answer.union(allocated_hosts(r, subarray))
+    return sorted(answer)
 
-    for host, strkeys in multiget_status(r, "bluse", ["PKTIDX", "PKTSTART", "PKTSTOP"]):
+
+def get_recording(r):
+    """Returns a sorted list of all hosts that are currently recording.
+    """
+    answer = set()
+    hkeys = ["PKTIDX", "PKTSTART", "PKTSTOP"]
+    for host, strkeys in multiget_status(r, "bluse", hkeys):
+        for k, val in zip(hkeys, strkeys):
+            if val is None:
+                log.warning("on host {} the key {} is not set".format(host, k))
         if None in strkeys:
             # This seems to happen sometimes during recording.
             # Let's treat it as "in use"
@@ -106,6 +110,18 @@ def coordinator_hosts(r):
         if pktstart > 0 and pktidx < pktstop:
             answer.add(host)
     return sorted(answer)
+
+
+def coordinator_hosts(r):
+    """Returns a list of all hosts the coordinator is using.
+
+    These are the hosts that the coordinator may write more files to, even if it
+    receives no further instructions from us.
+    We don't want to start processing on a host while the coordinator is still using it.
+
+    TODO: carefully avoid all race conditions here
+    """
+    return sorted(set(ready_to_record(r) + get_recording(r)))
 
 
 def sb_id_from_filename(filename):
@@ -291,13 +307,20 @@ def hpguppi_procstat(r):
 
     
 def show_status(r):
-    coord_using = coordinator_hosts(r)
-    print("the coordinator is using", len(coord_using), "hosts:")
-    print(coord_using)
-    print()
     subbed = multicast_subscribed(r)
     print(len(subbed), "hosts are subscribed to F-engine multicast:")
     print(subbed)
+    print()
+    ready = ready_to_record(r)
+    print("the coordinator is ready to record (nshot>0) on", len(ready), "hosts:")
+    print(ready)
+    print()
+    recording = get_recording(r)
+    if recording:
+        print(len(recording), "hosts are currently recording:")
+        print(recording)
+    else:
+        print("no hosts are currently recording")
     dirmap = hosts_by_dir(raw_files(r))
     if not dirmap:
         print()
