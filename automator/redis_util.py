@@ -2,6 +2,7 @@
 # Helpers functions for looking up various redis data.
 # The convention is that "r" is our redis client.
 
+from datetime import datetime
 import os
 import redis
 import sys
@@ -79,8 +80,20 @@ def get_status(r, domain, key):
     return [(host, results[0]) for (host, results) in multiget_status(r, domain, [key])]
 
 
+def broken_daqs(r):
+    """Return a sorted list of which daqs look broken."""
+    answer = []
+    for host, result in get_status(r, "bluse", "DAQPULSE"):
+        if result is None:
+            continue
+        delta = datetime.strptime(result, "%c") - datetime.now()
+        if abs(delta.total_seconds()) > 10:
+            answer.append(host)
+    return answer
+
+
 def ready_to_record(r):
-    """Returns a sorted list of all hosts that are ready to record.
+    """Returns a sorted list of all hosts for which the coordinator is ready to record.
     This means they will start recording on the next tracking event.
     """
     answer = set()
@@ -307,6 +320,11 @@ def hpguppi_procstat(r):
 
     
 def show_status(r):
+    broken = broken_daqs(r)
+    if broken:
+        print(len(broken), "daqs are broken:")
+        print(broken)
+        print()
     subbed = multicast_subscribed(r)
     print(len(subbed), "hosts are subscribed to F-engine multicast:")
     print(subbed)
