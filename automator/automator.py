@@ -19,6 +19,11 @@ SLACK_CHANNEL = "meerkat-obs-log"
 SLACK_PROXY_CHANNEL = "slack-messages"
 
 
+def timestring():
+    """A standard format to report the current time in"""
+    return datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d %H:%M:%S %Z")
+
+
 class Automator(object):
     """The automator controls when the system is recording raw files, when
     the system is processing raw files, and when it's doing neither.
@@ -90,8 +95,7 @@ class Automator(object):
         # Setting this to True should stop all subsequent actions while we manually debug
         self.paused = False
 
-        self.alert("starting at " +
-                   datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d %H:%M:%S %Z"))
+        self.alert("starting up")
 
         
     def start(self):
@@ -191,7 +195,7 @@ class Automator(object):
         
         
     def pause(self, message):
-        full_message = message + "; pausing for debugging."
+        full_message = message + "; pausing for debugging"
         self.alert(full_message)
         self.paused = True
 
@@ -210,6 +214,16 @@ class Automator(object):
         input_dir, hosts = list(dirmap.items())[0]
         self.process(input_dir, hosts)
         self.maybe_start_processing()
+
+
+    def alert_seticore_error(self):
+        """Sends a message to slack about the last seticore error."""
+        host, lines = redis_util.last_seticore_error(self.redis_server)
+        if host is None:
+            return
+        message = "sample seticore error, from {}:```{}```".format(
+            host, "\n".join(lines))
+        self.alert(message)
         
         
     def process(self, input_dir, hosts):
@@ -245,10 +259,13 @@ class Automator(object):
             else:
                 self.pause("the seticore slurm job failed with code {}".format(
                     result_seticore))
+            self.alert_seticore_error()
             return
         self.alert("seticore completed with code {}. output in /scratch/data/{}".format(
             result_seticore, sb_id))
-
+        if result_seticore > 0:
+            self.alert_seticore_error()
+        
         # Run hpguppi_proc if we can
         subarray = redis_util.infer_subarray(self.redis_server, hosts)
         procstatmap = redis_util.hpguppi_procstat(self.redis_server)
@@ -390,5 +407,5 @@ class Automator(object):
         """
         log.info(message)
         # Format: <Slack channel>:<Slack message text>
-        alert_msg = '{}:automator: {}'.format(slack_channel, message)
+        alert_msg = '{}:automator [{}]: {}'.format(slack_channel, timestring(), message)
         self.redis_server.publish(slack_proxy_channel, alert_msg)

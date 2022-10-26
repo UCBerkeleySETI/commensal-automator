@@ -1,0 +1,2 @@
+#!/bin/bash -e
+tail -n 30 -f /var/log/bluse/automator/automator.err

@@ -318,6 +318,40 @@ def hpguppi_procstat(r):
         answer[procstat].append(host)
     return answer
 
+
+def last_seticore_error(r):
+    """Returns a tuple of (host, log lines) for the most recent seticore run that
+    ended in an error.
+    Returns (None, []) if no errors are found.
+    """
+    answer_host = None
+    answer_run_line = None
+    answer_lines = []
+    for host in all_hosts(r):
+        filename = "/home/obs/seticore_slurm/seticore_{}.err".format(host)
+        try:
+            lines = open(filename).readlines()
+        except:
+            continue
+        reversed_lines = []
+        for line in reversed(lines[-20:]):
+            reversed_lines.append(line.strip())
+            if "running seticore" in line:
+                break
+        else:
+            # We have more than 20 lines of error output, seems weird
+            continue
+        possible_run_line = reversed_lines.pop()
+        if not reversed_lines:
+            # There's no error here
+            continue
+        if answer_run_line is None or possible_run_line > answer_run_line:
+            # This one looks like the most recent error so far
+            answer_host = host
+            answer_run_line = possible_run_line
+            answer_lines = list(reversed(reversed_lines))
+    return answer_host, answer_lines
+        
     
 def show_status(r):
     broken = broken_daqs(r)
@@ -353,6 +387,7 @@ def show_status(r):
         print()
         print(len(hosts), "hosts are in hpguppi_proc state", stat, ":")
         print(hosts)
+
         
 def main():
     if len(sys.argv) < 2:
@@ -415,6 +450,22 @@ def main():
 
     if command == "status":
         show_status(r)
+        return
+
+    if command == "last_seticore_error":
+        host, lines = last_seticore_error(r)
+        if host is None:
+            print("no recent seticore errors found")
+        else:
+            print("seticore error on {}:".format(host))
+            for line in lines:
+                print(line)
+        return
+
+    if command == "get_bluse_status":
+        key = args[0]
+        for host, value in sorted(get_status(r, "bluse", key)):
+            print(host, value)
         return
     
     print("unrecognized command:", command)
