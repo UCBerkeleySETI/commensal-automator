@@ -111,11 +111,14 @@ def get_recording(r):
     answer = set()
     hkeys = ["PKTIDX", "PKTSTART", "PKTSTOP"]
     for host, strkeys in multiget_status(r, "bluse", hkeys):
+        if strkeys[1] == "0":
+            # PKTSTART=0 indicates not-in-use even if the other keys are absent
+            continue
         for k, val in zip(hkeys, strkeys):
             if val is None:
                 log.warning("on host {} the key {} is not set".format(host, k))
         if None in strkeys:
-            # This seems to happen sometimes during recording.
+            # This is a race condition and we don't know what it means.
             # Let's treat it as "in use"
             answer.add(host)
             continue
