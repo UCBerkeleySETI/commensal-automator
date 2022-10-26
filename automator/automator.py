@@ -407,5 +407,5 @@ class Automator(object):
         """
         log.info(message)
         # Format: <Slack channel>:<Slack message text>
-        alert_msg = '{}:automator [{}]: {}'.format(slack_channel, timestring(), message)
+        alert_msg = '{}:[{}] automator: {}'.format(slack_channel, timestring(), message)
         self.redis_server.publish(slack_proxy_channel, alert_msg)
