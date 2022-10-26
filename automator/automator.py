@@ -317,7 +317,7 @@ class Automator(object):
                 self.pause("cleanmybuf0.sh failed")
                 return
             time.sleep(1)
-            still_have_raw = set(redis_util.raw_files(self.redis).keys())
+            still_have_raw = set(redis_util.raw_files(self.redis_server).keys())
             hosts = hosts.difference(still_have_raw)
             if not hosts:
                 # We deleted everything
