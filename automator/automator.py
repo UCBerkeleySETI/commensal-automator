@@ -5,6 +5,7 @@ import numpy as np
 import os
 import subprocess
 import sys
+import time
 
 from automator import redis_util
 from .logger import log
@@ -237,7 +238,7 @@ class Automator(object):
         
         # Run seticore
         self.alert("running seticore...")
-        result_seticore = run_seticore(hosts, BFRDIR, input_dir, sb_id)
+        result_seticore = run_seticore(sorted(hosts), BFRDIR, input_dir, sb_id)
         if result_seticore > 1:
             if result_seticore > 128:
                 self.pause("seticore killed with signal {}".format(result_seticore - 128))
@@ -271,25 +272,44 @@ class Automator(object):
             self.alert("hpguppi_proc completed. output in /scratch/data/{}".format(datadir))
 
         # Clean up
-        self.alert("removing raw files...")
-        try:
-            cmd = ['srun', 
-                   '-w', 
-                   ' '.join(hosts), 
-                   'bash', 
-                   '-c', 
-                   '/home/obs/bin/cleanmybuf0.sh --force']
-            log.info(cmd)      
-            subprocess.run(cmd)
-        except Exception as e:
-            self.pause("cleanmybuf0.sh failed")
+        self.alert("deleting raw files...")
+        if not self.delete_buf0(hosts):
             return
             
         self.processing = self.processing.difference(hosts)
         self.alert("processing complete.")
         self.maybe_start_recording()
 
-
+        
+    def delete_buf0(self, initial_hosts):
+        """Deletes everything on buf0 for the provided iterable of hosts.
+        Returns whether we succeeded. Pauses if we didn't.
+        """
+        hosts = set(initial_hosts)
+        for _ in range(5):
+            try:
+                cmd = ['srun', 
+                       '-w', 
+                       ' '.join(sorted(hosts)), 
+                       'bash', 
+                       '-c', 
+                       '/home/obs/bin/cleanmybuf0.sh --force']
+                log.info(cmd)      
+                subprocess.run(cmd)
+            except Exception as e:
+                self.pause("cleanmybuf0.sh failed")
+                return
+            time.sleep(1)
+            still_have_raw = set(raw_files(self.redis).keys())
+            hosts = hosts.difference(still_have_raw)
+            if not hosts:
+                # We deleted everything
+                return True
+        self.pause("failed to delete buf0 on {} hosts: {}".format(
+            len(hosts), " ".join(sorted(hosts))))
+        return False
+    
+            
     def maybe_start_recording(self):
         """Checks if any subarrays are ready to start recording, and tells the
         coordinator to start for any subarrays that are ready.

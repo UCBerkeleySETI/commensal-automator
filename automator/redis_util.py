@@ -322,7 +322,7 @@ def hpguppi_procstat(r):
 def show_status(r):
     broken = broken_daqs(r)
     if broken:
-        print(len(broken), "daqs are broken:")
+        print(len(broken), "daqs (bluse_hashpipe) are broken:")
         print(broken)
         print()
     subbed = multicast_subscribed(r)
