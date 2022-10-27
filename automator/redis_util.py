@@ -337,12 +337,12 @@ def last_seticore_error(r):
         except:
             continue
         reversed_lines = []
-        for line in reversed(lines[-20:]):
-            reversed_lines.append(line.strip())
+        for line in reversed(lines[-100:]):
+            reversed_lines.append(line.strip("\n"))
             if "running seticore" in line:
                 break
         else:
-            # We have more than 20 lines of error output, seems weird
+            # We have more than 100 lines of error output, seems weird
             continue
         possible_run_line = reversed_lines.pop()
         if not reversed_lines:
@@ -353,6 +353,11 @@ def last_seticore_error(r):
             answer_host = host
             answer_run_line = possible_run_line
             answer_lines = list(reversed(reversed_lines))
+    max_length = 10
+    if len(answer_lines) > max_length:
+        cut = max_length - 1
+        answer_lines = answer_lines[:cut] + [
+            "<{} more lines>".format(len(answer_lines) - cut)]
     return answer_host, answer_lines
         
     

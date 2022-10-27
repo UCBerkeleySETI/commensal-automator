@@ -303,7 +303,7 @@ class Automator(object):
         Returns whether we succeeded. Pauses if we didn't.
         """
         hosts = set(initial_hosts)
-        for _ in range(5):
+        for _ in range(10):
             try:
                 cmd = ['srun', 
                        '-w', 
@@ -316,12 +316,13 @@ class Automator(object):
             except Exception as e:
                 self.pause("cleanmybuf0.sh failed")
                 return
-            time.sleep(1)
             still_have_raw = set(redis_util.raw_files(self.redis_server).keys())
-            hosts = hosts.difference(still_have_raw)
+            hosts = hosts.intersection(still_have_raw)
             if not hosts:
                 # We deleted everything
                 return True
+            time.sleep(2)
+
         self.pause("failed to delete buf0 on {} hosts: {}".format(
             len(hosts), " ".join(sorted(hosts))))
         return False
