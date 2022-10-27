@@ -359,7 +359,7 @@ def last_seticore_error(r):
         answer_lines = answer_lines[:cut] + [
             "<{} more lines>".format(len(answer_lines) - cut)]
     return answer_host, answer_lines
-        
+
     
 def show_status(r):
     broken = broken_daqs(r)
@@ -389,7 +389,7 @@ def show_status(r):
         print()
         print(len(hosts), "hosts have raw files in", d, ":")
         print(sorted(hosts))
-    for stat, hosts in sorted(hpguppi_procstat(r).items()):
+    for stat, hosts in hpguppi_procstat(r).items():
         if stat in [None, "IDLE", "END"]:
             continue
         print()
@@ -474,6 +474,14 @@ def main():
         key = args[0]
         for host, value in sorted(get_status(r, "bluse", key)):
             print(host, value)
+        return
+
+    if command == "hpguppi_procstat":
+        print()
+        for stat, hosts in hpguppi_procstat(r).items():
+            print(len(hosts), "hosts are in hpguppi_proc state", stat, ":")
+            print(hosts)
+            print()
         return
     
     print("unrecognized command:", command)
