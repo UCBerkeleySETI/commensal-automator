@@ -390,7 +390,7 @@ def show_status(r):
         print(len(hosts), "hosts have raw files in", d, ":")
         print(sorted(hosts))
     for stat, hosts in sorted(hpguppi_procstat(r).items()):
-        if stat is None:
+        if stat in [None, "IDLE", "END"]:
             continue
         print()
         print(len(hosts), "hosts are in hpguppi_proc state", stat, ":")
