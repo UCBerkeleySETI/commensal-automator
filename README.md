@@ -57,7 +57,7 @@ Instructions for installation and deployment on the BLUSE headnode:
 
 - Clone repository into desired location: `git clone https://github.com/UCBerkeleySETI/commensal-automator.git`
 - `cd commensal-automator`
-- Install into the `bluse3` virtual environment: `sudo /opt/virtualenv/bluse3/bin/python3 setup.py install` 
+- Install into the `bluse3.9` virtual environment: `sudo /opt/virtualenv/bluse3.9/bin/python setup.py install` 
 - Restart the automator (for now, only when the subarray is deconfigured): `circusctl --endpoint tcp://<IP address>:<port> restart automator`
 - If desired, check the automator logs for errors: `less /var/log/bluse/automator/automator.err`
 
@@ -79,7 +79,7 @@ For use as a daemonised process with `circus`, follow these steps:
      ```
      [env:automator]
      VE_DIR = /opt/virtualenv/<env_name>
-     VE_VER = 3.5
+     VE_VER = <env version>
      ```
 
 -    Ensure logging is set up correctly and that a location for the log files
