@@ -353,11 +353,13 @@ def last_seticore_error(r):
             answer_host = host
             answer_run_line = possible_run_line
             answer_lines = list(reversed(reversed_lines))
-    max_length = 10
-    if len(answer_lines) > max_length:
-        cut = max_length - 1
-        answer_lines = answer_lines[:cut] + [
-            "<{} more lines>".format(len(answer_lines) - cut)]
+
+    # Truncate the error lines for nicer display
+    half_window = 5
+    if len(answer_lines) > 2 * half_window + 1:
+        snipped = len(answer_lines) - 2 * half_window
+        answer_lines = answer_lines[:half_window] + [
+            "<{} lines snipped>".format(snipped)] + answer_lines[-half_window:]
     return answer_host, answer_lines
 
     
