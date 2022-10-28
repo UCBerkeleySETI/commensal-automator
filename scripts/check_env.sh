@@ -6,5 +6,5 @@ if [[ `which python` == "/opt/virtualenv/bluse3.9/bin/python" ]]; then
 fi
 
 echo "bad python environment. run:"
-echo source /opt/virtualenv/bluse3/bin/activate
+echo source /opt/virtualenv/bluse3.9/bin/activate
 exit 1
