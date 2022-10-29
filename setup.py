@@ -23,8 +23,5 @@ setuptools.setup(
             'blproc_manual = automator.blproc_manual:cli', 
             ]
         },
-    scripts = [
-        'scripts/processing_example.sh'       
-        ]
 
     )
