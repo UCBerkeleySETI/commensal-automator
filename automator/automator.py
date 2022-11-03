@@ -312,13 +312,12 @@ class Automator(object):
                        '-c', 
                        '/home/obs/bin/cleanmybuf0.sh --force']
                 log.info(cmd)      
-                subprocess.run(cmd)
+                result = subprocess.run(cmd)
             except Exception as e:
                 self.pause("cleanmybuf0.sh failed")
                 return
             still_have_raw = set(redis_util.raw_files(self.redis_server).keys())
-            hosts = hosts.intersection(still_have_raw)
-            if not hosts:
+            if result.returncode == 0 and not hosts.intersection(still_have_raw):
                 # We deleted everything
                 return True
             time.sleep(2)
@@ -335,6 +334,11 @@ class Automator(object):
         TODO: avoid having a race condition here where we start a recording
         multiple times.
         """
+        broken = redis_util.broken_daqs(self.redis_server)
+        if broken:
+            self.pause("{} daqs appear to be broken: {}".format(
+                len(broken), " ".join(broken)))
+            return
         subarrays = redis_util.suggest_recording(self.redis_server,
                                                  processing=self.processing)
         for subarray in subarrays:
