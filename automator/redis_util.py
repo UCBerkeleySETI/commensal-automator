@@ -171,6 +171,8 @@ def suggest_recording(r, processing=None, verbose=False):
     processing is a set of hosts that are busy processing, so we can't
     use them to record.
     """
+    subbed = set(multicast_subscribed(r))
+
     # Determine what hosts are already being used
     busy = set()
     if processing is not None:
@@ -198,6 +200,11 @@ def suggest_recording(r, processing=None, verbose=False):
     answer = []
     for subarray in subarrays:
         hosts = set(allocated_hosts(r, subarray))
+        if not subbed.intersection(hosts):
+            if verbose:
+                print("we cannot record on {} because no hosts are subscribed".format(
+                    subarray))
+            continue
         inter = busy.intersection(hosts)
         if inter:
             if verbose:

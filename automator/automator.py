@@ -129,11 +129,12 @@ class Automator(object):
 
         subarray_state, subarray_name = msg_components
 
-        log.info('subarray {} is now in state: {}'.format(subarray_name, subarray_state))
         if self.paused:
-            log.info('the automator is paused, so do nothing')
+            log.info('paused, ignoring subarray {} going into state {}'.format(
+                subarray_name, subarray_state))
             return
-
+        log.info('subarray {} is now in state: {}'.format(subarray_name, subarray_state))
+        
         self.maybe_start_recording()
         self.maybe_start_processing()
         
