@@ -130,8 +130,6 @@ class Automator(object):
         subarray_state, subarray_name = msg_components
 
         if self.paused:
-            log.info('paused, ignoring subarray {} going into state {}'.format(
-                subarray_name, subarray_state))
             return
         log.info('subarray {} is now in state: {}'.format(subarray_name, subarray_state))
         
@@ -266,31 +264,33 @@ class Automator(object):
             result_seticore, sb_id))
         if result_seticore > 0:
             self.alert_seticore_error()
-        
-        # Run hpguppi_proc if we can
-        subarray = redis_util.infer_subarray(self.redis_server, hosts)
-        procstatmap = redis_util.hpguppi_procstat(self.redis_server)
-        usable_hosts = set()
-        for key in ["IDLE", "END"]:
-            usable_hosts = usable_hosts.union(procstatmap.get(key, []))
 
-        if subarray is None:
-            self.alert("cannot run hpguppi_proc: no subarray exists for data in {}".format(
-                input_dir))
-        elif not usable_hosts.issuperset(hosts):
-            self.alert("cannot run hpguppi_proc: some instances are stuck")
-        else:
-            self.alert("running hpguppi_proc...")
-            proc_hpguppi = ProcHpguppi()
-            result_hpguppi = proc_hpguppi.process(PROC_DOMAIN, hosts, subarray, BFRDIR)
-            if result_hpguppi != 0:
-                self.pause("hpguppi_proc timed out")
-                return
+        if False:
+            # hpguppi_proc temporarily disabled
+            # Run hpguppi_proc if we can
+            subarray = redis_util.infer_subarray(self.redis_server, hosts)
+            procstatmap = redis_util.hpguppi_procstat(self.redis_server)
+            usable_hosts = set()
+            for key in ["IDLE", "END"]:
+                usable_hosts = usable_hosts.union(procstatmap.get(key, []))
 
-            self.alert("hpguppi_proc completed. output in /scratch/data/{}".format(datadir))
+            if subarray is None:
+                self.alert("cannot run hpguppi_proc: no subarray exists for data in {}".format(
+                    input_dir))
+            elif not usable_hosts.issuperset(hosts):
+                self.alert("cannot run hpguppi_proc: some instances are stuck")
+            else:
+                self.alert("running hpguppi_proc...")
+                proc_hpguppi = ProcHpguppi()
+                result_hpguppi = proc_hpguppi.process(PROC_DOMAIN, hosts, subarray, BFRDIR)
+                if result_hpguppi != 0:
+                    self.pause("hpguppi_proc timed out")
+                    return
+
+                self.alert("hpguppi_proc completed. output in /scratch/data/{}".format(datadir))
 
         # Clean up
-        self.alert("deleting raw files...")
+        # self.alert("deleting raw files...")
         if not self.delete_buf0(hosts):
             return
             
