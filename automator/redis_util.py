@@ -108,24 +108,31 @@ def ready_to_record(r):
 def get_recording(r):
     """Returns a sorted list of all hosts that are currently recording.
     """
-    answer = set()
     hkeys = ["PKTIDX", "PKTSTART", "PKTSTOP"]
-    for host, strkeys in multiget_status(r, "bluse", hkeys):
-        if strkeys[1] == "0":
-            # PKTSTART=0 indicates not-in-use even if the other keys are absent
+    for _ in range(10):
+        try:
+            answer = set()
+            for host, strkeys in multiget_status(r, "bluse", hkeys):
+                if strkeys[1] == "0":
+                    # PKTSTART=0 indicates not-in-use even if the other keys are absent
+                    continue
+                for k, val in zip(hkeys, strkeys):
+                    if val is None:
+                        log.warning("on host {} the key {} is not set".format(host, k))
+                        raise IOError("try again")
+                if None in strkeys:
+                    # This is a race condition and we don't know what it means.
+                    # Let's treat it as "in use"
+                    answer.add(host)
+                    continue
+                pktidx, pktstart, pktstop = map(int, strkeys)
+                if pktstart > 0 and pktidx < pktstop:
+                    answer.add(host)
+            return sorted(answer)
+        except IOError:
+            time.sleep(1)
             continue
-        for k, val in zip(hkeys, strkeys):
-            if val is None:
-                log.warning("on host {} the key {} is not set".format(host, k))
-        if None in strkeys:
-            # This is a race condition and we don't know what it means.
-            # Let's treat it as "in use"
-            answer.add(host)
-            continue
-        pktidx, pktstart, pktstop = map(int, strkeys)
-        if pktstart > 0 and pktidx < pktstop:
-            answer.add(host)
-    return sorted(answer)
+    raise IOError("get_recording failed even after retry")
 
 
 def coordinator_hosts(r):
