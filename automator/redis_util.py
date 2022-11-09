@@ -6,6 +6,7 @@ from datetime import datetime
 import os
 import redis
 import sys
+import time
 
 from automator.logger import log
 
@@ -119,7 +120,7 @@ def get_recording(r):
                 for k, val in zip(hkeys, strkeys):
                     if val is None:
                         log.warning("on host {} the key {} is not set".format(host, k))
-                        raise IOError("try again")
+                        raise IOError("synthetic error to invoke retry logic")
                 if None in strkeys:
                     # This is a race condition and we don't know what it means.
                     # Let's treat it as "in use"
