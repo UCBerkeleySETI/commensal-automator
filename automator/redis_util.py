@@ -88,7 +88,7 @@ def broken_daqs(r):
         if result is None:
             continue
         delta = datetime.strptime(result, "%c") - datetime.now()
-        if abs(delta.total_seconds()) > 10:
+        if abs(delta.total_seconds()) > 60:
             answer.append(host)
     return answer
 
