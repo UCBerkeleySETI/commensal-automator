@@ -1,0 +1,110 @@
+# .yaml configuration file for coordinator.py and katportal_server.py.
+
+# Temporary; to be calculated by a function in future.
+streams_per_instance: 
+- 4
+
+hashpipe_instances:
+- blpn0/0
+- blpn1/0
+- blpn2/0
+- blpn3/0
+- blpn4/0
+- blpn5/0
+- blpn6/0
+- blpn7/0
+- blpn8/0
+- blpn9/0
+- blpn10/0
+- blpn11/0
+- blpn12/0
+- blpn13/0
+- blpn14/0
+- blpn15/0
+- blpn16/0
+- blpn17/0
+- blpn18/0
+- blpn19/0
+- blpn20/0
+- blpn21/0
+- blpn22/0
+- blpn23/0
+- blpn24/0
+- blpn25/0
+- blpn26/0
+- blpn27/0
+- blpn28/0
+- blpn29/0
+- blpn30/0
+- blpn31/0
+- blpn32/0
+- blpn33/0
+- blpn34/0
+- blpn35/0
+- blpn36/0
+- blpn37/0
+- blpn38/0
+- blpn39/0
+- blpn40/0
+- blpn41/0
+- blpn42/0
+- blpn43/0
+- blpn44/0
+- blpn45/0
+- blpn46/0
+- blpn47/0
+- blpn48/0
+- blpn49/0
+- blpn50/0
+- blpn51/0
+- blpn52/0
+- blpn53/0
+- blpn54/0
+- blpn55/0
+- blpn56/0
+- blpn57/0
+- blpn58/0
+- blpn59/0
+- blpn61/0
+- blpn62/0
+- blpn63/0
+
+per_antenna_sub:         
+#- dig_l_band_noise_diode
+#- dig_s_band_noise_diode
+#- dig_u_band_noise_diode
+
+array_on_configure:
+- pool_resources
+
+cbf_sub:
+- pos_request_base_azim
+- pos_request_base_ra
+- pos_request_base_dec
+- pos_request_base_elev
+- target
+- offset_ut1
+
+cbf_on_configure:
+- antenna_channelised_voltage_n_chans_per_substream
+- tied_array_channelised_voltage_0x_spectra_per_heap
+- sync_time
+- antenna_channelised_voltage_n_samples_between_spectra
+- adc_sample_rate
+- input_labelling
+
+cbf_on_track:
+# - target
+
+stream_sub:
+- antenna_channelised_voltage_input_data_suspect
+
+stream_on_configure:
+- antenna_channelised_voltage_centre_freq
+
+array_sub:
+- observation_activity
+- script_status 
+- script_last_delay_calibration
+- script_last_phaseup 
+
