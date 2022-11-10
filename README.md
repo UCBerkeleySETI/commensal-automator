@@ -90,3 +90,14 @@ For use as a daemonised process with `circus`, follow these steps:
 -    Run `circusctl --endpoint <endpoint> reloadconfig`
 
 -    Run `circusctl --endpoint <endpoint> start automator`
+
+### Coordinator requirements  
+
+Notes on transplanting/subsuming the coordinator from 
+`meerkat-backend-interface` to the automator. 
+
+Requirements:  
+
+katsdptelstate >= 0.11: https://github.com/ska-sa/katsdptelstate
+
+
