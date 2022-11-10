@@ -9,9 +9,9 @@ import redis
 import numpy as np
 import string
 import ast
-from meerkat_backend_interface import redis_tools
-from meerkat_backend_interface.telstate_interface import TelstateInterface
-from meerkat_backend_interface.logger import log, set_logger
+from .coordinator import redis_tools
+from .telstate_interface import TelstateInterface
+from automator.logger import log, set_logger
 
 # Redis channels
 ALERTS_CHANNEL = redis_tools.REDIS_CHANNELS.alerts

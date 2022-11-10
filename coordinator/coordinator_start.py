@@ -5,8 +5,8 @@ import signal
 import sys
 import logging
 
-from meerkat_backend_interface.coordinator import Coordinator
-from meerkat_backend_interface.logger import log, set_logger
+from .coordinator import Coordinator
+from automator.logger import log, set_logger
 
 def cli(prog = sys.argv[0]):
     """Command line interface. 

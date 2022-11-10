@@ -1,4 +1,4 @@
-from .logger import log
+from automator.logger import log
 
 class REDIS_CHANNELS:
     """Redis channels for communication between processes.
