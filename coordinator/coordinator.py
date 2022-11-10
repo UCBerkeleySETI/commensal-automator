@@ -9,14 +9,16 @@ import redis
 import numpy as np
 import string
 import ast
-from .coordinator import redis_tools
+
+from .redis_tools import REDIS_CHANNELS, write_list_redis
 from .telstate_interface import TelstateInterface
 from automator.logger import log, set_logger
 
+
 # Redis channels
-ALERTS_CHANNEL = redis_tools.REDIS_CHANNELS.alerts
-SENSOR_CHANNEL = redis_tools.REDIS_CHANNELS.sensor_alerts
-TRIGGER_CHANNEL = redis_tools.REDIS_CHANNELS.trigger_mode
+ALERTS_CHANNEL = REDIS_CHANNELS.alerts
+SENSOR_CHANNEL = REDIS_CHANNELS.sensor_alerts
+TRIGGER_CHANNEL = REDIS_CHANNELS.trigger_mode
 TARGETS_CHANNEL = 'target-selector:new-pointing'
 # Type of stream
 STREAM_TYPE = 'cbf.antenna_channelised_voltage'
@@ -104,7 +106,7 @@ class Coordinator(object):
         free_hosts = self.red.lrange('coordinator:free_hosts', 0, 
                 self.red.llen('coordinator:free_hosts'))
         if(len(free_hosts) == 0):
-            redis_tools.write_list_redis(self.red, 'coordinator:free_hosts', self.hashpipe_instances)
+            write_list_redis(self.red, 'coordinator:free_hosts', self.hashpipe_instances)
             log.info('First configuration - no list of available hosts. Retrieving from config file.')
         # Subscribe to the required Redis channels.
         ps = self.red.pubsub(ignore_subscribe_messages=True)
@@ -208,7 +210,7 @@ class Coordinator(object):
             free_hosts = self.red.lrange('coordinator:free_hosts', 0, 
                 self.red.llen('coordinator:free_hosts'))
             allocated_hosts = free_hosts[0:n_red_chans]
-            redis_tools.write_list_redis(self.red, 
+            write_list_redis(self.red, 
                     'coordinator:allocated_hosts:{}'.format(product_id), allocated_hosts)
             # Remove allocated hosts from list of available hosts
             # NOTE: in future, append/pop with Redis commands instead of write_list_redis
@@ -221,7 +223,7 @@ class Coordinator(object):
                 self.red.delete('coordinator:free_hosts')
             elif(len(free_hosts) > n_red_chans):
                 free_hosts = free_hosts[n_red_chans:]
-                redis_tools.write_list_redis(self.red, 'coordinator:free_hosts', free_hosts)
+                write_list_redis(self.red, 'coordinator:free_hosts', free_hosts)
             log.info('Allocated {} hosts to {}'.format(n_red_chans, product_id))
             # Create Hashpipe-Redis Gateway group for the current subarray:
             # Using groups feature (please see rb-hashpipe documentation).
