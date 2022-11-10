@@ -1,0 +1,75 @@
+"""
+Temporary configuration file for coordinator.py 
+
+It contains:
+1. The number of F-engine streams to be processed per hashpipe instance.
+2. All the available hashpipe instances in the format: <host>/<instance>.
+"""
+
+streams_per_instance: 
+- 4
+
+hashpipe_instances:
+- blpn0/0
+- blpn1/0
+- blpn2/0
+- blpn3/0
+- blpn4/0
+- blpn5/0
+- blpn6/0
+- blpn7/0
+- blpn8/0
+- blpn9/0
+- blpn10/0
+- blpn11/0
+- blpn12/0
+- blpn13/0
+- blpn14/0
+- blpn15/0
+- blpn16/0
+- blpn17/0
+- blpn18/0
+- blpn19/0
+- blpn20/0
+- blpn21/0
+- blpn22/0
+- blpn23/0
+- blpn24/0
+- blpn25/0
+- blpn26/0
+- blpn27/0
+- blpn28/0
+- blpn29/0
+- blpn30/0
+- blpn31/0
+- blpn32/0
+- blpn33/0
+- blpn34/0
+- blpn35/0
+- blpn36/0
+- blpn37/0
+- blpn38/0
+- blpn39/0
+- blpn40/0
+- blpn41/0
+- blpn42/0
+- blpn43/0
+- blpn44/0
+- blpn45/0
+- blpn46/0
+- blpn47/0
+- blpn48/0
+- blpn49/0
+- blpn50/0
+- blpn51/0
+- blpn52/0
+- blpn53/0
+- blpn54/0
+- blpn55/0
+- blpn56/0
+- blpn57/0
+- blpn58/0
+- blpn59/0
+- blpn61/0
+- blpn62/0
+- blpn63/0
