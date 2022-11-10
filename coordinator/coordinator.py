@@ -120,10 +120,6 @@ class Coordinator(object):
                 if((msg_type == 'coordinator') & (description == 'trigger_mode')):
                     trigger_key = value.split(':', 1)[0] 
                     trigger_value = value.split(':', 1)[1]
-                    # Update the default trigger mode:
-                    self.trigger_mode = trigger_value
-                    self.red.set('coordinator:trigger_mode', value)
-                    log.info('Default trigger mode (for all subarrays) set to \'{}\''.format(trigger_value))
                     # Update the trigger mode for the specific array in question:
                     # (this is useful during an observation)
                     self.red.set('coordinator:trigger_mode:{}'.format(trigger_key), trigger_value)
