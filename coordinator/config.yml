@@ -1,10 +1,8 @@
-"""
-Temporary configuration file for coordinator.py 
+#Temporary configuration file for coordinator.py 
+#It contains:
+#1. The number of F-engine streams to be processed per hashpipe instance.
+#2. All the available hashpipe instances in the format: <host>/<instance>.
 
-It contains:
-1. The number of F-engine streams to be processed per hashpipe instance.
-2. All the available hashpipe instances in the format: <host>/<instance>.
-"""
 
 streams_per_instance: 
 - 4
