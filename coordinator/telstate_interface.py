@@ -1,5 +1,3 @@
-# -*- coding: future_fstrings -*-
-
 """Module to interface with Telstate to retrieve calibration solutions.
 
    See also:
