@@ -17,7 +17,7 @@ PROC_DOMAIN = 'blproc'
 ACQ_DOMAIN = 'bluse'
 SLACK_CHANNEL = "meerkat-obs-log"
 SLACK_PROXY_CHANNEL = "slack-messages"
-
+DEFAULT_DWELL = 290
 
 def timestring():
     """A standard format to report the current time in"""
@@ -171,7 +171,7 @@ class Automator(object):
         # we may want to process in about `DWELL` + margin seconds.
         allocated_hosts = redis_util.allocated_hosts(self.redis_server, subarray_name)
         log.info("allocated hosts for {}: {}".format(subarray_name, allocated_hosts))
-        dwell = self.retrieve_dwell(allocated_hosts)
+        dwell = self.retrieve_dwell(allocated_hosts, DEFAULT_DWELL)
         log.info("dwell: {}".format(dwell))
         duration = dwell + self.margin
 
@@ -347,9 +347,9 @@ class Automator(object):
             self.set_nshot(subarray, 1)
         
         
-    def retrieve_dwell(self, host_list):
+    def retrieve_dwell(self, host_list, default_dwell):
         """Retrieve the current value of `DWELL` from the Hashpipe-Redis 
-        Gateway for a specific set of hosts. Defaults to 300 seconds. 
+        Gateway for a specific set of hosts. 
         Note that this assumes all instances are host/0.
 
         Args:
@@ -361,7 +361,7 @@ class Automator(object):
             DWELL (float): The duration for which the processing nodes will record
             for the current subarray (in seconds). 
         """
-        dwell = 300
+        dwell = default_dwell
         dwell_values = []
         for host in host_list:
             host_key = '{}://{}/0/status'.format(self.hpgdomain, host)
@@ -378,7 +378,7 @@ class Automator(object):
             if len(np.unique(dwell_values)) > 1:
                 log.warning("DWELL disagreement")    
         else:
-            log.warning("Could not retrieve DWELL. Using 300 sec by default.")
+            log.warning("Could not retrieve DWELL. Using {} sec by default.".format(default_dwell))
         return dwell
 
     
