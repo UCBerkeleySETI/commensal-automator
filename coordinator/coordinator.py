@@ -79,7 +79,7 @@ class Coordinator(object):
         self.cfg_file = cfg_file
         # Read global trigger mode:
         self.trigger_mode = trigger_mode # This is the default trigger_mode (for all subarrays)
-        log = set_logger(log_level = logging.DEBUG)
+        log = set_logger(level=logging.DEBUG)
 
     def start(self):
         """Start the coordinator as follows:
