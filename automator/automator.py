@@ -15,14 +15,7 @@ from .proc_seticore import run_seticore
 BFRDIR = '/home/obs/bfr5'
 PROC_DOMAIN = 'blproc'
 ACQ_DOMAIN = 'bluse'
-SLACK_CHANNEL = "meerkat-obs-log"
-SLACK_PROXY_CHANNEL = "slack-messages"
 DEFAULT_DWELL = 290
-
-def timestring():
-    """A standard format to report the current time in"""
-    return datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d %H:%M:%S %Z")
-
 
 class Automator(object):
     """The automator controls when the system is recording raw files, when
@@ -95,7 +88,7 @@ class Automator(object):
         # Setting this to True should stop all subsequent actions while we manually debug
         self.paused = False
 
-        self.alert("starting up")
+        redis_util.alert("starting up")
 
         
     def start(self):
@@ -195,7 +188,7 @@ class Automator(object):
         
     def pause(self, message):
         full_message = message + "; pausing for debugging"
-        self.alert(full_message)
+        redis_util.alert(full_message)
         self.paused = True
 
 
@@ -222,7 +215,7 @@ class Automator(object):
             return
         message = "sample seticore error, from {}:```{}```".format(
             host, "\n".join(lines))
-        self.alert(message)
+        redis_util.alert(message)
         
         
     def process(self, input_dir, hosts):
@@ -250,7 +243,7 @@ class Automator(object):
             return
         
         # Run seticore
-        self.alert("running seticore...")
+        redis_util.alert("running seticore...")
         result_seticore = run_seticore(sorted(hosts), BFRDIR, input_dir, sb_id)
         if result_seticore > 1:
             if result_seticore > 128:
@@ -260,7 +253,7 @@ class Automator(object):
                     result_seticore))
             self.alert_seticore_error()
             return
-        self.alert("seticore completed with code {}. output in /scratch/data/{}".format(
+        redis_util.alert("seticore completed with code {}. output in /scratch/data/{}".format(
             result_seticore, sb_id))
         if result_seticore > 0:
             self.alert_seticore_error()
@@ -275,19 +268,19 @@ class Automator(object):
                 usable_hosts = usable_hosts.union(procstatmap.get(key, []))
 
             if subarray is None:
-                self.alert("cannot run hpguppi_proc: no subarray exists for data in {}".format(
+                redis_util.alert("cannot run hpguppi_proc: no subarray exists for data in {}".format(
                     input_dir))
             elif not usable_hosts.issuperset(hosts):
-                self.alert("cannot run hpguppi_proc: some instances are stuck")
+                redis_util.alert("cannot run hpguppi_proc: some instances are stuck")
             else:
-                self.alert("running hpguppi_proc...")
+                redis_util.alert("running hpguppi_proc...")
                 proc_hpguppi = ProcHpguppi()
                 result_hpguppi = proc_hpguppi.process(PROC_DOMAIN, hosts, subarray, BFRDIR)
                 if result_hpguppi != 0:
                     self.pause("hpguppi_proc timed out")
                     return
 
-                self.alert("hpguppi_proc completed. output in /scratch/data/{}".format(datadir))
+                redis_util.alert("hpguppi_proc completed. output in /scratch/data/{}".format(datadir))
 
         # Clean up
         # self.alert("deleting raw files...")
@@ -295,7 +288,7 @@ class Automator(object):
             return
             
         self.processing = self.processing.difference(hosts)
-        self.alert("processing complete.")
+        redis_util.alert("processing complete.")
         self.maybe_start_recording()
 
         
@@ -399,19 +392,3 @@ class Automator(object):
         return mode_1d
 
     
-    def alert(self, message, slack_channel=SLACK_CHANNEL,
-              slack_proxy_channel=SLACK_PROXY_CHANNEL):
-        """Publish a message to the alerts Slack channel. 
-
-        Args:
-            message (str): Message to publish to Slack.  
-            slack_channel (str): Slack channel to publish message to. 
-            slack_proxy_channel (str): Redis channel for the Slack proxy/bridge. 
-
-        Returns:
-            None  
-        """
-        log.info(message)
-        # Format: <Slack channel>:<Slack message text>
-        alert_msg = '{}:[{}] automator: {}'.format(slack_channel, timestring(), message)
-        self.redis_server.publish(slack_proxy_channel, alert_msg)

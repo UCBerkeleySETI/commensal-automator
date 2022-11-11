@@ -10,6 +10,9 @@ import time
 
 from automator.logger import log
 
+SLACK_CHANNEL = "meerkat-obs-log"
+SLACK_PROXY_CHANNEL = "slack-messages"
+
 def raw_files(r):
     """Returns a dict mapping host name to a list of raw files on the host."""
     hosts = [key.split(":")[-1] for key in r.keys("bluse_raw_watch:*")]
@@ -377,7 +380,28 @@ def last_seticore_error(r):
             "<{} lines snipped>".format(snipped)] + answer_lines[-half_window:]
     return answer_host, answer_lines
 
-    
+
+def timestring():
+    """A standard format to report the current time in"""
+    return datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d %H:%M:%S %Z")
+
+
+def alert(self, message, slack_channel=SLACK_CHANNEL,
+          slack_proxy_channel=SLACK_PROXY_CHANNEL):
+    """Publish a message to the alerts Slack channel. 
+    Args:
+        message (str): Message to publish to Slack.  
+        slack_channel (str): Slack channel to publish message to. 
+        slack_proxy_channel (str): Redis channel for the Slack proxy/bridge. 
+    Returns:
+        None  
+    """
+    log.info(message)
+    # Format: <Slack channel>:<Slack message text>
+    alert_msg = '{}:[{}] automator: {}'.format(slack_channel, timestring(), message)
+    self.redis_server.publish(slack_proxy_channel, alert_msg)
+
+
 def show_status(r):
     broken = broken_daqs(r)
     if broken:
