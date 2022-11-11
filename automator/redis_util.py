@@ -2,7 +2,7 @@
 # Helpers functions for looking up various redis data.
 # The convention is that "r" is our redis client.
 
-from datetime import datetime
+from datetime import datetime, timezone
 import os
 import redis
 import sys
@@ -386,7 +386,7 @@ def timestring():
     return datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d %H:%M:%S %Z")
 
 
-def alert(self, message, name, slack_channel=SLACK_CHANNEL,
+def alert(r, message, name, slack_channel=SLACK_CHANNEL,
           slack_proxy_channel=SLACK_PROXY_CHANNEL):
     """Publish a message to the alerts Slack channel. 
     Args:
@@ -400,7 +400,7 @@ def alert(self, message, name, slack_channel=SLACK_CHANNEL,
     log.info(message)
     # Format: <Slack channel>:<Slack message text>
     alert_msg = '{}:[{}] {}: {}'.format(slack_channel, timestring(), name, message)
-    self.redis_server.publish(slack_proxy_channel, alert_msg)
+    r.publish(slack_proxy_channel, alert_msg)
 
 
 def show_status(r):

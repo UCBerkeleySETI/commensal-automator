@@ -92,7 +92,7 @@ class Coordinator(object):
              appropriate function. 
         """        
         # Configure coordinator
-        redis_util.alert('Starting up', 'coordinator')
+        redis_util.alert(self.red, 'starting up', 'coordinator')
         try:
             self.hashpipe_instances, self.streams_per_instance = self.config(self.cfg_file)
             log.info('Configured from {}'.format(self.cfg_file))
@@ -196,14 +196,15 @@ class Coordinator(object):
         addr_list, port, n_addrs, n_red_chans = self.ip_addresses(product_id, offset)
         # Allocate hosts for the current subarray:
         if(self.red.exists('coordinator:free_hosts')): # If key exists, there are free hosts
-            redis_util.alert('Allocating hosts to {}'.format(product_id), 'coordinator')
+            redis_util.alert(self.red, 
+                'Allocating hosts to {}'.format(product_id), 'coordinator')
             # Clear any prior nshot values ahead of host allocation:
             trigger_mode = 'nshot:0'
             self.red.set('coordinator:trigger_mode:{}'.format(product_id), trigger_mode)
             log.info('nshot set to 0 prior to host allocation')
             # Alert via slack:
             msg = "nshot cleared for {}".format(product_id)
-            redis_util.alert(msg, 'coordinator')
+            redis_util.alert(self.red, msg, 'coordinator')
             # Host allocation:
             free_hosts = self.red.lrange('coordinator:free_hosts', 0, 
                 self.red.llen('coordinator:free_hosts'))
@@ -288,8 +289,9 @@ class Coordinator(object):
                 self.pub_gateway_msg(self.red, chan_list[i], 'DESTIP', addr_list[i], log, True)
         else:
             # If key does not exist, there are no free hosts.
-            redis_util.alert("No free resources, cannot process data from {}".format(
-                product_id), "coordinator")
+            redis_util.alert(self.red, 
+                "No free resources, cannot process data from {}".format(product_id),
+                "coordinator")
 
     def tracking_start(self, product_id):
         """When a subarray is on source and begins tracking, and the F-engine
@@ -368,10 +370,11 @@ class Coordinator(object):
         if(last_cal_ts < current_cal_ts): 
             # Retrieve and save calibration solutions:
             self.TelInt.query_telstate(DIAGNOSTIC_LOC, product_id)
-            redis_util.alert("New calibration solutions retrieved.", "coordinator")
+            redis_util.alert(self.red, 
+                "New calibration solutions retrieved.", "coordinator")
             self.red.set('coordinator:cal_ts:{}'.format(product_id), current_cal_ts)
         else:
-            redis_util.alert.info("No calibration solution updates.", "coordinator")
+            redis_util.alert(self.red, "No calibration solution updates.", "coordinator")
 
     def record_track(self, target_str, ra_s, dec_s, product_id, n_remaining): 
         """Data recording is initiated by issuing a PKTSTART value to the 
@@ -449,7 +452,7 @@ class Coordinator(object):
 
         # Alert via slack:
         slack_message = "Instructed recording for {} to {}".format(product_id, datadir)
-        redis_util.alert(slack_message, 'coordinator')
+        redis_util.alert(self.red, slack_message, 'coordinator')
 
         # Set subarray state to 'tracking':
         self.red.set('coordinator:tracking:{}'.format(product_id), '1')
@@ -500,7 +503,8 @@ class Coordinator(object):
                 self.pub_gateway_msg(self.red, chan_list[i], 'DWELL', dwell_time, log, False)
             # Reset tracking state to '0'
             self.red.set('coordinator:tracking:{}'.format(product_id), '0')
-            redis_util.alert("Tracking stopped for {}".format(product_id), 
+            redis_util.alert(self.red, 
+                "Tracking stopped for {}".format(product_id), 
                 "coordinator")
 
     def deconfigure(self, description):
@@ -529,8 +533,9 @@ class Coordinator(object):
         for chan in chan_list:
             self.pub_gateway_msg(self.red, chan, 'DESTIP', '0.0.0.0', log, False)
         
-        redis_util.alert("Instructed hosts for {} to unsubscribe from mcast groups".format(
-            description), "coordinator")
+        redis_util.alert(self.red,
+            "Instructed hosts for {} to unsubscribe from mcast groups".format(description), 
+            "coordinator")
 
         # Instruct gateways to leave current subarray group:   
         subarray_group = '{}:{}///set'.format(HPGDOMAIN, description)
@@ -736,7 +741,7 @@ class Coordinator(object):
             log.error('PKTIDX varies by more than 60 seconds across instances')
             # Alert via slack:
             msg = "PKTIDX varies by >60 seconds for {}".format(product_id)
-            redis_util.alert(msg, 'coordinator')
+            redis_util.alert(self.red, msg, 'coordinator')
         pktstart = np.max(pkt_idxs) + idx_margin
         log.info("PKTIDX: Min {}, Median {}, Max {}, PKTSTART {}".format(min_idx, med_idx, max_idx, pktstart))
         return pktstart
