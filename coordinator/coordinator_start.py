@@ -32,7 +32,6 @@ def on_shutdown():
 
 def main(port, cfg_file, trigger_mode):
     log = set_logger(level=logging.DEBUG)
-    log.info("Starting Coordinator")
     coord = Coordinator(port, cfg_file, trigger_mode)
     signal.signal(signal.SIGINT, lambda sig, frame: on_shutdown())
     coord.start()
