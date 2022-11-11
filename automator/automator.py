@@ -88,7 +88,7 @@ class Automator(object):
         # Setting this to True should stop all subsequent actions while we manually debug
         self.paused = False
 
-        redis_util.alert("starting up")
+        redis_util.alert("starting up", "automator")
 
         
     def start(self):
@@ -188,7 +188,7 @@ class Automator(object):
         
     def pause(self, message):
         full_message = message + "; pausing for debugging"
-        redis_util.alert(full_message)
+        redis_util.alert(full_message, "automator")
         self.paused = True
 
 
@@ -215,7 +215,7 @@ class Automator(object):
             return
         message = "sample seticore error, from {}:```{}```".format(
             host, "\n".join(lines))
-        redis_util.alert(message)
+        redis_util.alert(message, "automator")
         
         
     def process(self, input_dir, hosts):
@@ -243,7 +243,7 @@ class Automator(object):
             return
         
         # Run seticore
-        redis_util.alert("running seticore...")
+        redis_util.alert("running seticore...", "automator")
         result_seticore = run_seticore(sorted(hosts), BFRDIR, input_dir, sb_id)
         if result_seticore > 1:
             if result_seticore > 128:
@@ -254,7 +254,7 @@ class Automator(object):
             self.alert_seticore_error()
             return
         redis_util.alert("seticore completed with code {}. output in /scratch/data/{}".format(
-            result_seticore, sb_id))
+            result_seticore, sb_id), "automator")
         if result_seticore > 0:
             self.alert_seticore_error()
 
@@ -269,18 +269,19 @@ class Automator(object):
 
             if subarray is None:
                 redis_util.alert("cannot run hpguppi_proc: no subarray exists for data in {}".format(
-                    input_dir))
+                    input_dir), "automator")
             elif not usable_hosts.issuperset(hosts):
-                redis_util.alert("cannot run hpguppi_proc: some instances are stuck")
+                redis_util.alert("cannot run hpguppi_proc: some instances are stuck", "automator")
             else:
-                redis_util.alert("running hpguppi_proc...")
+                redis_util.alert("running hpguppi_proc...", "automator")
                 proc_hpguppi = ProcHpguppi()
                 result_hpguppi = proc_hpguppi.process(PROC_DOMAIN, hosts, subarray, BFRDIR)
                 if result_hpguppi != 0:
                     self.pause("hpguppi_proc timed out")
                     return
 
-                redis_util.alert("hpguppi_proc completed. output in /scratch/data/{}".format(datadir))
+                redis_util.alert("hpguppi_proc completed. output in /scratch/data/{}".format(
+                    datadir), "automator")
 
         # Clean up
         # self.alert("deleting raw files...")
@@ -288,7 +289,7 @@ class Automator(object):
             return
             
         self.processing = self.processing.difference(hosts)
-        redis_util.alert("processing complete.")
+        redis_util.alert("processing complete.", "automator")
         self.maybe_start_recording()
 
         
