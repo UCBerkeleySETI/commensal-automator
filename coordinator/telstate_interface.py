@@ -38,7 +38,7 @@ class TelstateInterface(object):
                local_redis (str): Local Redis endpoint of the form <host>:<port>
                telstate_redis (str): Redis endpoint for Telstate (host:port)
         """
-        log = set_logger(log_level = logging.DEBUG)
+        log = set_logger(level=logging.DEBUG)
         local_redis_host = local_redis.split(':')[0]
         local_redis_port = local_redis.split(':')[1]
         self.red = redis.StrictRedis(host=local_redis_host, 
