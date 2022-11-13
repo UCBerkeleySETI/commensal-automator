@@ -424,7 +424,6 @@ class Coordinator(object):
 
         # Calculate PKTSTART
         pktidx_start = self.get_start_idx(allocated_hosts, PKTIDX_MARGIN, log, product_id)
-
         pktidx_start_ts = self.pktidx_to_ts(pktidx_start, product_id)
         pktidx_start_ts = datetime.utcfromtimestamp(pktidx_start_ts).strftime("%Y%m%dT%H%M%SZ")
 
@@ -440,14 +439,11 @@ class Coordinator(object):
             pktidx_start, log, False)
 
         # Alert the target selector to the new pointing:
-        log.info(ra_s)
         ra_deg = self.ra_degrees(ra_s)
         dec_deg = self.dec_degrees(dec_s)
         # For the minimal target selector (temporary):
         fecenter = self.centre_freq(product_id) 
-        log.info(fecenter)
         target_information = '{}:{}:{}:{}:{}'.format(obsid, target_str, ra_deg, dec_deg, fecenter)
-        log.info(target_information)
         self.red.publish(TARGETS_CHANNEL, target_information)
 
         # Alert via slack:
