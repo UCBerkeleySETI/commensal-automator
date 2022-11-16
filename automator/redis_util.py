@@ -386,6 +386,26 @@ def timestring():
     return datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d %H:%M:%S %Z")
 
 
+def pktidx_to_timestamp(r, pktidx, subarray):
+    """
+    Converts a PKTIDX value into a floating point unix timestamp in UTC, using
+    metadata from redis for a given subarray.
+    """
+    if pktidx <= 0:
+        raise ValueError("cannot convert pktidx {} to a timestamp".format(pktidx))
+
+    pipe = r.pipeline()
+    for subkey in ["hclocks", "synctime", "fenchan", "chan_bw"]:
+        pipe.get(subarray + ":" + subkey)
+    results = pipe.execute()
+    hclocks, synctime, fenchan, chan_bw = map(float, results)
+
+    # Seconds since SYNCTIME: PKTIDX*HCLOCKS/(2e6*FENCHAN*ABS(CHAN_BW))
+    timestamp = synctime + pktidx * hclocks / (2e6 * fenchan * abs(chan_bw))
+
+    return timestamp
+
+
 def alert(r, message, name, slack_channel=SLACK_CHANNEL,
           slack_proxy_channel=SLACK_PROXY_CHANNEL):
     """Publish a message to the alerts Slack channel. 
@@ -524,6 +544,12 @@ def main():
             print(len(hosts), "hosts are in hpguppi_proc state", stat, ":")
             print(hosts)
             print()
+        return
+
+    if command == "pktidx_to_timestamp":
+        pktidx_str, subarray = args
+        pktidx = int(pktidx_str)
+        print(pktidx_to_timestamp(r, pktidx, subarray))
         return
     
     print("unrecognized command:", command)
