@@ -87,8 +87,12 @@ class Automator(object):
         # Setting this to True should stop all subsequent actions while we manually debug
         self.paused = False
 
-        redis_util.alert(self.redis_server, "starting up", "automator")
+        self.alert("starting up")
 
+
+    def alert(self, message):
+        redis_util.alert(self.redis_server, message, "automator")
+        
         
     def start(self):
         """Start the automator."""
@@ -186,8 +190,7 @@ class Automator(object):
         
         
     def pause(self, message):
-        full_message = message + "; pausing for debugging"
-        redis_util.alert(self.redis_server, full_message, "automator")
+        self.alert(f"{message}; pausing for debugging")
         self.paused = True
 
 
@@ -212,9 +215,8 @@ class Automator(object):
         host, lines = redis_util.last_seticore_error(self.redis_server)
         if host is None:
             return
-        message = "sample seticore error, from {}:```{}```".format(
-            host, "\n".join(lines))
-        redis_util.alert(self.redis_server, message, "automator")
+        joined_lines = "\n".join(lines)
+        self.alert(f"sample seticore error, from {host}:```{joined_lines}```")
         
         
     def process(self, input_dir, hosts):
@@ -236,14 +238,14 @@ class Automator(object):
             return
         self.processing = self.processing.union(hosts)
 
-        sb_id = redis_util.sb_id_from_filename(input_dir)
-        if sb_id is None:
+        timestamp = redis_util.timestamp_from_filename(input_dir)
+        if timestamp is None:
             self.pause("unexpected directory name: {}".format(input_dir))
             return
         
         # Run seticore
-        redis_util.alert(self.redis_server, "running seticore...", "automator")
-        result_seticore = run_seticore(sorted(hosts), BFRDIR, input_dir, sb_id)
+        self.alert("running seticore...")
+        result_seticore = run_seticore(sorted(hosts), BFRDIR, input_dir, timestamp)
         if result_seticore > 1:
             if result_seticore > 128:
                 self.pause("seticore killed with signal {}".format(result_seticore - 128))
@@ -252,9 +254,8 @@ class Automator(object):
                     result_seticore))
             self.alert_seticore_error()
             return
-        redis_util.alert(self.redis_server, 
-            "seticore completed with code {}. output in /scratch/data/{}".format(
-            result_seticore, sb_id), "automator")
+        self.alert(f"seticore completed with code {result_seticore}. "
+                   f"output in /scratch/data/{timestamp}")
         if result_seticore > 0:
             self.alert_seticore_error()
 
@@ -268,24 +269,18 @@ class Automator(object):
                 usable_hosts = usable_hosts.union(procstatmap.get(key, []))
 
             if subarray is None:
-                redis_util.alert(self.redis_server,
-                    "cannot run hpguppi_proc: no subarray exists for data in {}".format(
-                    input_dir), "automator")
+                self.alert("cannot run hpguppi_proc: no subarray exists for {input_dir}")
             elif not usable_hosts.issuperset(hosts):
-                redis_util.alert(self.redis_server, 
-                    "cannot run hpguppi_proc: some instances are stuck", "automator")
+                self.alert("cannot run hpguppi_proc: some instances are stuck")
             else:
-                redis_util.alert(self.redis_server, 
-                    "running hpguppi_proc...", "automator")
+                self.alert("running hpguppi_proc...")
                 proc_hpguppi = ProcHpguppi()
                 result_hpguppi = proc_hpguppi.process(PROC_DOMAIN, hosts, subarray, BFRDIR)
                 if result_hpguppi != 0:
                     self.pause("hpguppi_proc timed out")
                     return
 
-                redis_util.alert(self.redis_server, 
-                    "hpguppi_proc completed. output in /scratch/data/{}".format(
-                    datadir), "automator")
+                self.alert(f"hpguppi_proc completed. output in /scratch/data/{datadir}")
 
         # Clean up
         # self.alert("deleting raw files...")
@@ -293,7 +288,7 @@ class Automator(object):
             return
             
         self.processing = self.processing.difference(hosts)
-        redis_util.alert(self.redis_server, "processing complete.", "automator")
+        self.alert("processing complete.")
         self.maybe_start_recording()
 
         

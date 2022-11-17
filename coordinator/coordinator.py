@@ -408,16 +408,6 @@ class Coordinator(object):
 
         subarray_group = '{}:{}///set'.format(HPGDOMAIN, product_id)
 
-        # Retrieve DATADIR from these specific hosts:
-        datadir = self.datadir(product_id, allocated_hosts)
-        # Publish DATADIR to gateway
-        self.pub_gateway_msg(self.red, subarray_group, 'DATADIR', datadir, 
-            log, False)
-
-        # SRC_NAME:
-        self.pub_gateway_msg(self.red, subarray_group, 'SRC_NAME', target_str, 
-            log, False)
-
         # Calculate PKTSTART
         pktstart = self.get_start_idx(allocated_hosts, PKTIDX_MARGIN, log, product_id)
         pktstart_timestamp = redis_util.pktidx_to_timestamp(self.red, pktstart, product_id)
@@ -426,6 +416,15 @@ class Coordinator(object):
         if abs(pktstart_dt - datetime.utcnow()) > timedelta(minutes=1):
             self.alert(f"bad pktstart: {pktstart_str}")
             return
+
+        # Publish DATADIR to gateway
+        datadir = f"/buf0/{pktstart_str}"
+        self.pub_gateway_msg(self.red, subarray_group, 'DATADIR', datadir, 
+            log, False)
+
+        # SRC_NAME:
+        self.pub_gateway_msg(self.red, subarray_group, 'SRC_NAME', target_str, 
+            log, False)
         
         # Publish OBSID to the gateway:
         # OBSID is a unique identifier for a particular observation. 
@@ -964,73 +963,6 @@ class Coordinator(object):
             s_num, cbf_prefix, sensor)
         return stream_sensor
 
-    def datadir(self, product_id, host_list):
-        """Determine DATADIR according to the current schedule block ID. This 
-           entails retrieving the list of schedule blocks, extracting the ID of 
-           the current one and formatting it as a file path.
-        
-           Schedule block IDs follow the format: YYYYMMDD-XXXX where XXXX is the 
-           schedule block number (in order of assignment). To create the correct
-           DATADIR, we format it (per schedule block) as follows: 
-           DATADIR=YYYYMMDD/XXXX
-           If the schedule block ID is not known, we set it to:
-           DATADIR=Unknown_SB
-
-           Args:
-              product_id (str): the name of the current subarray
-
-           Returns:
-              datadir (str): the name of the directory in which to record
-              incoming data. 
-        """
-        current_sb_id = 'Unknown_SB' # Default
-        # Attempt to fetch the current upper directory for the data:
-        upper_dir = self.get_datadir_root(host_list)
-        # Attempt to fetch current SB 
-        try: 
-            sb_key = '{}:sched_observation_schedule_1'.format(product_id)
-            sb_ids = self.red.get(sb_key)
-            # First ID in list is the current SB (as per CAM GUI)
-            current_sb_id = sb_ids.split(',')[0] 
-            # Format for file path
-            current_sb_id = current_sb_id.replace('-', '/')
-        except:
-            log.error("Schedule block IDs not available")
-            log.warning("Setting DATADIR='{}/Unknown_SB".format(upper_dir))
-        # Save current SB ID to a Redis key:
-        self.red.set('{}:current_sb_id'.format(product_id), current_sb_id)
-        datadir = '{}/{}'.format(upper_dir, current_sb_id)
-        return datadir
-
-    def get_datadir_root(self, host_list):
-        """Get the upper directory for DATADIR from the status buffers if 
-           available.
-
-           Args:
-
-               host_list (list): list of host names in computing cluster.
-
-           Returnss:
-
-               upper_dir (str): upper directory for DATADIR
-        """
-        host_key = '{}://{}/status'.format(HPGDOMAIN, host_list[0])
-        host_status = self.red.hgetall(host_key)
-        upper_dir = '/buf0' # default to NVMe modules
-        if len(host_status) > 0:
-            if 'DATADIR' in host_status:
-                if len(host_status['DATADIR']) > 0:
-                    upper_dir = host_status['DATADIR']
-                else:
-                    log.warning('No preset DATADIR for {}, defaulting to /buf0/'.format(host_key))
-            else:
-                log.warning('DATADIR not available for {}, defaulting to /buf0/'.format(host_key))
-        else:
-            log.warning('Cannot acquire {}, defaulting to /buf0/'.format(host_key))
-        # Take only the first part of the file path, since it is dynamically
-        # changed along with the changing schedule blocks (see function datadir above).
-        upper_dir = '/'.join(upper_dir.split('/', 2)[:2])
-        return upper_dir
 
     def antennas(self, product_id):
         """Number of antennas, NANTS.

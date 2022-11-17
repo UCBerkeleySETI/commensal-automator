@@ -4,6 +4,7 @@
 
 from datetime import datetime, timezone
 import os
+import re
 import redis
 import sys
 import time
@@ -162,6 +163,19 @@ def sb_id_from_filename(filename):
     if len(x) != 8 or not x.isnumeric() or not y.isnumeric():
         return None
     return "{}/{}".format(x, y)
+
+
+def timestamp_from_filename(filename):
+    """Extracts timestamp from filenames like:
+    /buf0/<timestamp>/blah/blah/etc
+    """
+    parts = filename.strip("/").split("/")
+    if len(parts) < 2:
+        return None
+    answer = parts[1]
+    if not re.match(r"^[0-9]{8}T[0-9]{6}Z$", answer):
+        return None
+    return answer
 
 
 def infer_subarray(r, hosts):
