@@ -13,7 +13,7 @@ import ast
 from .redis_tools import REDIS_CHANNELS, write_list_redis
 from .telstate_interface import TelstateInterface
 from automator.logger import log, set_logger
-from automator import redis_util
+from automator import redis_util, util
 
 # Redis channels
 ALERTS_CHANNEL = REDIS_CHANNELS.alerts
@@ -79,6 +79,10 @@ class Coordinator(object):
 
     def alert(self, message):
         redis_util.alert(self.red, message, "coordinator")
+    
+    def annotate(self, tag, text):
+        response = util.annotate_grafana(tag, text)
+        log.info('Annotating Grafana, response: {}'.format(response))
         
     def start(self):
         """Start the coordinator as follows:
@@ -179,6 +183,8 @@ class Coordinator(object):
                description (str): the second field of the Redis message, which 
                in this case is the name of the current subarray. 
         """
+        # Configuration process started:
+        self.annotate('CONFIGURE', 'Coordinator configuring DAQs')
         # This is the identifier for the subarray that has completed configuration.
         product_id = description
         log.info('New subarray built: {}'.format(product_id))
@@ -436,6 +442,9 @@ class Coordinator(object):
         # all been delivered:
         self.pub_gateway_msg(self.red, subarray_group, 'PKTSTART', 
             pktstart, log, False)
+        
+        # Recording process started:
+        self.annotate('RECORD', 'Coordinator instructed DAQs to record')
 
         # Alert the target selector to the new pointing:
         ra_deg = self.ra_degrees(ra_s)
@@ -522,6 +531,9 @@ class Coordinator(object):
         # Build list of Hashpipe-Redis Gateway channels to publish to:
         chan_list = self.host_list(HPGDOMAIN, allocated_hosts)
 
+        # Unsubscription process started:
+        self.annotate('UNSUBSCRIBE', 'Coordinator instructing DAQs to unsubscribe')
+        
         # Set DESTIP to 0.0.0.0 individually for robustness. 
         for chan in chan_list:
             self.pub_gateway_msg(self.red, chan, 'DESTIP', '0.0.0.0', log, False)
