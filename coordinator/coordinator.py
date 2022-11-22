@@ -183,10 +183,13 @@ class Coordinator(object):
                description (str): the second field of the Redis message, which 
                in this case is the name of the current subarray. 
         """
-        # Configuration process started:
-        self.annotate('CONFIGURE', 'Coordinator configuring DAQs')
         # This is the identifier for the subarray that has completed configuration.
         product_id = description
+        # Configuration process started:
+        self.annotate(
+            'CONFIGURE', 
+            '{}: Coordinator configuring DAQs.'.format(product_id)
+            )
         log.info('New subarray built: {}'.format(product_id))
         tracking = 0 # Initialise tracking state to 0
         # Initialise cal_solutions timestamp to 0 to ensure the most recent
@@ -444,7 +447,10 @@ class Coordinator(object):
             pktstart, log, False)
         
         # Recording process started:
-        self.annotate('RECORD', 'Coordinator instructed DAQs to record')
+        self.annotate(
+            'RECORD', 
+            '{}: Coordinator instructed DAQs to record'.format(product_id)
+            )
 
         # Alert the target selector to the new pointing:
         ra_deg = self.ra_degrees(ra_s)
@@ -532,7 +538,10 @@ class Coordinator(object):
         chan_list = self.host_list(HPGDOMAIN, allocated_hosts)
 
         # Unsubscription process started:
-        self.annotate('UNSUBSCRIBE', 'Coordinator instructing DAQs to unsubscribe')
+        self.annotate(
+            'UNSUBSCRIBE', 
+            '{}: Coordinator instructing DAQs to unsubscribe.'.format(description)
+            )
         
         # Set DESTIP to 0.0.0.0 individually for robustness. 
         for chan in chan_list:
