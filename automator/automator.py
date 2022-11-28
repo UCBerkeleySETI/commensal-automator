@@ -206,7 +206,8 @@ class Automator(object):
 
         # Process one directory at a time to avoid race conditions
         input_dir, hosts = list(dirmap.items())[0]
-        self.process(input_dir, hosts)
+        if not self.process(input_dir, hosts):
+            return
         self.maybe_start_processing()
 
 
@@ -227,25 +228,27 @@ class Automator(object):
         * delete the raw files
 
         The caller should verify that it's possible to process before calling this.
+
+        Returns whether processing was successful.
         """
         if self.paused:
             log.info("we are paused so we do not want to process.")
-            return
+            return False
 
         if self.processing.intersection(hosts):
             log.error("currently processing {} so cannot double-process {}".format(
                 self.processing, hosts))
-            return
+            return False
         self.processing = self.processing.union(hosts)
 
-        timestamp = redis_util.timestamp_from_filename(input_dir)
-        if timestamp is None:
+        timestamped_dir = redis_util.timestamped_dir_from_filename(input_dir)
+        if timestamped_dir is None:
             self.pause("unexpected directory name: {}".format(input_dir))
-            return
+            return False
         
         # Run seticore
         self.alert("running seticore...")
-        result_seticore = run_seticore(sorted(hosts), BFRDIR, input_dir, timestamp)
+        result_seticore = run_seticore(sorted(hosts), BFRDIR, input_dir, timestamped_dir)
         if result_seticore > 1:
             if result_seticore > 128:
                 self.pause("seticore killed with signal {}".format(result_seticore - 128))
@@ -253,9 +256,9 @@ class Automator(object):
                 self.pause("the seticore slurm job failed with code {}".format(
                     result_seticore))
             self.alert_seticore_error()
-            return
+            return False
         self.alert(f"seticore completed with code {result_seticore}. "
-                   f"output in /scratch/data/{timestamp}")
+                   f"output in /scratch/data/{timestamped_dir}")
         if result_seticore > 0:
             self.alert_seticore_error()
 
@@ -278,18 +281,19 @@ class Automator(object):
                 result_hpguppi = proc_hpguppi.process(PROC_DOMAIN, hosts, subarray, BFRDIR)
                 if result_hpguppi != 0:
                     self.pause("hpguppi_proc timed out")
-                    return
+                    return False
 
                 self.alert(f"hpguppi_proc completed. output in /scratch/data/{datadir}")
 
         # Clean up
         # self.alert("deleting raw files...")
         if not self.delete_buf0(hosts):
-            return
+            return False
             
         self.processing = self.processing.difference(hosts)
         self.alert("processing complete.")
         self.maybe_start_recording()
+        return True
 
         
     def delete_buf0(self, initial_hosts):
