@@ -28,7 +28,21 @@ def raw_files(r):
 
 
 def sb_id(r, subarray):
-    return r.get('{}:current_sb_id'.format(subarray))
+    """Returns the current schedule block id, in hyphenated form.
+    For example, it could be:
+    20221128-0003
+    Raises a ValueError if there is none.
+    May return "Unknown_SB" if the upstream code indicates the schedule block is unknown.
+    """
+    sb_id_list = r.get(f"{subarray}:sched_observation_schedule_1")
+    if not sb_id_list:
+        raise ValueError("no schedule block ids found")
+    answer = sb_id_list.split(",")[0]
+    if answer == "Unknown_SB":
+        return answer
+    if not re.match(r"[0-9]{8}-[0-9]{4}", answer):
+        raise ValueError(f"bad sb_id_list value: {sb_id_list}")
+    return answer
 
 
 def coordinator_subarrays(r):
@@ -165,15 +179,15 @@ def sb_id_from_filename(filename):
     return "{}/{}".format(x, y)
 
 
-def timestamp_from_filename(filename):
-    """Extracts timestamp from filenames like:
-    /buf0/<timestamp>/blah/blah/etc
+def timestamped_dir_from_filename(filename):
+    """Extracts timestamped section from filenames like:
+    /buf0/<timestamp-part>/blah/blah/etc
     """
     parts = filename.strip("/").split("/")
     if len(parts) < 2:
         return None
     answer = parts[1]
-    if not re.match(r"^[0-9]{8}T[0-9]{6}Z$", answer):
+    if not re.match(r"^[0-9]{8}T[0-9]{6}Z-[^/]*$", answer):
         return None
     return answer
 

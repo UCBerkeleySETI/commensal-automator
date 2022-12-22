@@ -426,8 +426,10 @@ class Coordinator(object):
             self.alert(f"bad pktstart: {pktstart_str}")
             return
 
+        sb_id = redis_util.sb_id(self.red, product_id)
+        
         # Publish DATADIR to gateway
-        datadir = f"/buf0/{pktstart_str}"
+        datadir = f"/buf0/{pktstart_str}-{sb_id}"
         self.pub_gateway_msg(self.red, subarray_group, 'DATADIR', datadir, 
             log, False)
 

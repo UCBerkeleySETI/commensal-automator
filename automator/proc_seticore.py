@@ -5,7 +5,7 @@ import subprocess
 
 from .logger import log
 
-def run_seticore(hosts, bfrdir, inputdir, timestamp):
+def run_seticore(hosts, bfrdir, inputdir, timestamped_dir):
     """Processes the incoming data using seticore.
 
     Args:
@@ -15,14 +15,14 @@ def run_seticore(hosts, bfrdir, inputdir, timestamp):
         associated with the data in the NVMe modules. 
         arrayid (str): Name of the current subarray. 
         inputdir (str): Directory containing raw file input
-        timestamp (str): timestamp of recording start, in <day>T<time>Z format
+        timestamped_dir (str): directory component starting with a timestamp
 
     Returns:
         None
     """
     # Create output directories:
-    outputdir = f"/scratch/data/{timestamp}/seticore_search"
-    h5dir = f"/scratch/data/{timestamp}/seticore_beamformer"
+    outputdir = f"/scratch/data/{timestamped_dir}/seticore_search"
+    h5dir = f"/scratch/data/{timestamped_dir}/seticore_beamformer"
     log.info("Creating output directories...") 
     log.info(f"\nsearch: {outputdir}\nbeamformer: {h5dir}")
     for host in hosts:
