@@ -405,7 +405,7 @@ def pktidx_to_timestamp(r, pktidx, subarray):
     Converts a PKTIDX value into a floating point unix timestamp in UTC, using
     metadata from redis for a given subarray.
     """
-    if pktidx <= 0:
+    if pktidx < 0:
         raise ValueError("cannot convert pktidx {} to a timestamp".format(pktidx))
 
     pipe = r.pipeline()
