@@ -15,7 +15,7 @@ BFRDIR = '/home/obs/bfr5'
 PROC_DOMAIN = 'blproc'
 ACQ_DOMAIN = 'bluse'
 DEFAULT_DWELL = 290
-PROPOSAL_ID = 'BLUSE' 
+PROPOSAL_ID = 'EXT-20220504-DM-01' 
 
 class Automator(object):
     """The automator controls when the system is recording raw files, when
