@@ -15,6 +15,7 @@ BFRDIR = '/home/obs/bfr5'
 PROC_DOMAIN = 'blproc'
 ACQ_DOMAIN = 'bluse'
 DEFAULT_DWELL = 290
+PROPOSAL_ID = 'BLUSE' 
 
 class Automator(object):
     """The automator controls when the system is recording raw files, when
@@ -163,6 +164,10 @@ class Automator(object):
         nshot = self.get_nshot(subarray_name)
         log.info('{} in tracking state with nshot = {}'.format(subarray_name, nshot))
 
+        # Check if this observation has our specific proposal ID. If this is true, 
+        # we want to preserve all the data in the buffers. 
+        self.check_proposal_id(subarray_name)
+
         # If this is the last recording before the buffers will be full, 
         # we may want to process in about `DWELL` + margin seconds.
         allocated_hosts = redis_util.allocated_hosts(self.redis_server, subarray_name)
@@ -177,6 +182,20 @@ class Automator(object):
         t.start()
         self.timers[subarray_name] = t
 
+    def check_proposal_id(self, subarray_name):
+        """Check the current proposal ID. If it corresponds with 
+        our own BLUSE primary time, preserve data (no processing or 
+        cleanup to take place).
+        """
+        try:
+            subarray = 'subarray_{}'.format(subarray_name[-1])
+            p_id_key = '{}_observation_script_proposal_id'.format(subarray)
+            p_id = self.redis_server.get('{}:{}'.format(subarray_name, p_id_key))
+            if p_id == PROPOSAL_ID:
+                self.alert("BLUSE proposal ID detected; pausing to preserve data.")
+                self.paused = True
+        except:
+            self.alert("Could not retrieve proposal ID.")
 
     def not_tracking(self, subarray_name):
         """Handle the telescope going into a not-tracking state.
