@@ -548,8 +548,16 @@ class Coordinator(object):
         # Set DESTIP to 0.0.0.0 individually for robustness. 
         for chan in chan_list:
             self.pub_gateway_msg(self.red, chan, 'DESTIP', '0.0.0.0', log, False)
-        
         self.alert(f"Instructed hosts for {description} to unsubscribe from mcast groups")
+        time.sleep(3) # give them a chance to respond
+
+        # Belt and braces restart pipelines
+        hostnames_only = [host.split('/')[0] for host in allocated_hosts]
+        result = util.restart_pipeline(hostnames_only, 'bluse_hashpipe')
+        if len(result) > 0:
+            self.alert(f"WARNING: failed to restart bluse_hashpipe on hosts: {result}")
+        else:
+            self.alert(f"Successfully restarted bluse_hashpipe for dealloacted hosts of {description}")
 
         # Instruct gateways to leave current subarray group:   
         subarray_group = '{}:{}///set'.format(HPGDOMAIN, description)
