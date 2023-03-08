@@ -26,7 +26,7 @@ def restart_pipeline(hosts, pipeline):
             }
         }
     ctx = zmq.Context.instance()
-    s = ctx.Socket(zmq.DEALER)
+    s = ctx.socket(zmq.DEALER)
     failed = []
     for host in hosts:
         s.connect(f"tcp://{host}:5555")
