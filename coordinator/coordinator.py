@@ -551,6 +551,16 @@ class Coordinator(object):
         self.alert(f"Instructed hosts for {description} to unsubscribe from mcast groups")
         time.sleep(3) # give them a chance to respond
 
+        # Get current DWELL per host:
+        dwell_list = []
+        for i in range(len(chan_list)):
+            # For the moment, get dwell time from each
+            # of the hosts. Then set to zero and then back to to the
+            # original dwell time.
+            host_key = '{}://{}/status'.format(HPGDOMAIN, allocated_hosts[i])
+            dwell_time = self.get_dwell_time(host_key)
+            dwell_list.append(dwell_time)
+
         # Belt and braces restart pipelines
         hostnames_only = [host.split('/')[0] for host in allocated_hosts]
         result = util.restart_pipeline(hostnames_only, 'bluse_hashpipe')
@@ -562,7 +572,20 @@ class Coordinator(object):
         # Instruct gateways to leave current subarray group:   
         subarray_group = '{}:{}///set'.format(HPGDOMAIN, description)
         self.red.publish(subarray_group, 'leave={}'.format(description))
-        log.info('Disbanded gateway group: {}'.format(description))
+        self.alert('Disbanded gateway group: {}'.format(description))
+
+        # Sleep for 20 seconds to allow pipelines to restart before:
+        time.sleep(20)
+        # Reset DWELL for all hosts after pipeline restart:
+        for i in range(len(chan_list)):
+            # For the moment during testing, get dwell time from each
+            # of the hosts. Then set to zero and then back to to the
+            # original dwell time.
+            self.pub_gateway_msg(self.red, chan_list[i], 'DWELL', '0', log, False)
+            self.pub_gateway_msg(self.red, chan_list[i], 'PKTSTART', '0', log, False)
+            time.sleep(0.1) # Wait for processing node. NOTE: Is this long enough?
+            self.pub_gateway_msg(self.red, chan_list[i], 'DWELL', dwell_list[i], log, False)
+        self.alert('DWELL has been reset for instances assigned to {}'.format(description))
 
         # Release hosts (note: the automator still controls when nshot is set > 0;
         # this ensures recording does not take place while processing is still ongoing).
@@ -580,9 +603,9 @@ class Coordinator(object):
         self.red.rpush('coordinator:free_hosts', *free_hosts)    
         # Remove resources from current subarray 
         self.red.delete('coordinator:allocated_hosts:{}'.format(description))
-        log.info("Released {} hosts; {} hosts available".format(len(allocated_hosts),
+        self.alert("Released {} hosts; {} hosts available".format(len(allocated_hosts),
                                                                 len(free_hosts)))
-        log.info('Subarray {} deconfigured'.format(description))
+        self.alert('Subarray {} deconfigured'.format(description))
 
     def data_suspect(self, description, value): 
         """Parse and publish data-suspect mask to the appropriate 
