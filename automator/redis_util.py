@@ -70,6 +70,17 @@ def is_rec_enabled(r, subarray_name):
     rec_enabled = int(r.get(rec_enabled_key))
     return rec_enabled
 
+def get_bluse_dwell(r, subarray_name):
+    """Get specified dwell for BLUSE primary time observing.
+    Dwell in seconds.
+    """
+    bluse_dwell_key = 'bluse_dwell:{}'.format(subarray_name)
+    bluse_dwell = r.get(bluse_dwell_key)
+    if bluse_dwell is None:
+       log.warning('No specified primary time DWELL; defaulting to 290 sec.')
+       bluse_dwell = 290   
+    return int(bluse_dwell)
+
 def all_hosts(r):
     return sorted(key.split("//")[-1].split("/")[0]
                   for key in r.keys("bluse://*/0/status"))
