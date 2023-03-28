@@ -63,6 +63,12 @@ def get_nshot(r, subarray_name):
     nshot = int(r.get(nshot_key).split(':')[1])
     return nshot
 
+def is_rec_enabled(r, subarray_name):
+    """Is recording enabled?
+    """
+    rec_enabled_key = 'rec_enabled:{}'.format(subarray_name)
+    rec_enabled = int(r.get(rec_enabled_key))
+    return rec_enabled
 
 def all_hosts(r):
     return sorted(key.split("//")[-1].split("/")[0]

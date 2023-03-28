@@ -139,6 +139,24 @@ class Automator(object):
             self.not_tracking(subarray_name)
 
 
+    def enable_recording(self, subarray_name):
+        """Allow recording to proceed with new tracks for 
+        the specified array.
+        """
+        rec_setting = redis_util.is_rec_enabled(self.redis_server, subarray_name)
+        log.info('rec_setting {}, setting to 1'.format(rec_setting))
+        rec_setting_key = 'rec_enabled:{}'.format(subarray_name)
+        self.redis_server.set(rec_setting_key, 1) 
+
+    def disable_recording(self, subarray_name):
+        """Prevent recording from proceeding for new tracks for 
+        the specified array.
+        """
+        rec_setting = redis_util.is_rec_enabled(self.redis_server, subarray_name)
+        log.info('rec_setting {}, setting to 0'.format(rec_setting))
+        rec_setting_key = 'rec_enabled:{}'.format(subarray_name)
+        self.redis_server.set(rec_setting_key, 0) 
+
     def get_nshot(self, subarray_name):
         """Get the current value of nshot from redis.
         """
