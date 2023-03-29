@@ -102,6 +102,18 @@ def get_bluse_dwell(r, subarray_name):
        bluse_dwell = 290   
     return int(bluse_dwell)
 
+def is_bluse_primary_time(r, subarray_name):
+    """Check if the current observation ID is for BLUSE primary
+    time. 
+    """
+    subarray = 'subarray_{}'.format(subarray_name[-1])
+    p_id_key = '{}_observation_script_proposal_id'.format(subarray)
+    p_id = r.get('{}:{}'.format(subarray_name, p_id_key))
+    if p_id == PROPOSAL_ID:
+        log.info("BLUSE proposal ID detected for {}".format(subarray_name))
+        return True
+    return False
+
 def all_hosts(r):
     return sorted(key.split("//")[-1].split("/")[0]
                   for key in r.keys("bluse://*/0/status"))
