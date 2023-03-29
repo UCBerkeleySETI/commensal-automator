@@ -102,7 +102,7 @@ def get_bluse_dwell(r, subarray_name):
        bluse_dwell = 290   
     return int(bluse_dwell)
 
-def is_bluse_primary_time(r, subarray_name):
+def is_primary_time(r, subarray_name):
     """Check if the current observation ID is for BLUSE primary
     time. 
     """
@@ -112,6 +112,18 @@ def is_bluse_primary_time(r, subarray_name):
     if p_id == PROPOSAL_ID:
         log.info("BLUSE proposal ID detected for {}".format(subarray_name))
         return True
+    return False
+
+def primary_time_in_progress(r):
+    """Returns True if still in the midst of primary observing
+    sequence.
+    """
+    # Note: as of now, this will only ever happen with a single subarray.
+    if is_primary_time(r, 'array_1'):
+        nshot = get_nshot(r, 'array_1')
+        if nshot > 0:
+            log.info('Not processing: nshot is {}'.format(nshot))
+            return True
     return False
 
 def all_hosts(r):
