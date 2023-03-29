@@ -209,13 +209,6 @@ class Coordinator(object):
         # Allocate hosts for the current subarray:
         if self.red.exists('coordinator:free_hosts'): # If key exists, there are free hosts
             self.alert('Allocating hosts to {}'.format(product_id))
-            # Clear any prior nshot values ahead of host allocation:
-            trigger_mode = 'nshot:0'
-            self.red.set('coordinator:trigger_mode:{}'.format(product_id), trigger_mode)
-            log.info('nshot set to 0 prior to host allocation')
-            # Alert via slack:
-            msg = "nshot cleared for {}".format(product_id)
-            self.alert(msg)
             # Host allocation:
             free_hosts = self.red.lrange('coordinator:free_hosts', 0, 
                 self.red.llen('coordinator:free_hosts'))
@@ -322,19 +315,9 @@ class Coordinator(object):
            Args:
                product_id (str): name of current subarray. 
         """
-        # Read trigger mode
-        trigger_mode = self.red.get('coordinator:trigger_mode:{}'.format(product_id))
-        try:
-            nshot = trigger_mode.split(':')
-            n_remaining = int(nshot[1])
-            # Determine if recording should go ahead (if nshot > 0).        
-            if n_remaining == 0:
-                log.info("nshot == 0, therefore not recording this track/scan.")
-        except:
-            log.error("Could not read trigger mode: {}, not recording".format(trigger_mode))
-            n_remaining = 0
-
-        if n_remaining > 0:
+        # Check if recording has been enabled: 
+        rec_enabled = redis_util.is_rec_enabled(self.red, product_id)
+        if rec_enabled:
             # Target information (required here to check list of allowed sources):
             target_str, ra, dec = self.target(product_id)
             # Check for list of allowed sources. If the list is not empty, record
@@ -467,11 +450,8 @@ class Coordinator(object):
         # Set subarray state to 'tracking':
         self.red.set('coordinator:tracking:{}'.format(product_id), '1')
 
-        # Decrement nshot:
-        trigger_mode = 'nshot:{}'.format(n_remaining - 1)
-        self.red.set('coordinator:trigger_mode:{}'.format(product_id), trigger_mode)
-        log.info('Trigger mode: n shots remaining: {}'.format(n_remaining - 1))
-
+        # Disable new recording while current recording underway:
+        redis_util.disable_recording(self.red, product_id)
         
     def tracking_stop(self, product_id):
         """If the subarray stops tracking a source (more specifically, if the incoming 
