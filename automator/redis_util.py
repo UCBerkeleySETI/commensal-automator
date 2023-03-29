@@ -67,8 +67,11 @@ def is_rec_enabled(r, subarray_name):
     """Is recording enabled?
     """
     rec_enabled_key = 'rec_enabled:{}'.format(subarray_name)
-    rec_enabled = int(r.get(rec_enabled_key))
-    return rec_enabled
+    rec_enabled = r.get(rec_enabled_key)
+    if rec_enabled is None:
+        log.warning('Could not determine recording permission. Defaulting to disabled.')
+        rec_enabled = 0
+    return int(rec_enabled)
 
 def get_bluse_dwell(r, subarray_name):
     """Get specified dwell for BLUSE primary time observing.
