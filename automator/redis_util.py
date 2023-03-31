@@ -107,7 +107,7 @@ def is_primary_time(r, subarray_name):
     time. 
     """
     subarray = 'subarray_{}'.format(subarray_name[-1])
-    p_id_key = '{}_observation_script_proposal_id'.format(subarray)
+    p_id_key = '{}_script_proposal_id'.format(subarray)
     p_id = r.get('{}:{}'.format(subarray_name, p_id_key))
     if p_id == PROPOSAL_ID:
         log.info("BLUSE proposal ID detected for {}".format(subarray_name))
