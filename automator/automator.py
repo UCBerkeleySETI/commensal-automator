@@ -15,7 +15,6 @@ BFRDIR = '/home/obs/bfr5'
 PROC_DOMAIN = 'blproc'
 ACQ_DOMAIN = 'bluse'
 DEFAULT_DWELL = 290
-PROPOSAL_ID = 'EXT-20220504-DM-01' 
 
 class Automator(object):
     """The automator controls when the system is recording raw files, when
@@ -139,23 +138,6 @@ class Automator(object):
             self.not_tracking(subarray_name)
 
 
-    def enable_recording(self, subarray_name):
-        """Allow recording to proceed with new tracks for 
-        the specified array.
-        """
-        rec_setting = redis_util.is_rec_enabled(self.redis_server, subarray_name)
-        log.info('rec_setting {}, setting to 1'.format(rec_setting))
-        rec_setting_key = 'rec_enabled:{}'.format(subarray_name)
-        self.redis_server.set(rec_setting_key, 1) 
-
-    def disable_recording(self, subarray_name):
-        """Prevent recording from proceeding for new tracks for 
-        the specified array.
-        """
-        rec_setting = redis_util.is_rec_enabled(self.redis_server, subarray_name)
-        log.info('rec_setting {}, setting to 0'.format(rec_setting))
-        rec_setting_key = 'rec_enabled:{}'.format(subarray_name)
-        self.redis_server.set(rec_setting_key, 0) 
 
     def get_nshot(self, subarray_name):
         """Get the current value of nshot from redis.
@@ -182,9 +164,6 @@ class Automator(object):
         nshot = self.get_nshot(subarray_name)
         log.info('{} in tracking state with nshot = {}'.format(subarray_name, nshot))
 
-        # Check if this observation has our specific proposal ID. If this is true, 
-        # we want to preserve all the data in the buffers. 
-        self.check_proposal_id(subarray_name)
 
         # If this is the last recording before the buffers will be full, 
         # we may want to process in about `DWELL` + margin seconds.
@@ -200,20 +179,6 @@ class Automator(object):
         t.start()
         self.timers[subarray_name] = t
 
-    def check_proposal_id(self, subarray_name):
-        """Check the current proposal ID. If it corresponds with 
-        our own BLUSE primary time, preserve data (no processing or 
-        cleanup to take place).
-        """
-        try:
-            subarray = 'subarray_{}'.format(subarray_name[-1])
-            p_id_key = '{}_observation_script_proposal_id'.format(subarray)
-            p_id = self.redis_server.get('{}:{}'.format(subarray_name, p_id_key))
-            if p_id == PROPOSAL_ID:
-                self.alert("BLUSE proposal ID detected; pausing to preserve data.")
-                self.paused = True
-        except:
-            self.alert("Could not retrieve proposal ID.")
 
     def not_tracking(self, subarray_name):
         """Handle the telescope going into a not-tracking state.
@@ -236,6 +201,12 @@ class Automator(object):
 
         This method will not return until all processing is done.
         """
+
+        # Check if we are in the middle of a sequence of primary time 
+        # observations:
+        if redis_util.primary_time_in_progress(self.redis_server):
+            return
+
         dirmap = redis_util.suggest_processing(self.redis_server,
                                                processing=self.processing)
         if not dirmap:
@@ -322,10 +293,18 @@ class Automator(object):
 
                 self.alert(f"hpguppi_proc completed. output in /scratch/data/{datadir}")
 
-        # Clean up
-        # self.alert("deleting raw files...")
-        if not self.delete_buf0(hosts):
-            return False
+        # Check if array_1 has our specific proposal ID. If this is true, 
+        # we want to preserve all the data in the buffers. Note primary time
+        # (for now) will only be conducted with a single subarray. 
+        # ToDo: create proper subarray awareness automator-wide
+        if redis_util.is_primary_time(self.redis_server, 'array_1'):
+            self.alert('Primary time, therefore pausing after processing')
+            self.paused = True
+        else:
+            # Clean up
+            # self.alert("deleting raw files...")
+            if not self.delete_buf0(hosts):
+                return False
             
         self.processing = self.processing.difference(hosts)
         self.alert("processing complete.")
@@ -377,8 +356,9 @@ class Automator(object):
         subarrays = redis_util.suggest_recording(self.redis_server,
                                                  processing=self.processing)
         for subarray in subarrays:
-            log.info("subarray {} is ready for recording".format(subarray))            
-            self.set_nshot(subarray, 1)
+            log.info("subarray {} is ready for recording".format(subarray))     
+            redis_util.enable_recording(self.redis_server, subarray)       
+##            self.set_nshot(subarray, 1)
         
         
     def retrieve_dwell(self, host_list, default_dwell):
