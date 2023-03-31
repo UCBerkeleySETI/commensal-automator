@@ -13,6 +13,7 @@ from automator.logger import log
 
 SLACK_CHANNEL = "meerkat-obs-log"
 SLACK_PROXY_CHANNEL = "slack-messages"
+PROPOSAL_ID = 'EXT-20220504-DM-01' 
 
 def raw_files(r):
     """Returns a dict mapping host name to a list of raw files on the host."""
