@@ -490,7 +490,7 @@ class Coordinator(object):
                 dwell_time = self.get_dwell_time(host_key)
                 self.pub_gateway_msg(self.red, chan_list[i], 'DWELL', '0', log, False)
                 self.pub_gateway_msg(self.red, chan_list[i], 'PKTSTART', '0', log, False)
-                time.sleep(0.1) # Wait for processing node. NOTE: Is this long enough?
+                time.sleep(1.5) # Wait for processing node. NOTE: Is this long enough?
                 self.pub_gateway_msg(self.red, chan_list[i], 'DWELL', dwell_time, log, False)
             # Reset tracking state to '0'
             self.red.set('coordinator:tracking:{}'.format(product_id), '0')
@@ -563,7 +563,7 @@ class Coordinator(object):
             # original dwell time.
             self.pub_gateway_msg(self.red, chan_list[i], 'DWELL', '0', log, False)
             self.pub_gateway_msg(self.red, chan_list[i], 'PKTSTART', '0', log, False)
-            time.sleep(0.1) # Wait for processing node. NOTE: Is this long enough?
+            time.sleep(1.5) # Wait for processing node. NOTE: Is this long enough?
             self.pub_gateway_msg(self.red, chan_list[i], 'DWELL', dwell_list[i], log, False)
         self.alert('DWELL has been reset for instances assigned to {}'.format(description))
 
