@@ -40,6 +40,10 @@ def cli(args = sys.argv[0]):
                         type = str,
                         default = 'coordinator:trigger_mode:{}:nshot:{}', 
                         help = 'Format of message for changing nshot')
+    parser.add_argument('--partition',
+                        type = str,
+                        default = 'mydatag', 
+                        help = 'Name of destination partition for seticore output')
     if(len(sys.argv[1:]) == 0):
         parser.print_help()
         parser.exit()
@@ -50,10 +54,11 @@ def cli(args = sys.argv[0]):
          hpgdomain = args.hpgdomain, 
          buffer_length = args.buffer_length, 
          nshot_chan = args.nshot_chan, 
-         nshot_msg = args.nshot_msg)
+         nshot_msg = args.nshot_msg
+         partition = args.partition)
 
 def main(redis_endpoint, redis_channel, margin, hpgdomain, 
-    buffer_length, nshot_chan, nshot_msg):
+    buffer_length, nshot_chan, nshot_msg, partition):
     """Starts the automator.
   
     Args: 
@@ -70,6 +75,7 @@ def main(redis_endpoint, redis_channel, margin, hpgdomain,
         nshot_chan (str): The Redis channel for resetting nshot.
         nshot_msg (str): The base form of the Redis message for resetting
         nshot. For example, `coordinator:trigger_mode:<subarray_name>:nshot:<n>`
+        partition (str): Name of destination partition for seticore output.
 
     Returns:
 
@@ -82,7 +88,8 @@ def main(redis_endpoint, redis_channel, margin, hpgdomain,
                           hpgdomain, 
                           buffer_length, 
                           nshot_chan, 
-                          nshot_msg)
+                          nshot_msg,
+                          partition)
     Automaton.start()
 
 if(__name__ == '__main__'):

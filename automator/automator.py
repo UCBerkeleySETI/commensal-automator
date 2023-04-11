@@ -49,7 +49,7 @@ class Automator(object):
     does not generally work yet.
     """
     def __init__(self, redis_endpoint, redis_chan, margin, 
-                 hpgdomain, buffer_length, nshot_chan, nshot_msg):
+                 hpgdomain, buffer_length, nshot_chan, nshot_msg, partition):
         """Initialise the automator. 
 
         redis_endpoint (str): Redis endpoint (of the form <host IP
@@ -76,6 +76,7 @@ class Automator(object):
         self.buffer_length = buffer_length
         self.nshot_chan = nshot_chan
         self.nshot_msg = nshot_msg
+        self.partition = partition
 
         # A set of all hosts that are currently processing
         self.processing = set()
@@ -214,7 +215,7 @@ class Automator(object):
 
         # Process one directory at a time to avoid race conditions
         input_dir, hosts = list(dirmap.items())[0]
-        if not self.process(input_dir, hosts):
+        if not self.process(input_dir, hosts, self.partition):
             return
         self.maybe_start_processing()
 
@@ -228,7 +229,7 @@ class Automator(object):
         self.alert(f"sample seticore error, from {host}:```{joined_lines}```")
         
         
-    def process(self, input_dir, hosts):
+    def process(self, input_dir, hosts, partition):
         """Process raw files in the given directory and hosts. Handles the stages:
 
         * run seticore
@@ -256,7 +257,7 @@ class Automator(object):
         
         # Run seticore
         self.alert("running seticore...")
-        result_seticore = run_seticore(sorted(hosts), BFRDIR, input_dir, timestamped_dir)
+        result_seticore = run_seticore(sorted(hosts), BFRDIR, input_dir, timestamped_dir, partition)
         if result_seticore > 1:
             if result_seticore > 128:
                 self.pause("seticore killed with signal {}".format(result_seticore - 128))
@@ -266,7 +267,7 @@ class Automator(object):
             self.alert_seticore_error()
             return False
         self.alert(f"seticore completed with code {result_seticore}. "
-                   f"output in /scratch/data/{timestamped_dir}")
+                   f"output in /{partition}/data/{timestamped_dir}")
         if result_seticore > 0:
             self.alert_seticore_error()
 
