@@ -115,11 +115,33 @@ def is_primary_time(r, subarray_name):
         return True
     return False
 
+def get_last_rec_bluse(r, subarray_name):
+    """Return True if last recording was made under the BLUSE
+    proposal ID (thus primary time). 
+    """
+    key = f"{subarray_name}:primary_time"
+    val = r.get(key)
+    try:
+        val = int(val)
+    except:
+        log.error(f"Could not determine primary time status: {val}")
+    return val 
+
+def set_last_rec_bluse(r, subarray_name, value):
+    """Set the value (bool) of the last recording proposal
+    ID flag (True if BLUSE ID, False if not).
+    """ 
+    key = f"{subarray_name}:primary_time"
+    log.info(f"setting primary time status for {subarray_name}: {value}")
+    r.set(key, value)
+
 def primary_time_in_progress(r):
     """Returns True if still in the midst of primary observing
     sequence.
     """
     # Note: as of now, this will only ever happen with a single subarray.
+    # Note: we need to check proposal id at the time of the most recent 
+    # recording. 
     if is_primary_time(r, 'array_1'):
         nshot = get_nshot(r, 'array_1')
         if nshot > 0:
