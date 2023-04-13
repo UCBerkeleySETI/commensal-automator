@@ -64,6 +64,12 @@ def get_nshot(r, subarray_name):
     nshot = int(r.get(nshot_key).split(':')[1])
     return nshot
 
+def set_nshot(r, subarray_name, val):
+    """Set nshot for given subarray.
+    """
+    nshot_key = 'coordinator:trigger_mode:{}'.format(subarray_name)
+    r.set(nshot_key, f"nshot:{val}")
+
 def is_rec_enabled(r, subarray_name):
     """Is recording enabled?
     """
