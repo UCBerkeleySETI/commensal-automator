@@ -426,11 +426,25 @@ class Coordinator(object):
         self.pub_gateway_msg(self.red, subarray_group, 'OBSID', obsid,
             log, False)
 
+
+
         # Set PKTSTART separately after all the above messages have 
         # all been delivered:
         self.pub_gateway_msg(self.red, subarray_group, 'PKTSTART', 
             pktstart, log, False)
+
+        # Set BLUSE proposal ID flag. If we are in primary time, 
+        # decrement nshot if it is > 0.
+        if redis_util.is_primary_time(self.red, product_id):
+            redis_util.set_last_rec_bluse(self.red, 1)
+            nshot = redis_util.get_nshot(self.red, product_id)
+            if nshot > 0:
+                # decrement and set
+        else:
+            redis_util.set_last_rec_bluse(self.red, 0)
         
+        # If BLUSE, decrement nshot. Will need to reset nshot elsewhere to at least one if down to 0.
+
         # Recording process started:
         self.annotate(
             'RECORD', 
