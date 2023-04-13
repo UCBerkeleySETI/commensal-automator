@@ -109,6 +109,25 @@ def get_bluse_dwell(r, subarray_name):
        bluse_dwell = 290   
     return int(bluse_dwell)
 
+def reset_dwell(r, instances, dwell):
+    """Reset DWELL for given list of instances.
+    """
+    chan_list = channel_list('bluse', instances)
+    # Send messages to these specific hosts:
+    for i in range(len(chan_list)):
+        log.info(f"Resetting DWELL for {chan_list[i]}, new dwell: {dwell}")
+        r.publish(chan_list[i], "DWELL=0")
+        r.publish(chan_list[i], "PKTSTART=0")
+        time.sleep(1.5) # Wait for processing node. NOTE: Is this long enough?
+        r.publish(chan_list[i], f"DWELL={dwell}")
+
+def channel_list(hpgdomain, instances):
+    """Build a list of Hashpipe-Redis Gateway channels from a list 
+       of instance names (of format: host/instance)
+    """
+    channel_list = [hpgdomain + '://' + instance + '/set' for instance in instances]
+    return channel_list
+
 def is_primary_time(r, subarray_name):
     """Check if the current observation ID is for BLUSE primary
     time. 
