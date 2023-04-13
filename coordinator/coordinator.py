@@ -340,6 +340,8 @@ class Coordinator(object):
             else:
                 log.info('No list of allowed sources, proceeding...')
                 self.record_track(target_str, ra, dec, product_id, n_remaining)
+        else:
+            log.info('Recording disabled, skipping this track.')
 
     def retrieve_cals(self, product_id):
         """Retrieves calibration solutions and saves them to Redis. They are 
@@ -432,12 +434,13 @@ class Coordinator(object):
         self.pub_gateway_msg(self.red, subarray_group, 'OBSID', obsid,
             log, False)
 
-
-
         # Set PKTSTART separately after all the above messages have 
         # all been delivered:
         self.pub_gateway_msg(self.red, subarray_group, 'PKTSTART', 
             pktstart, log, False)
+
+        # Set subarray state to 'tracking':
+        self.red.set('coordinator:tracking:{}'.format(product_id), '1')
 
         # Set BLUSE proposal ID flag. If we are in primary time, 
         # decrement nshot if it is > 0.
@@ -445,12 +448,14 @@ class Coordinator(object):
             redis_util.set_last_rec_bluse(self.red, 1)
             nshot = redis_util.get_nshot(self.red, product_id)
             if nshot > 0:
-                # decrement and set
+                # Decrement and set:
+                redis_util.set_nshot(self.red, product_id, nshot - 1)
+                log.info(f"Primary time: nshot now {nshot-1}")
+            else:
+                log.info(f"Not recording for {product_id} as nshot = {nshot}")
         else:
             redis_util.set_last_rec_bluse(self.red, 0)
         
-        # If BLUSE, decrement nshot. Will need to reset nshot elsewhere to at least one if down to 0.
-
         # Recording process started:
         self.annotate(
             'RECORD', 
@@ -466,9 +471,6 @@ class Coordinator(object):
         self.red.publish(TARGETS_CHANNEL, target_information)
 
         self.alert(f"Instructed recording for {product_id} to {datadir}")
-
-        # Set subarray state to 'tracking':
-        self.red.set('coordinator:tracking:{}'.format(product_id), '1')
 
         # Disable new recording while current recording underway:
         redis_util.disable_recording(self.red, product_id)
