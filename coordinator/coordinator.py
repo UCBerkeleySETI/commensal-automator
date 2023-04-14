@@ -20,6 +20,12 @@ ALERTS_CHANNEL = REDIS_CHANNELS.alerts
 SENSOR_CHANNEL = REDIS_CHANNELS.sensor_alerts
 TRIGGER_CHANNEL = REDIS_CHANNELS.trigger_mode
 TARGETS_CHANNEL = 'target-selector:new-pointing'
+
+# Standard DWELL time to fill the buffers:
+DEFAULT_DWELL = 290
+# Primary time dwell for use with nshot:
+PRIMARY_TIME_DWELL = 30
+
 # Type of stream
 STREAM_TYPE = 'cbf.antenna_channelised_voltage'
 # F-engine mode (so far 'wide' and 'narrow' are known to be available)
@@ -279,7 +285,7 @@ class Coordinator(object):
 
             # Individually address processing nodes in subarray group where necessary:
             # Build list of Hashpipe-Redis Gateway channels to publish to:
-            chan_list = self.host_list(HPGDOMAIN, allocated_hosts)
+            chan_list = redis_util.channel_list(HPGDOMAIN, allocated_hosts)
 
             for i in range(0, len(chan_list)):
                 # Number of streams for instance i (NSTRM)
@@ -498,22 +504,15 @@ class Coordinator(object):
             allocated_hosts = self.red.lrange(array_key, 0, 
                 self.red.llen(array_key))
             # Build list of Hashpipe-Redis Gateway channels to publish to:
-            chan_list = self.host_list(HPGDOMAIN, allocated_hosts)
+            chan_list = redis_util.channel_list(HPGDOMAIN, allocated_hosts)
 
             # NOTE: check how to alter here. 
             #subarray_group = '{}:{}///set'.format(HPGDOMAIN, product_id)
 
-            # Send messages to these specific hosts:
-            for i in range(len(chan_list)):
-                # For the moment during testing, get dwell time from each
-                # of the hosts. Then set to zero and then back to to the
-                # original dwell time.
-                host_key = '{}://{}/status'.format(HPGDOMAIN, allocated_hosts[i])
-                dwell_time = self.get_dwell_time(host_key)
-                self.pub_gateway_msg(self.red, chan_list[i], 'DWELL', '0', log, False)
-                self.pub_gateway_msg(self.red, chan_list[i], 'PKTSTART', '0', log, False)
-                time.sleep(1.5) # Wait for processing node. NOTE: Is this long enough?
-                self.pub_gateway_msg(self.red, chan_list[i], 'DWELL', dwell_time, log, False)
+            # Reset DWELL:
+            redis_util.reset_dwell(self.red, allocated_hosts, DEFAULT_DWELL)
+            self.alert('DWELL has been reset for instances assigned to {}'.format(description))
+            
             # Reset tracking state to '0'
             self.red.set('coordinator:tracking:{}'.format(product_id), '0')
             self.alert(f"Tracking stopped for {product_id}")
@@ -539,7 +538,7 @@ class Coordinator(object):
                 self.red.llen(array_key))
 
         # Build list of Hashpipe-Redis Gateway channels to publish to:
-        chan_list = self.host_list(HPGDOMAIN, allocated_hosts)
+        chan_list = redis_util.channel_list(HPGDOMAIN, allocated_hosts)
 
         # Unsubscription process started:
         self.annotate(
@@ -552,16 +551,6 @@ class Coordinator(object):
             self.pub_gateway_msg(self.red, chan, 'DESTIP', '0.0.0.0', log, False)
         self.alert(f"Instructed hosts for {description} to unsubscribe from mcast groups")
         time.sleep(3) # give them a chance to respond
-
-        # Get current DWELL per host:
-        dwell_list = []
-        for i in range(len(chan_list)):
-            # For the moment, get dwell time from each
-            # of the hosts. Then set to zero and then back to to the
-            # original dwell time.
-            host_key = '{}://{}/status'.format(HPGDOMAIN, allocated_hosts[i])
-            dwell_time = self.get_dwell_time(host_key)
-            dwell_list.append(dwell_time)
 
         # Belt and braces restart pipelines
         hostnames_only = [host.split('/')[0] for host in allocated_hosts]
@@ -576,17 +565,11 @@ class Coordinator(object):
         self.red.publish(subarray_group, 'leave={}'.format(description))
         self.alert('Disbanded gateway group: {}'.format(description))
 
-        # Sleep for 20 seconds to allow pipelines to restart before:
+        # Sleep for 20 seconds to allow pipelines to restart:
         time.sleep(20)
+        
         # Reset DWELL for all hosts after pipeline restart:
-        for i in range(len(chan_list)):
-            # For the moment during testing, get dwell time from each
-            # of the hosts. Then set to zero and then back to to the
-            # original dwell time.
-            self.pub_gateway_msg(self.red, chan_list[i], 'DWELL', '0', log, False)
-            self.pub_gateway_msg(self.red, chan_list[i], 'PKTSTART', '0', log, False)
-            time.sleep(1.5) # Wait for processing node. NOTE: Is this long enough?
-            self.pub_gateway_msg(self.red, chan_list[i], 'DWELL', dwell_list[i], log, False)
+        redis_util.reset_dwell(self.red, allocated_hosts, DEFAULT_DWELL)
         self.alert('DWELL has been reset for instances assigned to {}'.format(description))
 
         # Release hosts (note: the automator still controls when nshot is set > 0;
@@ -790,20 +773,6 @@ class Coordinator(object):
         pktstart = np.max(pkt_idxs) + idx_margin
         log.info("PKTIDX: Min {}, Median {}, Max {}, PKTSTART {}".format(min_idx, med_idx, max_idx, pktstart))
         return pktstart
-
-    def host_list(self, hpgdomain, hosts):
-        """Build a list of Hashpipe-Redis Gateway channels from a list 
-           of host names.
-
-           Args:
-              hpgdomain (str): Hashpipe-Redis Gateway domain (e.g. 'bluse'). 
-              hosts (list): list of hosts.
-
-           Returns:
-              channel_list (list): list of Hashpipe-Redis Gateway channels.
-        """
-        channel_list = [hpgdomain + '://' + host + '/set' for host in hosts]
-        return channel_list
 
     def target(self, product_id):
         """Get target name and coordinates.
