@@ -203,16 +203,16 @@ class Automator(object):
         This method will not return until all processing is done.
         """
 
-        # Check if we are in the middle of a sequence of primary time 
-        # observations:
-
         # Check if most recent recording was BLUSE primary time AND if so,
-        # nshot == 0 (then process). If BLUSE but nshot > 0, return. 
-
-        # Expected that nshot will manually be reset. 
-
-        #if redis_util.primary_time_in_progress(self.redis_server):
-        #    return
+        # if nshot == 0 (then process). If BLUSE but nshot > 0, return. 
+        # NOTE: for now we expect that primary time will only be via array_1
+        if redis_util.get_last_rec_bluse(self.redis_server, 'array_1'):
+            log.info("Last recording was BLUSE primary time.")
+            if redis_util.get_nshot(self.redis_server, 'array_1') > 0:
+                log.info("Primary time still in progress, nshot > 0") 
+                return
+            else:
+                log.info("nshot == 0, therefore processing.")
 
         dirmap = redis_util.suggest_processing(self.redis_server,
                                                processing=self.processing)
