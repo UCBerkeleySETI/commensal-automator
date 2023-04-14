@@ -400,7 +400,25 @@ class Coordinator(object):
            
            [1] https://arxiv.org/pdf/1906.07391.pdf
         """
- 
+
+        # Check if we are observing under BLUSE primary time. 
+        if redis_util.is_primary_time(self.red, product_id):
+            # Since it is a primary time track, set DWELL to the 
+            # desired primary time DWELL:
+            redis_util.reset_dwell(self.red, allocated_hosts, PRIMARY_TIME_DWELL)
+            # Set flag: most recent recording was BLUSE primary time.
+            redis_util.set_last_rec_bluse(self.red, 1)
+            # decrement nshot if it is > 0.
+            nshot = redis_util.get_nshot(self.red, product_id)
+            if nshot > 0:
+                # Decrement and set:
+                redis_util.set_nshot(self.red, product_id, nshot - 1)
+                log.info(f"Primary time: nshot now {nshot-1}")
+            else:
+                log.info(f"Not recording for {product_id} as nshot = {nshot}")
+        else:
+            redis_util.set_last_rec_bluse(self.red, 0)
+
         # Retrieve calibration solutions after 60 seconds have passed (see above
         # for explanation of this delay):
         delay = threading.Timer(60, lambda:self.retrieve_cals(product_id))
@@ -447,20 +465,6 @@ class Coordinator(object):
 
         # Set subarray state to 'tracking':
         self.red.set('coordinator:tracking:{}'.format(product_id), '1')
-
-        # Set BLUSE proposal ID flag. If we are in primary time, 
-        # decrement nshot if it is > 0.
-        if redis_util.is_primary_time(self.red, product_id):
-            redis_util.set_last_rec_bluse(self.red, 1)
-            nshot = redis_util.get_nshot(self.red, product_id)
-            if nshot > 0:
-                # Decrement and set:
-                redis_util.set_nshot(self.red, product_id, nshot - 1)
-                log.info(f"Primary time: nshot now {nshot-1}")
-            else:
-                log.info(f"Not recording for {product_id} as nshot = {nshot}")
-        else:
-            redis_util.set_last_rec_bluse(self.red, 0)
         
         # Recording process started:
         self.annotate(
