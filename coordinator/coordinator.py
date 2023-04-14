@@ -328,7 +328,7 @@ class Coordinator(object):
             target_str, ra, dec = self.target(product_id)
             # If we have a track which starts without any pointing information, 
             # abort:
-            if ra == "UNKNOWN" or dec = "UNKNOWN":
+            if ra == "UNKNOWN" or dec == "UNKNOWN":
                 log.error(f"""Could not retrieve pointing information for 
                             current track, aborting for {product_id}""")
                 return
