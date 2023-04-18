@@ -88,7 +88,7 @@ class Automator(object):
         # Setting this to True should stop all subsequent actions while we manually debug
         self.paused = False
 
-        self.alert("starting up")
+        self.alert(f"starting up, search products will be written to `/{partition}`")
 
 
     def alert(self, message):

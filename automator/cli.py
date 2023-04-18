@@ -42,7 +42,7 @@ def cli(args = sys.argv[0]):
                         help = 'Format of message for changing nshot')
     parser.add_argument('--partition',
                         type = str,
-                        default = 'mydatag', 
+                        default = 'scratch', 
                         help = 'Name of destination partition for seticore output')
     if(len(sys.argv[1:]) == 0):
         parser.print_help()
@@ -54,7 +54,7 @@ def cli(args = sys.argv[0]):
          hpgdomain = args.hpgdomain, 
          buffer_length = args.buffer_length, 
          nshot_chan = args.nshot_chan, 
-         nshot_msg = args.nshot_msg
+         nshot_msg = args.nshot_msg,
          partition = args.partition)
 
 def main(redis_endpoint, redis_channel, margin, hpgdomain, 
