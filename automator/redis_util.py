@@ -87,7 +87,7 @@ def enable_recording(r, subarray_name):
     rec_setting = is_rec_enabled(r, subarray_name)
     log.info('rec_setting {}, setting to 1'.format(rec_setting))
     rec_setting_key = 'rec_enabled:{}'.format(subarray_name)
-    self.r.set(rec_setting_key, 1) 
+    r.set(rec_setting_key, 1) 
 
 def disable_recording(r, subarray_name):
     """Prevent recording from proceeding for new tracks for 
@@ -96,7 +96,7 @@ def disable_recording(r, subarray_name):
     rec_setting = is_rec_enabled(r, subarray_name)
     log.info('rec_setting {}, setting to 0'.format(rec_setting))
     rec_setting_key = 'rec_enabled:{}'.format(subarray_name)
-    self.r.set(rec_setting_key, 0) 
+    r.set(rec_setting_key, 0) 
 
 def get_bluse_dwell(r, subarray_name):
     """Get specified dwell for BLUSE primary time observing.
