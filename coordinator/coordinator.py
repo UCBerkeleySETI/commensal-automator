@@ -340,12 +340,12 @@ class Coordinator(object):
                 allowed_sources = self.red.lrange(allowed_key, 0, self.red.llen(allowed_key))
                 log.info('Filter by the following source names: {}'.format(allowed_sources)) 
                 if target_str in allowed_sources:
-                    self.record_track(target_str, ra, dec, product_id, n_remaining)
+                    self.record_track(target_str, ra, dec, product_id)
                 else:
                     log.info('Target {} not in list of allowed sources, skipping...')
             else:
                 log.info('No list of allowed sources, proceeding...')
-                self.record_track(target_str, ra, dec, product_id, n_remaining)
+                self.record_track(target_str, ra, dec, product_id)
         else:
             log.info('Recording disabled, skipping this track.')
 
@@ -378,7 +378,7 @@ class Coordinator(object):
         else:
             self.alert("No calibration solution updates.")
 
-    def record_track(self, target_str, ra_s, dec_s, product_id, n_remaining): 
+    def record_track(self, target_str, ra_s, dec_s, product_id): 
         """Data recording is initiated by issuing a PKTSTART value to the 
            processing nodes in question via the Hashpipe-Redis gateway [1].
           
@@ -395,8 +395,6 @@ class Coordinator(object):
                ra_s (str): RA of the target (sexagesimal form).
                dec_s (str): Dec of the target (sexagesimal form).
                product_id (str): name of current subarray. 
-               n_remaining (int): number of remaining recordings to take
-               (including the current recording). 
            
            [1] https://arxiv.org/pdf/1906.07391.pdf
         """
@@ -407,7 +405,7 @@ class Coordinator(object):
             # desired primary time DWELL:
             redis_util.reset_dwell(self.red, allocated_hosts, PRIMARY_TIME_DWELL)
             # Set flag: most recent recording was BLUSE primary time.
-            redis_util.set_last_rec_bluse(self.red, 1)
+            redis_util.set_last_rec_bluse(self.red, product_id, 1)
             # decrement nshot if it is > 0.
             nshot = redis_util.get_nshot(self.red, product_id)
             if nshot > 0:
@@ -417,7 +415,7 @@ class Coordinator(object):
             else:
                 log.info(f"Not recording for {product_id} as nshot = {nshot}")
         else:
-            redis_util.set_last_rec_bluse(self.red, 0)
+            redis_util.set_last_rec_bluse(self.red, product_id, 0)
 
         # Retrieve calibration solutions after 60 seconds have passed (see above
         # for explanation of this delay):
@@ -515,7 +513,7 @@ class Coordinator(object):
 
             # Reset DWELL:
             redis_util.reset_dwell(self.red, allocated_hosts, DEFAULT_DWELL)
-            self.alert('DWELL has been reset for instances assigned to {}'.format(description))
+            self.alert('DWELL has been reset for instances assigned to {}'.format(product_id))
             
             # Reset tracking state to '0'
             self.red.set('coordinator:tracking:{}'.format(product_id), '0')
