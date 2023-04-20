@@ -125,10 +125,11 @@ class Automator(object):
             return
 
         subarray_state, subarray_name = msg_components
+        log.info('subarray {} is now in state: {}'.format(subarray_name, subarray_state))
 
         if self.paused:
+            log.info("Paused, taking no action")
             return
-        log.info('subarray {} is now in state: {}'.format(subarray_name, subarray_state))
         
         self.maybe_start_recording()
         self.maybe_start_processing()
@@ -162,9 +163,15 @@ class Automator(object):
         We don't take any action immediately, but we do want to set a timer to check
         back later to see if we are ready to process.
         """
+
+        # If a sequence of primary time observations has ended (ie, this current
+        # track is not a primary time track), then process:
+        if redis_util.primary_sequence_end(self.redis_server, subarray_name):
+            log.info('Primary sequence has ended, proceeding to processing')
+            self.maybe_start_processing()
+
         nshot = self.get_nshot(subarray_name)
         log.info('{} in tracking state with nshot = {}'.format(subarray_name, nshot))
-
 
         # If this is the last recording before the buffers will be full, 
         # we may want to process in about `DWELL` + margin seconds.
@@ -202,17 +209,6 @@ class Automator(object):
 
         This method will not return until all processing is done.
         """
-
-        # Check if most recent recording was BLUSE primary time AND if so,
-        # if nshot == 0 (then process). If BLUSE but nshot > 0, return. 
-        # NOTE: for now we expect that primary time will only be via array_1
-        if redis_util.get_last_rec_bluse(self.redis_server, 'array_1'):
-            log.info("Last recording was BLUSE primary time.")
-            if redis_util.get_nshot(self.redis_server, 'array_1') > 0:
-                log.info("Primary time still in progress, nshot > 0") 
-                return
-            else:
-                log.info("nshot == 0, therefore processing.")
 
         dirmap = redis_util.suggest_processing(self.redis_server,
                                                processing=self.processing)
@@ -300,12 +296,11 @@ class Automator(object):
 
                 self.alert(f"hpguppi_proc completed. output in /scratch/data/{datadir}")
 
-        # Check if array_1 has our specific proposal ID. If this is true, 
-        # we want to preserve all the data in the buffers. Note primary time
-        # (for now) will only be conducted with a single subarray. 
-        # ToDo: create proper subarray awareness automator-wide
-        if redis_util.is_primary_time(self.redis_server, 'array_1'):
-            self.alert('Primary time, therefore pausing after processing')
+        # If we have just processed for a sequence of primary time
+        # observations, we want to preserve the data in the buffers and
+        # prevent further recording and processing.
+        if redis_util.primary_sequence_end(self.redis_server, subarray_name):
+            log.info("Primary sequence processed, therefore pausing.")
             self.paused = True
         else:
             # Clean up
@@ -355,6 +350,12 @@ class Automator(object):
         TODO: avoid having a race condition here where we start a recording
         multiple times.
         """
+        # If a primary sequence has ended, we don't want to record
+        # the next track.
+        if redis_util.primary_sequence_end(self.redis_server, product_id):
+            log.info()
+            redis_util.disable_recording(self.red, product_id)
+
         broken = redis_util.broken_daqs(self.redis_server)
         if broken:
             self.pause("{} daqs appear to be broken: {}".format(
@@ -363,8 +364,15 @@ class Automator(object):
         subarrays = redis_util.suggest_recording(self.redis_server,
                                                  processing=self.processing)
         for subarray in subarrays:
-            log.info("subarray {} is ready for recording".format(subarray))     
-            redis_util.enable_recording(self.redis_server, subarray)       
+            # If a primary sequence has ended, we don't want to record
+            # the next track.
+            if redis_util.primary_sequence_end(self.redis_server, subarray):
+                log.info(f"""A primary sequence has ended for {subarray},
+                therefore not recording.""")
+                redis_util.disable_recording(self.redis_server, subarray)
+            else:
+                log.info("subarray {} is ready for recording".format(subarray))
+                redis_util.enable_recording(self.redis_server, subarray)
 ##            self.set_nshot(subarray, 1)
         
         

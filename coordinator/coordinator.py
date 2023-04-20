@@ -23,7 +23,8 @@ TARGETS_CHANNEL = 'target-selector:new-pointing'
 
 # Standard DWELL time to fill the buffers:
 DEFAULT_DWELL = 290
-# Primary time dwell for use with nshot:
+# Primary time dwell:
+# ToDo: Make these CLI args or Redis keys
 PRIMARY_TIME_DWELL = 30
 
 # Type of stream
@@ -103,7 +104,9 @@ class Coordinator(object):
            - Incoming messages trigger the appropriate function for the stage of the 
              observation. The contents of the messages (if any) are sent to the 
              appropriate function. 
-        """        
+        """
+        # Reset primary time flag:
+        redis_util.set_last_rec_bluse(self.red, product_id, 0)
         # Configure coordinator
         self.alert('starting up')
         try:
@@ -321,9 +324,25 @@ class Coordinator(object):
            Args:
                product_id (str): name of current subarray. 
         """
+        # Check if most recent observation was primary time. If it was,
+        # and the current track is NOT primary time, then we should not record.
+        # The automator will process all the primary time recordings first.
+        if redis_util.primary_sequence_end(self.red, product_id):
+            redis_util.disable_recording(self.red, product_id)
+
         # Check if recording has been enabled: 
-        rec_enabled = redis_util.is_rec_enabled(self.red, product_id)
-        if rec_enabled:
+        if redis_util.is_rec_enabled(self.red, product_id):
+
+            # Check if this track is BLUSE primary time.
+            if redis_util.is_primary_time(self.red, product_id):
+                # Set DWELL to the desired primary time DWELL:
+                redis_util.reset_dwell(self.red, allocated_hosts, PRIMARY_TIME_DWELL)
+                # Set flag: current recording is BLUSE primary time.
+                redis_util.set_last_rec_bluse(self.red, product_id, 1)
+            else:
+                # Set flag: current recording is not BLUSE primary time.
+                redis_util.set_last_rec_bluse(self.red, product_id, 0)
+
             # Target information (required here to check list of allowed sources):
             target_str, ra, dec = self.target(product_id)
             # If we have a track which starts without any pointing information, 
@@ -332,6 +351,7 @@ class Coordinator(object):
                 log.error(f"""Could not retrieve pointing information for 
                             current track, aborting for {product_id}""")
                 return
+
             # Check for list of allowed sources. If the list is not empty, record
             # only if these sources are present.
             # If the list is empty, proceed with recording the current track/scan.
@@ -346,6 +366,7 @@ class Coordinator(object):
             else:
                 log.info('No list of allowed sources, proceeding...')
                 self.record_track(target_str, ra, dec, product_id)
+
         else:
             log.info('Recording disabled, skipping this track.')
 
@@ -398,24 +419,6 @@ class Coordinator(object):
            
            [1] https://arxiv.org/pdf/1906.07391.pdf
         """
-
-        # Check if we are observing under BLUSE primary time. 
-        if redis_util.is_primary_time(self.red, product_id):
-            # Since it is a primary time track, set DWELL to the 
-            # desired primary time DWELL:
-            redis_util.reset_dwell(self.red, allocated_hosts, PRIMARY_TIME_DWELL)
-            # Set flag: most recent recording was BLUSE primary time.
-            redis_util.set_last_rec_bluse(self.red, product_id, 1)
-            # decrement nshot if it is > 0.
-            nshot = redis_util.get_nshot(self.red, product_id)
-            if nshot > 0:
-                # Decrement and set:
-                redis_util.set_nshot(self.red, product_id, nshot - 1)
-                log.info(f"Primary time: nshot now {nshot-1}")
-            else:
-                log.info(f"Not recording for {product_id} as nshot = {nshot}")
-        else:
-            redis_util.set_last_rec_bluse(self.red, product_id, 0)
 
         # Retrieve calibration solutions after 60 seconds have passed (see above
         # for explanation of this delay):
@@ -480,8 +483,8 @@ class Coordinator(object):
 
         self.alert(f"Instructed recording for {product_id} to {datadir}")
 
-        # Disable new recording while current recording underway:
-        redis_util.disable_recording(self.red, product_id)
+        if redis_util.is_primary_time(self.red, product_id):
+            self.alert("Primary time observation for {product_id")
         
     def tracking_stop(self, product_id):
         """If the subarray stops tracking a source (more specifically, if the incoming 
@@ -574,9 +577,7 @@ class Coordinator(object):
         redis_util.reset_dwell(self.red, allocated_hosts, DEFAULT_DWELL)
         self.alert('DWELL has been reset for instances assigned to {}'.format(description))
 
-        # Release hosts (note: the automator still controls when nshot is set > 0;
-        # this ensures recording does not take place while processing is still ongoing).
-        # Get list of currently available hosts:
+        # Release hosts
         if self.red.exists('coordinator:free_hosts'):
             free_hosts = self.red.lrange('coordinator:free_hosts', 0,
                 self.red.llen('coordinator:free_hosts'))
