@@ -129,8 +129,8 @@ def channel_list(hpgdomain, instances):
     return channel_list
 
 def is_primary_time(r, subarray_name):
-    """Check if the current observation ID is for BLUSE primary
-    time. 
+    """Check if the current (or most recent) observation ID is for BLUSE
+    primary time.
     """
     subarray = 'subarray_{}'.format(subarray_name[-1])
     p_id_key = '{}_script_proposal_id'.format(subarray)
@@ -173,6 +173,16 @@ def primary_time_in_progress(r):
             log.info('Not processing: nshot is {}'.format(nshot))
             return True
     return False
+
+
+def primary_sequence_end(r, subarray):
+    """If the previously recorded track was a primary time track, and the
+    current track is not a primary time track, return True.
+    """
+    if get_last_rec_bluse(r, subarray) and is_primary_time(r, subarray):
+        return True
+    return False
+
 
 def all_hosts(r):
     return sorted(key.split("//")[-1].split("/")[0]
