@@ -32,14 +32,6 @@ def cli(args = sys.argv[0]):
                         type = float,
                         default = 300.0, 
                         help = 'Max recording length at max data rate (sec)')
-    parser.add_argument('--nshot_chan',
-                        type = str,
-                        default = 'coordinator:trigger_mode', 
-                        help = 'Redis channel for changing nshot')
-    parser.add_argument('--nshot_msg',
-                        type = str,
-                        default = 'coordinator:trigger_mode:{}:nshot:{}', 
-                        help = 'Format of message for changing nshot')
     parser.add_argument('--partition',
                         type = str,
                         default = 'scratch', 
@@ -53,12 +45,10 @@ def cli(args = sys.argv[0]):
          margin = args.margin, 
          hpgdomain = args.hpgdomain, 
          buffer_length = args.buffer_length, 
-         nshot_chan = args.nshot_chan, 
-         nshot_msg = args.nshot_msg,
          partition = args.partition)
 
 def main(redis_endpoint, redis_channel, margin, hpgdomain, 
-    buffer_length, nshot_chan, nshot_msg, partition):
+    buffer_length, partition):
     """Starts the automator.
   
     Args: 
@@ -72,9 +62,6 @@ def main(redis_endpoint, redis_channel, margin, hpgdomain,
         in question. 
         buffer_length (float): Maximum duration of recording (in seconds)
         for the maximum possible incoming data rate. 
-        nshot_chan (str): The Redis channel for resetting nshot.
-        nshot_msg (str): The base form of the Redis message for resetting
-        nshot. For example, `coordinator:trigger_mode:<subarray_name>:nshot:<n>`
         partition (str): Name of destination partition for seticore output.
 
     Returns:
@@ -87,8 +74,6 @@ def main(redis_endpoint, redis_channel, margin, hpgdomain,
                           margin, 
                           hpgdomain, 
                           buffer_length, 
-                          nshot_chan, 
-                          nshot_msg,
                           partition)
     Automaton.start()
 

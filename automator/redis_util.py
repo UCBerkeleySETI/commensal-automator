@@ -56,20 +56,6 @@ def allocated_hosts(r, subarray):
     results = r.lrange("coordinator:allocated_hosts:" + subarray, 0, -1)
     return sorted(s.split("/")[0] for s in results)
 
-
-def get_nshot(r, subarray_name):
-    """Get the current value of nshot from redis.
-    """
-    nshot_key = 'coordinator:trigger_mode:{}'.format(subarray_name)
-    nshot = int(r.get(nshot_key).split(':')[1])
-    return nshot
-
-def set_nshot(r, subarray_name, val):
-    """Set nshot for given subarray.
-    """
-    nshot_key = 'coordinator:trigger_mode:{}'.format(subarray_name)
-    r.set(nshot_key, f"nshot:{val}")
-
 def is_rec_enabled(r, subarray_name):
     """Is recording enabled?
     """
@@ -160,20 +146,6 @@ def set_last_rec_bluse(r, subarray_name, value):
     log.info(f"setting primary time status for {subarray_name}: {value}")
     r.set(key, value)
 
-def primary_time_in_progress(r):
-    """Returns True if still in the midst of primary observing
-    sequence.
-    """
-    # Note: as of now, this will only ever happen with a single subarray.
-    # Note: we need to check proposal id at the time of the most recent 
-    # recording. 
-    if is_primary_time(r, 'array_1'):
-        nshot = get_nshot(r, 'array_1')
-        if nshot > 0:
-            log.info('Not processing: nshot is {}'.format(nshot))
-            return True
-    return False
-
 
 def primary_sequence_end(r, subarray):
     """If the previously recorded track was a primary time track, and the
@@ -238,7 +210,7 @@ def ready_to_record(r):
     answer = set()
     subarrays = coordinator_subarrays(r)
     for subarray in subarrays:
-        # If recording enabled, union
+        # If recording enabled
         if redis_util.is_rec_enabled(r, subarray):
             answer = answer.union(allocated_hosts(r, subarray))
     return sorted(answer)
@@ -582,7 +554,7 @@ def show_status(r):
     print(subbed)
     print()
     ready = ready_to_record(r)
-    print("the coordinator is ready to record (nshot>0) on", len(ready), "hosts:")
+    print("the coordinator is ready to record on", len(ready), "hosts:")
     print(ready)
     print()
     recording = get_recording(r)
@@ -638,12 +610,6 @@ def main():
         hosts = allocated_hosts(r, subarray)
         print(subarray, "has", len(hosts), "allocated hosts:")
         print(" ".join(hosts))
-        return
-
-    if command == "get_nshot":
-        subarray = args[0]
-        nshot = get_nshot(r, subarray)
-        print(nshot)
         return
 
     if command == "all_hosts":

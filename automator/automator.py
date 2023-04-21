@@ -22,7 +22,7 @@ class Automator(object):
       
     The recording is more directly controlled by the coordinator.
     The automator instructs the coordinator when it can record by setting
-    an `nshot` key in redis.
+    an `enabled` key in redis.
 
     Processing is done with slurm wrapping seticore and hpguppi_proc.
 
@@ -34,8 +34,8 @@ class Automator(object):
     could still be intensively processing a different subarray.
 
     2. When the automator isn't doing any processing on a set of machines that
-    the coordinator has allocated to a subarray, it uses `nshot` to
-    tell the coordinator it can record on them.
+    the coordinator has allocated to a subarray, it uses the redis key: 
+    `rec_enabled:<subarray name>` to tell the coordinator it can record on them.
 
     3. When the automator notices the coordinator is done recording, it runs
     processing. When processing finishes, the automator has deleted the raw files.
@@ -49,7 +49,7 @@ class Automator(object):
     does not generally work yet.
     """
     def __init__(self, redis_endpoint, redis_chan, margin, 
-                 hpgdomain, buffer_length, nshot_chan, nshot_msg, partition):
+                 hpgdomain, buffer_length, partition):
         """Initialise the automator. 
 
         redis_endpoint (str): Redis endpoint (of the form <host IP
@@ -61,9 +61,6 @@ class Automator(object):
         in question. 
         buffer_length (float): Maximum duration of recording (in seconds)
         for the maximum possible incoming data rate. 
-        nshot_chan (str): The Redis channel for resetting nshot.
-        nshot_msg (str): The base form of the Redis message for resetting
-        nshot. For example, `coordinator:trigger_mode:<subarray_name>:nshot:<n>`
         """
         log.info('starting the automator. redis = {}'.format(redis_endpoint))
         redis_host, redis_port = redis_endpoint.split(':')
@@ -74,8 +71,6 @@ class Automator(object):
         self.margin = margin
         self.hpgdomain = hpgdomain
         self.buffer_length = buffer_length
-        self.nshot_chan = nshot_chan
-        self.nshot_msg = nshot_msg
         self.partition = partition
 
         # A set of all hosts that are currently processing
@@ -138,23 +133,6 @@ class Automator(object):
             self.tracking(subarray_name)
         elif subarray_state == 'not-tracking':
             self.not_tracking(subarray_name)
-
-
-
-    def get_nshot(self, subarray_name):
-        """Get the current value of nshot from redis.
-        """
-        nshot = redis_util.get_nshot(self.redis_server, subarray_name)
-        log.info("fetched nshot = {} from redis, for {}".format(nshot, subarray_name))
-        return nshot
-        
-    
-    def set_nshot(self, subarray_name, nshot):
-        """Set the value of nshot in redis.
-        """
-        nshot_msg = self.nshot_msg.format(subarray_name, nshot)
-        self.redis_server.publish(self.nshot_chan, nshot_msg)
-        log.info("published nshot = {} to redis, for {}".format(nshot, subarray_name))
     
             
     def tracking(self, subarray_name):
@@ -173,8 +151,7 @@ class Automator(object):
             log.info('Primary sequence has ended, proceeding to processing')
             self.maybe_start_processing()
 
-        nshot = self.get_nshot(subarray_name)
-        log.info('{} in tracking state with nshot = {}'.format(subarray_name, nshot))
+        log.info('{} in tracking state'.format(subarray_name))
 
         # If this is the last recording before the buffers will be full, 
         # we may want to process in about `DWELL` + margin seconds.
@@ -376,7 +353,6 @@ class Automator(object):
             else:
                 log.info("subarray {} is ready for recording".format(subarray))
                 redis_util.enable_recording(self.redis_server, subarray)
-##            self.set_nshot(subarray, 1)
         
         
     def retrieve_dwell(self, host_list, default_dwell):
