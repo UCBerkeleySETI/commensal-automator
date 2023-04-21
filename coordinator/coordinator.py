@@ -107,8 +107,6 @@ class Coordinator(object):
         """
         # Configure coordinator
         self.alert('starting up')
-        # Reset primary time flag:
-        redis_util.set_last_rec_bluse(self.red, product_id, 0)
         try:
             self.hashpipe_instances, self.streams_per_instance = self.config(self.cfg_file)
             log.info('Configured from {}'.format(self.cfg_file))
@@ -201,6 +199,8 @@ class Coordinator(object):
             )
         log.info('New subarray built: {}'.format(product_id))
         tracking = 0 # Initialise tracking state to 0
+        # Reset primary time flag:
+        redis_util.set_last_rec_bluse(self.red, product_id, 0)
         # Initialise cal_solutions timestamp to 0 to ensure the most recent
         # cal solutions are recorded. Note using Redis here so that the value persists
         # even if the coordinator is restarted in the middle of an observation. 
