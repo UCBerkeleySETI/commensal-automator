@@ -23,9 +23,6 @@ TARGETS_CHANNEL = 'target-selector:new-pointing'
 
 # Standard DWELL time to fill the buffers:
 DEFAULT_DWELL = 290
-# Primary time dwell:
-# ToDo: Make these CLI args or Redis keys
-PRIMARY_TIME_DWELL = 30
 
 # Type of stream
 STREAM_TYPE = 'cbf.antenna_channelised_voltage'
@@ -342,8 +339,6 @@ class Coordinator(object):
                 # it could be part of a sequence of primary time tracks that
                 # we only want to process at the end.
 
-                # Set DWELL to the desired primary time DWELL:
-                redis_util.reset_dwell(self.red, allocated_hosts, PRIMARY_TIME_DWELL)
                 # Set flag: current recording is BLUSE primary time.
                 redis_util.set_last_rec_bluse(self.red, product_id, 1)
 
