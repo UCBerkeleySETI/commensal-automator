@@ -165,8 +165,11 @@ class Automator(object):
         """
 
         # If a sequence of primary time observations has ended (ie, this current
-        # track is not a primary time track), then process:
+        # track is not a primary time track), then process right away:
         if redis_util.primary_sequence_end(self.redis_server, subarray_name):
+            # Disable recording here for the subarray, to avoid a race condition.
+            # Is there a better way of doing this?
+            redis_util.disable_recording(self.redis_server, subarray_name)
             log.info('Primary sequence has ended, proceeding to processing')
             self.maybe_start_processing()
 
@@ -209,6 +212,12 @@ class Automator(object):
 
         This method will not return until all processing is done.
         """
+
+        # If the most recent track was a primary time track, then we don't
+        # want to process yet (as there could be another primary time
+        # observation coming). In this case, the coordinator keeps
+        # recording enabled, which will keep the allocated instances from
+        # appearing in dirmap below.
 
         dirmap = redis_util.suggest_processing(self.redis_server,
                                                processing=self.processing)
@@ -350,12 +359,6 @@ class Automator(object):
         TODO: avoid having a race condition here where we start a recording
         multiple times.
         """
-        # If a primary sequence has ended, we don't want to record
-        # the next track.
-        if redis_util.primary_sequence_end(self.redis_server, product_id):
-            log.info()
-            redis_util.disable_recording(self.red, product_id)
-
         broken = redis_util.broken_daqs(self.redis_server)
         if broken:
             self.pause("{} daqs appear to be broken: {}".format(

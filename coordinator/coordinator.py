@@ -105,10 +105,10 @@ class Coordinator(object):
              observation. The contents of the messages (if any) are sent to the 
              appropriate function. 
         """
-        # Reset primary time flag:
-        redis_util.set_last_rec_bluse(self.red, product_id, 0)
         # Configure coordinator
         self.alert('starting up')
+        # Reset primary time flag:
+        redis_util.set_last_rec_bluse(self.red, product_id, 0)
         try:
             self.hashpipe_instances, self.streams_per_instance = self.config(self.cfg_file)
             log.info('Configured from {}'.format(self.cfg_file))
@@ -328,6 +328,7 @@ class Coordinator(object):
         # and the current track is NOT primary time, then we should not record.
         # The automator will process all the primary time recordings first.
         if redis_util.primary_sequence_end(self.red, product_id):
+            log.info('Primary sequence has ended, disabling further recording')
             redis_util.disable_recording(self.red, product_id)
 
         # Check if recording has been enabled: 
@@ -335,11 +336,22 @@ class Coordinator(object):
 
             # Check if this track is BLUSE primary time.
             if redis_util.is_primary_time(self.red, product_id):
+
+                # If this current track is a primary time track, we want to
+                # keep recording enabled even after this track has ended, as
+                # it could be part of a sequence of primary time tracks that
+                # we only want to process at the end.
+
                 # Set DWELL to the desired primary time DWELL:
                 redis_util.reset_dwell(self.red, allocated_hosts, PRIMARY_TIME_DWELL)
                 # Set flag: current recording is BLUSE primary time.
                 redis_util.set_last_rec_bluse(self.red, product_id, 1)
+
             else:
+                # As this is not a primary time track, we will process
+                # immediately afterwards; therefore disable new recordings
+                # until released by automator
+                redis_util.disable_recording(self.red, product_id)
                 # Set flag: current recording is not BLUSE primary time.
                 redis_util.set_last_rec_bluse(self.red, product_id, 0)
 
