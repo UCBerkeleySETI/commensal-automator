@@ -238,8 +238,8 @@ def ready_to_record(r):
     answer = set()
     subarrays = coordinator_subarrays(r)
     for subarray in subarrays:
-        nshot = get_nshot(r, subarray)
-        if nshot > 0:
+        # If recording enabled, union
+        if redis_util.is_rec_enabled(r, subarray):
             answer = answer.union(allocated_hosts(r, subarray))
     return sorted(answer)
 
