@@ -86,7 +86,7 @@ class Coordinator(object):
     
     def annotate(self, tag, text):
         response = util.annotate_grafana(tag, text)
-        log.info('Annotating Grafana, response: {}'.format(response))
+        log.info(f"Annotating Grafana, response: {response}")
         
     def start(self):
         """Start the coordinator as follows:
@@ -106,7 +106,7 @@ class Coordinator(object):
         self.alert('starting up')
         try:
             self.hashpipe_instances, self.streams_per_instance = self.config(self.cfg_file)
-            log.info('Configured from {}'.format(self.cfg_file))
+            log.info(f"Configured from {cfg_file}")
         except:
             log.warning('Configuration not updated; old configuration might be present.')
         # Attempt to read list of available hosts. If key does not exist, recreate from 
@@ -132,8 +132,8 @@ class Coordinator(object):
                     trigger_value = value.split(':', 1)[1]
                     # Update the trigger mode for the specific array in question:
                     # (this is useful during an observation)
-                    self.red.set('coordinator:trigger_mode:{}'.format(trigger_key), trigger_value)
-                    log.info('Trigger mode for {}  set to \'{}\''.format(trigger_key, trigger_value))
+                    self.red.set(f"coordinator:trigger_mode:{trigger_key}", trigger_value)
+                    log.info(f"Trigger mode for {trigger_key}  set to \'{trigger_value}\'")
                 # If all the sensor values required on configure have been
                 # successfully fetched by the katportalserver
                 elif msg_type == 'conf_complete':
@@ -192,39 +192,39 @@ class Coordinator(object):
         # Configuration process started:
         self.annotate(
             'CONFIGURE', 
-            '{}: Coordinator configuring DAQs.'.format(product_id)
+            f"{product_id}: Coordinator configuring DAQs."
             )
-        log.info('New subarray built: {}'.format(product_id))
+        log.info(f"New subarray built: {product_id}")
         tracking = 0 # Initialise tracking state to 0
         # Reset primary time flag:
         redis_util.set_last_rec_bluse(self.red, product_id, 0)
         # Initialise cal_solutions timestamp to 0 to ensure the most recent
         # cal solutions are recorded. Note using Redis here so that the value persists
         # even if the coordinator is restarted in the middle of an observation. 
-        self.red.set('coordinator:cal_ts:{}'.format(product_id), 0)
+        self.red.set(f"coordinator:cal_ts:{product_id}", 0)
         # Get IP address offset (if there is one) for ingesting only a specific
         # portion of the full band.
         offset = self.ip_offset(product_id)
         # Initialise trigger mode
-        if self.red.get('coordinator:trigger_mode:{}'.format(description)) is None:
-            log.info('No trigger mode found on configuration, defaulting to {}'.format(self.trigger_mode))
-            self.red.set('coordinator:trigger_mode:{}'.format(description), self.trigger_mode)
+        if self.red.get(f"coordinator:trigger_mode:{description}") is None:
+            log.info(f"No trigger mode found on configuration, defaulting to {self.trigger_mode}")
+            self.red.set(f"coordinator:trigger_mode:{description}", self.trigger_mode)
         # Generate list of stream IP addresses and publish appropriate messages to 
         # processing nodes:
         addr_list, port, n_addrs, n_red_chans = self.ip_addresses(product_id, offset)
         # Allocate hosts for the current subarray:
         if self.red.exists('coordinator:free_hosts'): # If key exists, there are free hosts
-            self.alert('Allocating hosts to {}'.format(product_id))
+            self.alert(f"Allocating hosts to {product_id}")
             # Host allocation:
             free_hosts = self.red.lrange('coordinator:free_hosts', 0, 
                 self.red.llen('coordinator:free_hosts'))
             allocated_hosts = free_hosts[0:n_red_chans]
             write_list_redis(self.red, 
-                    'coordinator:allocated_hosts:{}'.format(product_id), allocated_hosts)
+                    f"coordinator:allocated_hosts:{product_id}", allocated_hosts)
             # Remove allocated hosts from list of available hosts
             # NOTE: in future, append/pop with Redis commands instead of write_list_redis
             if len(free_hosts) < n_red_chans:
-                log.warning("Insufficient resources to process full band for {}".format(product_id))
+                log.warning(f"Insufficient resources to process full band for {product_id}")
                 # Delete the key (no empty lists in Redis)
                 self.red.delete('coordinator:free_hosts')
             elif len(free_hosts) == n_red_chans:
@@ -233,16 +233,16 @@ class Coordinator(object):
             elif len(free_hosts) > n_red_chans:
                 free_hosts = free_hosts[n_red_chans:]
                 write_list_redis(self.red, 'coordinator:free_hosts', free_hosts)
-            log.info('Allocated {} hosts to {}'.format(n_red_chans, product_id))
+            log.info(f"Allocated {n_red_chans} hosts to {product_id}")
             # Create Hashpipe-Redis Gateway group for the current subarray:
             # Using groups feature (please see rb-hashpipe documentation).
             # These groups will be given the name of the current subarray. 
             # The groups can be addressed as follows: <HPGDOMAIN>:<group>///set
             for i in range(len(allocated_hosts)):
-                hpg_gateway = '{}://{}/gateway'.format(HPGDOMAIN, allocated_hosts[i])
+                hpg_gateway = f"{HPGDOMAIN}://{allocated_hosts[i]}/gateway"
                 self.pub_gateway_msg(self.red, hpg_gateway, 'join', product_id, log, True)
             # Apply to processing nodes
-            subarray_group = '{}:{}///set'.format(HPGDOMAIN, product_id)
+            subarray_group = f"{HPGDOMAIN}:{product_id}///set"
 
             # Name of current subarray (SUBARRAY)
             self.pub_gateway_msg(self.red, subarray_group, 'SUBARRAY', product_id, log, True)
@@ -253,19 +253,19 @@ class Coordinator(object):
             # Sync time (UNIX, seconds)
             t_sync = self.sync_time(product_id)
             self.pub_gateway_msg(self.red, subarray_group, 'SYNCTIME', t_sync, log, True)
-            self.red.set('{}:synctime'.format(product_id), t_sync)
+            self.red.set(f"{product_id}:synctime", t_sync)
             # Centre frequency (FECENTER)
             fecenter = self.centre_freq(product_id) 
             self.pub_gateway_msg(self.red, subarray_group, 'FECENTER', fecenter, log, True)
             # Total number of frequency channels (FENCHAN)    
-            n_freq_chans = self.red.get('{}:n_channels'.format(product_id))
-            self.red.set('{}:fenchan'.format(product_id), n_freq_chans)
+            n_freq_chans = self.red.get(f"{product_id}:n_channels")
+            self.red.set(f"{product_id}:fenchan", n_freq_chans)
             self.pub_gateway_msg(self.red, subarray_group, 'FENCHAN', n_freq_chans, log, True)
             # Coarse channel bandwidth (from F engines)
             # Note: no sign information! 
             # (CHAN_BW)
             chan_bw = self.coarse_chan_bw(product_id, n_freq_chans)
-            self.red.set('{}:chan_bw'.format(product_id), chan_bw)
+            self.red.set(f"{product_id}:chan_bw", chan_bw)
             self.pub_gateway_msg(self.red, subarray_group, 'CHAN_BW', chan_bw, log, True) 
             # Number of channels per substream (HNCHAN)
             hnchan = self.chan_per_substream(product_id)
@@ -275,7 +275,7 @@ class Coordinator(object):
             self.pub_gateway_msg(self.red, subarray_group, 'HNTIME', hntime, log, True)
             # Number of ADC samples per heap (HCLOCKS)
             adc_per_heap = self.samples_per_heap(product_id, hntime)
-            self.red.set('{}:hclocks'.format(product_id), adc_per_heap)
+            self.red.set(f"{product_id}:hclocks", adc_per_heap)
             self.pub_gateway_msg(self.red, subarray_group, 'HCLOCKS', adc_per_heap, log, True)
             # Number of antennas (NANTS)
             n_ants = self.antennas(product_id)
@@ -362,14 +362,14 @@ class Coordinator(object):
             # Check for list of allowed sources. If the list is not empty, record
             # only if these sources are present.
             # If the list is empty, proceed with recording the current track/scan.
-            allowed_key = '{}:allowed'.format(product_id)
+            allowed_key = f"{product_id}:allowed"
             if self.red.exists(allowed_key): # Only this step needed (empty lists don't exist)
                 allowed_sources = self.red.lrange(allowed_key, 0, self.red.llen(allowed_key))
-                log.info('Filter by the following source names: {}'.format(allowed_sources)) 
+                log.info(f"Filter by the following source names: {allowed_sources}")
                 if target_str in allowed_sources:
                     self.record_track(target_str, ra, dec, product_id)
                 else:
-                    log.info('Target {} not in list of allowed sources, skipping...')
+                    log.info(f"Target {target_str} not in list of allowed sources, skipping...")
             else:
                 log.info('No list of allowed sources, proceeding...')
                 self.record_track(target_str, ra, dec, product_id)
@@ -385,16 +385,16 @@ class Coordinator(object):
             product_id (str): the name of the current subarray. 
         """
         # Retrieve and format current telstate endpoint:
-        endpoint_key = self.red.get('{}:telstate_sensor'.format(product_id))
+        endpoint_key = self.red.get(f"{product_id}:telstate_sensor")
         telstate_endpoint = ast.literal_eval(self.red.get(endpoint_key))
-        telstate_endpoint = '{}:{}'.format(telstate_endpoint[0], telstate_endpoint[1])
+        telstate_endpoint = f"{telstate_endpoint[0]}:{telstate_endpoint[1]}"
         # Initialise telstate interface object
         self.TelInt = TelstateInterface(self.redis_endpoint, telstate_endpoint) 
         # Before requesting solutions, check if they are newer than the most 
         # recent set that was retrieved. Note that a set is always requested if
         # this is the first recording for a particular subarray configuration.
         # Retrieve last timestamp:
-        last_cal_ts = float(self.red.get('coordinator:cal_ts:{}'.format(product_id))) 
+        last_cal_ts = float(self.red.get(f"coordinator:cal_ts:{product_id}"))
         # Retrieve current timestamp:
         current_cal_ts = self.TelInt.get_phaseup_time()
         # Compare:
@@ -402,7 +402,7 @@ class Coordinator(object):
             # Retrieve and save calibration solutions:
             self.TelInt.query_telstate(DIAGNOSTIC_LOC, product_id)
             self.alert("New calibration solutions retrieved.")
-            self.red.set('coordinator:cal_ts:{}'.format(product_id), current_cal_ts)
+            self.red.set(f"coordinator:cal_ts:{product_id}", current_cal_ts)
         else:
             self.alert("No calibration solution updates.")
 
@@ -434,11 +434,11 @@ class Coordinator(object):
         delay.start()
 
         # Get list of allocated hosts for this subarray:
-        array_key = 'coordinator:allocated_hosts:{}'.format(product_id)
+        array_key = f"coordinator:allocated_hosts:{product_id}"
         allocated_hosts = self.red.lrange(array_key, 0, 
             self.red.llen(array_key))
 
-        subarray_group = '{}:{}///set'.format(HPGDOMAIN, product_id)
+        subarray_group = f"{HPGDOMAIN}:{product_id}///set"
 
         # Calculate PKTSTART
         pktstart = self.get_start_idx(allocated_hosts, PKTIDX_MARGIN, log, product_id)
@@ -462,7 +462,7 @@ class Coordinator(object):
         
         # Publish OBSID to the gateway:
         # OBSID is a unique identifier for a particular observation. 
-        obsid = "{}:{}:{}".format(TELESCOPE_NAME, product_id, pktstart_str)
+        obsid = f"{TELESCOPE_NAME}:{product_id}:{pktstart_str}"
         self.pub_gateway_msg(self.red, subarray_group, 'OBSID', obsid,
             log, False)
 
@@ -472,12 +472,12 @@ class Coordinator(object):
             pktstart, log, False)
 
         # Set subarray state to 'tracking':
-        self.red.set('coordinator:tracking:{}'.format(product_id), '1')
+        self.red.set(f"coordinator:tracking:{product_id}", '1')
         
         # Recording process started:
         self.annotate(
             'RECORD', 
-            '{}: Coordinator instructed DAQs to record'.format(product_id)
+            f"{product_id}: Coordinator instructed DAQs to record"
             )
 
         # Alert the target selector to the new pointing:
@@ -485,7 +485,7 @@ class Coordinator(object):
         dec_deg = self.dec_degrees(dec_s)
         # For the minimal target selector (temporary):
         fecenter = self.centre_freq(product_id) 
-        target_information = '{}:{}:{}:{}:{}'.format(obsid, target_str, ra_deg, dec_deg, fecenter)
+        target_information = f"{obsid}:{target_str}:{ra_deg}:{dec_deg}:{fecenter}")
         self.red.publish(TARGETS_CHANNEL, target_information)
 
         self.alert(f"Instructed recording for {product_id} to {datadir}")
@@ -507,12 +507,12 @@ class Coordinator(object):
            Args:
                product_id (str): the name of the current subarray.
         """
-        tracking_state = self.red.get('coordinator:tracking:{}'.format(product_id))
+        tracking_state = self.red.get(f"coordinator:tracking:{product_id}")
         # If tracking state transitions from 'track' to any of the other states, 
         # follow the procedure below. Otherwise, do nothing.  
         if tracking_state == '1':
             # Get list of allocated hosts for this subarray:
-            array_key = 'coordinator:allocated_hosts:{}'.format(product_id)
+            array_key = f"coordinator:allocated_hosts:{product_id}"
             allocated_hosts = self.red.lrange(array_key, 0, 
                 self.red.llen(array_key))
             # Build list of Hashpipe-Redis Gateway channels to publish to:
@@ -523,10 +523,10 @@ class Coordinator(object):
 
             # Reset DWELL:
             redis_util.reset_dwell(self.red, allocated_hosts, DEFAULT_DWELL)
-            self.alert('DWELL has been reset for instances assigned to {}'.format(product_id))
+            self.alert(f"DWELL has been reset for instances assigned to {product_id}")
             
             # Reset tracking state to '0'
-            self.red.set('coordinator:tracking:{}'.format(product_id), '0')
+            self.red.set(f"coordinator:tracking:{product_id}", '0')
             self.alert(f"Tracking stopped for {product_id}")
 
             
@@ -545,7 +545,7 @@ class Coordinator(object):
         """
         # Fetch hosts allocated to this subarray:
         # Note description equivalent to product_id here
-        array_key = 'coordinator:allocated_hosts:{}'.format(description)
+        array_key = f"coordinator:allocated_hosts:{description}"
         allocated_hosts = self.red.lrange(array_key, 0, 
                 self.red.llen(array_key))
 
@@ -555,7 +555,7 @@ class Coordinator(object):
         # Unsubscription process started:
         self.annotate(
             'UNSUBSCRIBE', 
-            '{}: Coordinator instructing DAQs to unsubscribe.'.format(description)
+            f"{description}: Coordinator instructing DAQs to unsubscribe."
             )
         
         # Set DESTIP to 0.0.0.0 individually for robustness. 
@@ -573,16 +573,16 @@ class Coordinator(object):
             self.alert(f"Successfully restarted bluse_hashpipe for dealloacted hosts of {description}")
 
         # Instruct gateways to leave current subarray group:   
-        subarray_group = '{}:{}///set'.format(HPGDOMAIN, description)
-        self.red.publish(subarray_group, 'leave={}'.format(description))
-        self.alert('Disbanded gateway group: {}'.format(description))
+        subarray_group = f"{HPGDOMAIN}:{description}///set"
+        self.red.publish(subarray_group, f"leave={description}")
+        self.alert(f"Disbanded gateway group: {description}")
 
         # Sleep for 20 seconds to allow pipelines to restart:
         time.sleep(20)
         
         # Reset DWELL for all hosts after pipeline restart:
         redis_util.reset_dwell(self.red, allocated_hosts, DEFAULT_DWELL)
-        self.alert('DWELL has been reset for instances assigned to {}'.format(description))
+        self.alert(f"DWELL has been reset for instances assigned to {description}")
 
         # Release hosts
         if self.red.exists('coordinator:free_hosts'):
@@ -597,10 +597,9 @@ class Coordinator(object):
         free_hosts = free_hosts + allocated_hosts
         self.red.rpush('coordinator:free_hosts', *free_hosts)    
         # Remove resources from current subarray 
-        self.red.delete('coordinator:allocated_hosts:{}'.format(description))
-        self.alert("Released {} hosts; {} hosts available".format(len(allocated_hosts),
-                                                                len(free_hosts)))
-        self.alert('Subarray {} deconfigured'.format(description))
+        self.red.delete(f"coordinator:allocated_hosts:{description}")
+        self.alert(f"Released {len(allocated_hosts)} hosts; {len(free_hosts)} hosts available")
+        self.alert(f"Subarray {description} deconfigured")
 
     def data_suspect(self, description, value): 
         """Parse and publish data-suspect mask to the appropriate 
@@ -619,7 +618,7 @@ class Coordinator(object):
         bitmask = '#{:x}'.format(int(value, 2))
         # Note description equivalent to product_id here
         # Current Hashpipe-Redis Gateway group name:
-        subarray_group = '{}:{}///set'.format(HPGDOMAIN, description)
+        subarray_group = f"{HPGDOMAIN}:{description}///set"
         # NOTE: Question: do we want to publish the entire bitmask to each 
         # processing node?
         self.pub_gateway_msg(self.red, subarray_group, 'FESTATUS', bitmask, log, False)
@@ -639,12 +638,12 @@ class Coordinator(object):
         # NOTE: here, msg_type represents product_id. Need to fix this inconsistent
         # naming convention. 
         # Fetch hosts allocated to this subarray:
-        array_key = 'coordinator:allocated_hosts:{}'.format(msg_type)
+        array_key = f"coordinator:allocated_hosts:{msg_type}"
         allocated_hosts = self.red.lrange(array_key, 0, 
                 self.red.llen(array_key))
         # Hashpipe-Redis gateway group for the current subarray:
         # NOTE: here, msg_type represents product_id.
-        subarray_group = '{}:{}///set'.format(HPGDOMAIN, msg_type)
+        subarray_group = f"{HPGDOMAIN}:{msg_type}///set"
         # RA and Dec (in degrees)
         if 'dec' in description:
             self.pub_gateway_msg(self.red, subarray_group, 'DEC', value, log, False)
@@ -674,7 +673,7 @@ class Coordinator(object):
         """
         # Hashpipe-Redis gateway group for the current subarray:
         # NOTE: here, msg_type represents product_id.
-        subarray_group = '{}:{}///set'.format(HPGDOMAIN, msg_type)
+        subarray_group = f"{HPGDOMAIN}:{msg_type}///set"
         self.pub_gateway_msg(self.red, subarray_group, 'UT1_UTC', value, log, False)
 
     def get_dwell_time(self, host_key):
@@ -695,9 +694,9 @@ class Coordinator(object):
             if 'DWELL' in host_status:
                 dwell_time = host_status['DWELL']
             else:
-                log.warning('DWELL is missing for {}'.format(host_key))
+                log.warning(f"DWELL is missing for {host_key}")
         else:
-            log.warning('Cannot acquire {}'.format(host_key))
+            log.warning(f"Cannot acquire {host_key}")
         return dwell_time
 
     def get_pkt_idx(self, host_key):
@@ -720,11 +719,11 @@ class Coordinator(object):
                     if 'PKTIDX' in host_status:
                         pkt_idx = host_status['PKTIDX']
                     else:
-                        log.warning('PKTIDX is missing for {}'.format(host_key))
+                        log.warning(f"PKTIDX is missing for {host_key}")
                 else:
-                    log.warning('NETSTAT is missing for {}'.format(host_key))
+                    log.warning(f"NETSTAT is missing for {host_key}")
         else:
-            log.warning('Cannot acquire {}'.format(host_key))
+            log.warning(f"Cannot acquire {host_key}")
         return pkt_idx
 
     def get_start_idx(self, host_list, idx_margin, log, product_id):
@@ -746,7 +745,7 @@ class Coordinator(object):
         """
         pkt_idxs = []
         for host in host_list:
-            host_key = '{}://{}/status'.format(HPGDOMAIN, host)
+            host_key = f"{HPGDOMAIN}://{host}/status"
             pkt_idx = self.get_pkt_idx(host_key)
             if pkt_idx is not None:
                 pkt_idxs = pkt_idxs + [pkt_idx]
@@ -781,7 +780,7 @@ class Coordinator(object):
             self.alert(f"PKTIDX varies by >60 seconds for {product_id}")
 
         pktstart = np.max(pkt_idxs) + idx_margin
-        log.info("PKTIDX: Min {}, Median {}, Max {}, PKTSTART {}".format(min_idx, med_idx, max_idx, pktstart))
+        log.info(f"PKTIDX: Min {min_idx}, Median {med_idx}, Max {max_idx}, PKTSTART {pktstart}")
         return pktstart
 
     def target(self, product_id):
@@ -795,9 +794,9 @@ class Coordinator(object):
               ra_str (str): RA of current pointing in sexagesimal form.
               dec_str (str): Dec of current pointing in sexagesimal form. 
         """
-        ant_key = '{}:antennas'.format(product_id)
+        ant_key = f"{product_id}:antennas"
         ant_list = self.red.lrange(ant_key, 0, self.red.llen(ant_key))
-        target_key = "{}:{}_target".format(product_id, ant_list[0])
+        target_key = f"{product_id}:{ant_list[0]}_target"
         target_str = self.get_target(product_id, target_key, 5, 15)
         target_str, ra_str, dec_str = self.target_name(target_str, 16, delimiter = "|")
         return target_str, ra_str, dec_str
@@ -871,8 +870,8 @@ class Coordinator(object):
                if no new target name is available. 
         """
         for i in range(retries):
-            last_target = float(self.red.get("{}:last-target".format(product_id)))
-            last_start = float(self.red.get("{}:last-capture-start".format(product_id)))
+            last_target = float(self.red.get(f"{product_id}:last-target"))
+            last_start = float(self.red.get(f"{product_id}:last-capture-start"))
             if (last_target - last_start) < 0: # Check if new target available
                 log.warning("No new target name, retrying.")
                 time.sleep(retry_duration)
@@ -880,7 +879,7 @@ class Coordinator(object):
             else:
                 break
         if i == (retries - 1):
-            log.error("No new target name after {} retries; defaulting to UNKNOWN".format(retries))
+            log.error(f"No new target name after {retries} retries; defaulting to UNKNOWN")
             target = 'UNKNOWN'
         else:
             target = self.red.get(target_key)
@@ -919,13 +918,13 @@ class Coordinator(object):
             logger: Logger. 
             write (bool): If true, also write message to Redis database.
         """
-        msg = '{}={}'.format(msg_name, msg_val)
+        msg = f"{msg_name}={msg_val}"
         red_server.publish(chan_name, msg)
         # save hash of most recent messages
         if write:
             red_server.hset(chan_name, msg_name, msg_val)
-            logger.info('Wrote {} for channel {} to Redis'.format(msg, chan_name))
-        logger.info('Published {} to channel {}'.format(msg, chan_name))
+            logger.info(f"Wrote {msg} for channel {chan_name} to Redis")
+        logger.info(f"Published {msg} to channel {chan_name}")
 
     def parse_redis_msg(self, message):
         """Process incoming Redis messages from the various pub/sub channels. 
@@ -955,7 +954,7 @@ class Coordinator(object):
         value = ''
         msg_parts = message['data'].split(':', 2)
         if len(msg_parts) < 2:
-            log.info("Not processing this message: {}".format(message))
+            log.info(f"Not processing this message: {message}")
         else:
             msg_type = msg_parts[0]
             description = msg_parts[1] 
@@ -974,9 +973,9 @@ class Coordinator(object):
         Returns:
             cbf_sensor (str): Full cbf sensor name for querying via KATPortal.
         """
-        cbf_name = self.red.get('{}:cbf_name'.format(product_id))
-        cbf_prefix = self.red.get('{}:cbf_prefix'.format(product_id))
-        cbf_sensor_prefix = '{}:{}_{}_'.format(product_id, cbf_name, cbf_prefix)
+        cbf_name = self.red.get(f"{product_id}:cbf_name")
+        cbf_prefix = self.red.get(f"{product_id}:cbf_prefix")
+        cbf_sensor_prefix = f"{product_id}:{cbf_name}_{cbf_prefix}_"
         cbf_sensor = cbf_sensor_prefix + sensor
         return cbf_sensor
 
@@ -993,9 +992,8 @@ class Coordinator(object):
             via KATPortal.
         """
         s_num = product_id[-1] # subarray number
-        cbf_prefix = self.red.get('{}:cbf_prefix'.format(product_id))
-        stream_sensor = '{}:subarray_{}_streams_{}_{}'.format(product_id, 
-            s_num, cbf_prefix, sensor)
+        cbf_prefix = self.red.get(f"{product_id}:cbf_prefix")
+        stream_sensor = f"{product_id}:subarray_{s_num}_streams_{cbf_prefix}_{sensor}")
         return stream_sensor
 
 
@@ -1008,7 +1006,7 @@ class Coordinator(object):
            Returns:
               n_ants (int): the number of antennas in the current subarray. 
         """
-        ant_key = '{}:antennas'.format(product_id)
+        ant_key = f"{product_id}:antennas"
         n_ants = len(self.red.lrange(ant_key, 0, self.red.llen(ant_key)))
         return n_ants
         
@@ -1127,9 +1125,9 @@ class Coordinator(object):
                offset (int): number of IP addresses to offset by. 
         """
         try:
-            offset = int(self.red.get('{}:ip_offset'.format(product_id)))
+            offset = int(self.red.get(f"{product_id}:ip_offset"))
             if offset > 0:
-                log.info('Stream IP offset applied: {}'.format(offset))
+                log.info(f"Stream IP offset applied: {offset}")
         except:
             log.info("No stream IP offset; defaulting to 0")
             offset = 0
@@ -1152,7 +1150,7 @@ class Coordinator(object):
                (corresponding to the number of instances required).   
         """
         all_streams = json.loads(self.json_str_formatter(self.red.get(
-            "{}:streams".format(product_id))))
+            f"{product_id}:streams")))
         streams = all_streams[STREAM_TYPE]
         stream_addresses = streams[FENG_TYPE]
         addr_list, port, n_addrs = self.read_spead_addresses(stream_addresses, 
