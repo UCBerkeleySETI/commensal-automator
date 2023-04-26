@@ -491,7 +491,7 @@ class Coordinator(object):
         self.alert(f"Instructed recording for {product_id} to {datadir}")
 
         if redis_util.is_primary_time(self.red, product_id):
-            self.alert("Primary time observation for {product_id")
+            self.alert(f"Primary time observation for {product_id}")
         
     def tracking_stop(self, product_id):
         """If the subarray stops tracking a source (more specifically, if the incoming 
