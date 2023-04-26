@@ -62,7 +62,7 @@ class Automator(object):
         buffer_length (float): Maximum duration of recording (in seconds)
         for the maximum possible incoming data rate. 
         """
-        log.info('starting the automator. redis = {}'.format(redis_endpoint))
+        log.info(f"starting the automator. redis = {redis_endpoint}")
         redis_host, redis_port = redis_endpoint.split(':')
         self.redis_server = redis.StrictRedis(host=redis_host, 
                                               port=redis_port, 
@@ -116,11 +116,11 @@ class Automator(object):
         msg_data = msg['data'] 
         msg_components = msg_data.split(':')
         if len(msg_components) != 2:
-            log.warning("Unrecognised message: {}".format(msg_data))
+            log.warning(f"Unrecognised message: {msg_data}")
             return
 
         subarray_state, subarray_name = msg_components
-        log.info('subarray {} is now in state: {}'.format(subarray_name, subarray_state))
+        log.info(f"subarray {subarray_name} is now in state: {subarray_state}")
 
         if self.paused:
             log.info("Paused, taking no action")
@@ -142,7 +142,7 @@ class Automator(object):
         back later to see if we are ready to process.
         """
 
-        log.info('{} in tracking state'.format(subarray_name))
+        log.info(f"{subarray_name} in tracking state")
 
         # If a sequence of primary time observations has ended (ie, this current
         # track is not a primary time track), then process right away:
@@ -156,13 +156,13 @@ class Automator(object):
             # If this is the last recording before the buffers will be full, 
             # we may want to process in about `DWELL` + margin seconds.
             allocated_hosts = redis_util.allocated_hosts(self.redis_server, subarray_name)
-            log.info("allocated hosts for {}: {}".format(subarray_name, allocated_hosts))
+            log.info(f"allocated hosts for {subarray_name}: {allocated_hosts}")
             dwell = self.retrieve_dwell(allocated_hosts, DEFAULT_DWELL)
-            log.info("dwell: {}".format(dwell))
+            log.info(f"dwell: {dwell}")
             duration = dwell + self.margin
 
             # Start a timer to check for processing
-            log.info('starting tracking timer for {} seconds'.format(duration))
+            log.info(f"starting tracking timer for {duration} seconds")
             t = threading.Timer(duration, lambda: self.maybe_start_processing())
             t.start()
             self.timers[subarray_name] = t
@@ -233,14 +233,13 @@ class Automator(object):
             return False
 
         if self.processing.intersection(hosts):
-            log.error("currently processing {} so cannot double-process {}".format(
-                self.processing, hosts))
+            log.error(f"currently processing {self.processing} so cannot double-process {hosts}"
             return False
         self.processing = self.processing.union(hosts)
 
         timestamped_dir = redis_util.timestamped_dir_from_filename(input_dir)
         if timestamped_dir is None:
-            self.pause("unexpected directory name: {}".format(input_dir))
+            self.pause(f"unexpected directory name: {input_dir}")
             return False
         
         # Run seticore
@@ -248,10 +247,9 @@ class Automator(object):
         result_seticore = run_seticore(sorted(hosts), BFRDIR, input_dir, timestamped_dir, partition)
         if result_seticore > 1:
             if result_seticore > 128:
-                self.pause("seticore killed with signal {}".format(result_seticore - 128))
+                self.pause(f"seticore killed with signal {result_seticore - 128}")
             else:
-                self.pause("the seticore slurm job failed with code {}".format(
-                    result_seticore))
+                self.pause(f"the seticore slurm job failed with code {result_seticore}")
             self.alert_seticore_error()
             return False
         self.alert(f"seticore completed with code {result_seticore}. "
@@ -324,8 +322,7 @@ class Automator(object):
                 return True
             time.sleep(2)
 
-        self.pause("failed to delete buf0 on {} hosts: {}".format(
-            len(hosts), " ".join(sorted(hosts))))
+        self.pause(f"failed to delete buf0 on {len(hosts)} hosts: {" ".join(sorted(hosts))}")
         return False
     
             
@@ -338,8 +335,7 @@ class Automator(object):
         """
         broken = redis_util.broken_daqs(self.redis_server)
         if broken:
-            self.pause("{} daqs appear to be broken: {}".format(
-                len(broken), " ".join(broken)))
+            self.pause(f"{len(broken)} daqs appear to be broken: {" ".join(broken)}")
             return
         subarrays = redis_util.suggest_recording(self.redis_server,
                                                  processing=self.processing)
@@ -350,7 +346,7 @@ class Automator(object):
                 log.info(f"""A primary sequence has ended for {subarray},
                 therefore not recording.""")
             else:
-                log.info("subarray {} is ready for recording".format(subarray))
+                log.info(f"subarray {subarray} is ready for recording")
                 redis_util.enable_recording(self.redis_server, subarray)
         
         
@@ -371,21 +367,21 @@ class Automator(object):
         dwell = default_dwell
         dwell_values = []
         for host in host_list:
-            host_key = '{}://{}/0/status'.format(self.hpgdomain, host)
+            host_key = f"{self.hpgdomain}://{host}/0/status"
             host_status = self.redis_server.hgetall(host_key)
             if len(host_status) > 0:
                 if 'DWELL' in host_status:
                     dwell_values.append(float(host_status['DWELL']))
                 else:
-                    log.warning('Cannot retrieve DWELL for {}'.format(host))
+                    log.warning(f"Cannot retrieve DWELL for {host}")
             else:
-                log.warning('Cannot access {}'.format(host))
+                log.warning(f"Cannot access {host}")
         if len(dwell_values) > 0:
             dwell = self.mode_1d(dwell_values)
             if len(np.unique(dwell_values)) > 1:
                 log.warning("DWELL disagreement")    
         else:
-            log.warning("Could not retrieve DWELL. Using {} sec by default.".format(default_dwell))
+            log.warning(f"Could not retrieve DWELL. Using {default_dwell} sec by default.")
         return dwell
 
     

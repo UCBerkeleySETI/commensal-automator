@@ -59,7 +59,7 @@ def allocated_hosts(r, subarray):
 def is_rec_enabled(r, subarray_name):
     """Is recording enabled?
     """
-    rec_enabled_key = 'rec_enabled:{}'.format(subarray_name)
+    rec_enabled_key = f"rec_enabled:{subarray_name}"
     rec_enabled = r.get(rec_enabled_key)
     if rec_enabled is None:
         log.warning('Could not determine recording permission. Defaulting to disabled.')
@@ -71,8 +71,8 @@ def enable_recording(r, subarray_name):
     the specified array.
     """
     rec_setting = is_rec_enabled(r, subarray_name)
-    log.info('rec_setting {}, setting to 1'.format(rec_setting))
-    rec_setting_key = 'rec_enabled:{}'.format(subarray_name)
+    log.info(f"rec_setting {rec_setting}, setting to 1")
+    rec_setting_key = f"rec_enabled:{subarray_name}"
     r.set(rec_setting_key, 1) 
 
 def disable_recording(r, subarray_name):
@@ -80,15 +80,15 @@ def disable_recording(r, subarray_name):
     the specified array.
     """
     rec_setting = is_rec_enabled(r, subarray_name)
-    log.info('rec_setting {}, setting to 0'.format(rec_setting))
-    rec_setting_key = 'rec_enabled:{}'.format(subarray_name)
+    log.info(f"rec_setting {rec_setting}, setting to 0")
+    rec_setting_key = f"rec_enabled:{subarray_name}"
     r.set(rec_setting_key, 0) 
 
 def get_bluse_dwell(r, subarray_name):
     """Get specified dwell for BLUSE primary time observing.
     Dwell in seconds.
     """
-    bluse_dwell_key = 'bluse_dwell:{}'.format(subarray_name)
+    bluse_dwell_key = f"bluse_dwell:{subarray_name}"
     bluse_dwell = r.get(bluse_dwell_key)
     if bluse_dwell is None:
        log.warning('No specified primary time DWELL; defaulting to 290 sec.')
@@ -118,11 +118,11 @@ def is_primary_time(r, subarray_name):
     """Check if the current (or most recent) observation ID is for BLUSE
     primary time.
     """
-    subarray = 'subarray_{}'.format(subarray_name[-1])
-    p_id_key = '{}_script_proposal_id'.format(subarray)
-    p_id = r.get('{}:{}'.format(subarray_name, p_id_key))
+    subarray = f"subarray_{subarray_name[-1]}"
+    p_id_key = f"{subarray}_script_proposal_id"
+    p_id = r.get(f"{subarray_name}:{p_id_key}")
     if p_id == PROPOSAL_ID:
-        log.info("BLUSE proposal ID detected for {}".format(subarray_name))
+        log.info(f"BLUSE proposal ID detected for {subarray_name}")
         return True
     return False
 
@@ -177,7 +177,7 @@ def multiget_status(r, domain, keys):
     hosts = all_hosts(r)
     pipe = r.pipeline()
     for host in hosts:
-        redis_key = "{}://{}/0/status".format(domain, host)
+        redis_key = f"{domain}://{host}/0/status"
         pipe.hmget(redis_key, keys)
     results = pipe.execute()
     return list(zip(hosts, results))
@@ -229,7 +229,7 @@ def get_recording(r):
                     continue
                 for k, val in zip(hkeys, strkeys):
                     if val is None:
-                        log.warning("on host {} the key {} is not set".format(host, k))
+                        log.warning(f"on host {host} the key {k} is not set")
                         raise IOError("synthetic error to invoke retry logic")
                 if None in strkeys:
                     # This is a race condition and we don't know what it means.
@@ -268,7 +268,7 @@ def sb_id_from_filename(filename):
     x, y = parts[1:3]
     if len(x) != 8 or not x.isnumeric() or not y.isnumeric():
         return None
-    return "{}/{}".format(x, y)
+    return f"{x}/{y}"
 
 
 def timestamped_dir_from_filename(filename):
@@ -333,18 +333,15 @@ def suggest_recording(r, processing=None, verbose=False):
         hosts = set(allocated_hosts(r, subarray))
         if not subbed.intersection(hosts):
             if verbose:
-                print("we cannot record on {} because no hosts are subscribed".format(
-                    subarray))
+                print(f"we cannot record on {subarray} because no hosts are subscribed")
             continue
         inter = busy.intersection(hosts)
         if inter:
             if verbose:
-                print("we cannot record on {} because {} are in use".format(
-                    subarray, sorted(inter)))
+                print(f"we cannot record on {subarray} because {sorted(inter)} are in use")
             continue
         if verbose:
-            print("we can record on {} because {} are unused".format(
-                subarray, sorted(hosts)))
+            print(f"we can record on {subarray} because {sorted(hosts)} are unused")
         answer.append(subarray)
     return answer
 
@@ -395,10 +392,10 @@ def suggest_processing(r, processing=None, verbose=False):
         inter = hosts.intersection(busy)
         if inter:
             if verbose:
-                print("{} has busy hosts: {}".format(dirname, sorted(inter)))
+                print(f"{dirname} has busy hosts: {sorted(inter)}")
         else:
             if verbose:
-                print("{} is ready on hosts: {}".format(dirname, sorted(hosts)))
+                print(f"{dirname} is ready on hosts: {sorted(hosts)}")
             answer[dirname] = hosts
 
     return answer
@@ -413,24 +410,24 @@ def join_gateway_group(r, instances, group_name, gateway_domain):
     """
     # Instruct each instance to join specified group:
     for i in range(len(instances)):
-        node_gateway_channel = '{}://{}/gateway'.format(gateway_domain, instances[i])
-        msg = 'join={}'.format(group_name)
+        node_gateway_channel = f"{gateway_domain}://{instances[i]}/gateway"
+        msg = f"join={group_name}"
         r.publish(node_gateway_channel, msg)
-    log.info('Instances {} instructed to join gateway group: {}'.format(instances, group_name))
+    log.info(f"Instances {instances} instructed to join gateway group: {group_name}")
 
     
 def leave_gateway_group(r, group_name, gateway_domain):
     """Instruct hashpipe instances to leave a hashpipe-redis gateway group.
     """
-    message = 'leave={}'.format(group_name)
+    message = f"leave={group_name}"
     publish_gateway_message(r, group_name, gateway_domain, message)
-    log.info('Instances instructed to leave the gateway group: {}'.format(group_name))
+    log.info(f"Instances instructed to leave the gateway group: {group_name}")
 
     
 def publish_gateway_message(r, group_name, gateway_domain, message):
     """Publish a message to a hashpipe-redis group gateway <group_name>.
     """
-    group_gateway_channel = '{}:{}///gateway'.format(gateway_domain, group_name)
+    group_gateway_channel = f"{gateway_domain}:{group_name}///gateway"
     r.publish(group_gateway_channel, message)
 
     
@@ -438,14 +435,11 @@ def set_group_key(r, group_name, gateway_domain, key, value):
     """Set a hashpipe-redis gateway key for a specified hashpipe-redis gateway
     group.
     """
-    group_channel = '{}:{}///set'.format(gateway_domain, group_name)
+    group_channel = f"{gateway_domain}:{group_name}///set"
     # Message to set key:
-    message = '{}={}'.format(key, value)
+    message = f"{key}={value}"
     r.publish(group_channel, message)
-    log.info('Set {} to {} for {} instances in group {}'.format(key, 
-                                                                value, 
-                                                                gateway_domain,
-                                                                group_name))
+    log.info(f"Set {key} to {value} for {gateway_domain} instances in group {group_name}"
 
 def hpguppi_procstat(r):
     """Returns a map from hpguppi states to a list of hosts in them.
@@ -469,7 +463,7 @@ def last_seticore_error(r):
     answer_run_line = None
     answer_lines = []
     for host in all_hosts(r):
-        filename = "/home/obs/seticore_slurm/seticore_{}.err".format(host)
+        filename = f"/home/obs/seticore_slurm/seticore_{host}.err"
         try:
             lines = open(filename).readlines()
         except:
@@ -497,7 +491,7 @@ def last_seticore_error(r):
     if len(answer_lines) > 2 * half_window + 1:
         snipped = len(answer_lines) - 2 * half_window
         answer_lines = answer_lines[:half_window] + [
-            "<{} lines snipped>".format(snipped)] + answer_lines[-half_window:]
+            f"<{snipped} lines snipped>"] + answer_lines[-half_window:]
     return answer_host, answer_lines
 
 
@@ -512,7 +506,7 @@ def pktidx_to_timestamp(r, pktidx, subarray):
     metadata from redis for a given subarray.
     """
     if pktidx < 0:
-        raise ValueError("cannot convert pktidx {} to a timestamp".format(pktidx))
+        raise ValueError(f"cannot convert pktidx {pktidx} to a timestamp")
 
     pipe = r.pipeline()
     for subkey in ["hclocks", "synctime", "fenchan", "chan_bw"]:
@@ -539,7 +533,7 @@ def alert(r, message, name, slack_channel=SLACK_CHANNEL,
     """
     log.info(message)
     # Format: <Slack channel>:<Slack message text>
-    alert_msg = '{}:[{}] {}: {}'.format(slack_channel, timestring(), name, message)
+    alert_msg = f"{slack_channel}:[{timestring()}] {name}: {message}"
     r.publish(slack_proxy_channel, alert_msg)
 
 
@@ -641,7 +635,7 @@ def main():
         if host is None:
             print("no recent seticore errors found")
         else:
-            print("seticore error on {}:".format(host))
+            print(f"seticore error on {host}:")
             for line in lines:
                 print(line)
         return
