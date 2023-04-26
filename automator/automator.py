@@ -142,6 +142,8 @@ class Automator(object):
         back later to see if we are ready to process.
         """
 
+        log.info('{} in tracking state'.format(subarray_name))
+
         # If a sequence of primary time observations has ended (ie, this current
         # track is not a primary time track), then process right away:
         if redis_util.primary_sequence_end(self.redis_server, subarray_name):
@@ -150,22 +152,20 @@ class Automator(object):
             redis_util.disable_recording(self.redis_server, subarray_name)
             log.info('Primary sequence has ended, proceeding to processing')
             self.maybe_start_processing()
+        else:
+            # If this is the last recording before the buffers will be full, 
+            # we may want to process in about `DWELL` + margin seconds.
+            allocated_hosts = redis_util.allocated_hosts(self.redis_server, subarray_name)
+            log.info("allocated hosts for {}: {}".format(subarray_name, allocated_hosts))
+            dwell = self.retrieve_dwell(allocated_hosts, DEFAULT_DWELL)
+            log.info("dwell: {}".format(dwell))
+            duration = dwell + self.margin
 
-        log.info('{} in tracking state'.format(subarray_name))
-
-        # If this is the last recording before the buffers will be full, 
-        # we may want to process in about `DWELL` + margin seconds.
-        allocated_hosts = redis_util.allocated_hosts(self.redis_server, subarray_name)
-        log.info("allocated hosts for {}: {}".format(subarray_name, allocated_hosts))
-        dwell = self.retrieve_dwell(allocated_hosts, DEFAULT_DWELL)
-        log.info("dwell: {}".format(dwell))
-        duration = dwell + self.margin
-
-        # Start a timer to check for processing
-        log.info('starting tracking timer for {} seconds'.format(duration))
-        t = threading.Timer(duration, lambda: self.maybe_start_processing())
-        t.start()
-        self.timers[subarray_name] = t
+            # Start a timer to check for processing
+            log.info('starting tracking timer for {} seconds'.format(duration))
+            t = threading.Timer(duration, lambda: self.maybe_start_processing())
+            t.start()
+            self.timers[subarray_name] = t
 
 
     def not_tracking(self, subarray_name):
