@@ -151,7 +151,7 @@ def primary_sequence_end(r, subarray):
     """If the previously recorded track was a primary time track, and the
     current track is not a primary time track, return True.
     """
-    if get_last_rec_bluse(r, subarray) and is_primary_time(r, subarray):
+    if get_last_rec_bluse(r, subarray) and not is_primary_time(r, subarray):
         return True
     return False
 
