@@ -321,61 +321,64 @@ class Coordinator(object):
            Args:
                product_id (str): name of current subarray. 
         """
-        # Check if most recent observation was primary time. If it was,
-        # and the current track is NOT primary time, then we should not record.
-        # The automator will process all the primary time recordings first.
+
+        # Check if recording is enabled:
+        if not redis_util.is_rec_enabled(self.red, product_id):
+            log.info(f"Recording disabled for {product_id}, skipping.")
+            return
+
+        # Check if a primary sequence has ended.
         if redis_util.primary_sequence_end(self.red, product_id):
+            # As this is not a primary time track, and the previous track
+            # was, we disable new recordings until released by the automator.
             log.info('Primary sequence has ended, disabling further recording')
             redis_util.disable_recording(self.red, product_id)
+            return
 
-        # Check if recording has been enabled: 
-        if redis_util.is_rec_enabled(self.red, product_id):
+        # Check if this track is BLUSE primary time.
+        if redis_util.is_primary_time(self.red, product_id):
 
-            # Check if this track is BLUSE primary time.
-            if redis_util.is_primary_time(self.red, product_id):
+            self.alert(f"Primary time track: {product_id}")
 
-                # If this current track is a primary time track, we want to
-                # keep recording enabled even after this track has ended, as
-                # it could be part of a sequence of primary time tracks that
-                # we only want to process at the end.
+            # If this current track is a primary time track, we want to
+            # keep recording enabled even after this track has ended, as
+            # it could be part of a sequence of primary time tracks that
+            # we only want to process at the end.
 
-                # Set flag: current recording is BLUSE primary time.
-                redis_util.set_last_rec_bluse(self.red, product_id, 1)
-
-            else:
-                # As this is not a primary time track, we will process
-                # immediately afterwards; therefore disable new recordings
-                # until released by automator
-                redis_util.disable_recording(self.red, product_id)
-                # Set flag: current recording is not BLUSE primary time.
-                redis_util.set_last_rec_bluse(self.red, product_id, 0)
-
-            # Target information (required here to check list of allowed sources):
-            target_str, ra, dec = self.target(product_id)
-            # If we have a track which starts without any pointing information, 
-            # abort:
-            if ra == "UNKNOWN" or dec == "UNKNOWN":
-                log.error(f"""Could not retrieve pointing information for 
-                            current track, aborting for {product_id}""")
-                return
-
-            # Check for list of allowed sources. If the list is not empty, record
-            # only if these sources are present.
-            # If the list is empty, proceed with recording the current track/scan.
-            allowed_key = f"{product_id}:allowed"
-            if self.red.exists(allowed_key): # Only this step needed (empty lists don't exist)
-                allowed_sources = self.red.lrange(allowed_key, 0, self.red.llen(allowed_key))
-                log.info(f"Filter by the following source names: {allowed_sources}")
-                if target_str in allowed_sources:
-                    self.record_track(target_str, ra, dec, product_id)
-                else:
-                    log.info(f"Target {target_str} not in list of allowed sources, skipping...")
-            else:
-                log.info('No list of allowed sources, proceeding...')
-                self.record_track(target_str, ra, dec, product_id)
+            # Set flag: current recording is BLUSE primary time. Note this
+            # is for recordings that are actually intended to be carried out.
+            redis_util.set_last_rec_bluse(self.red, product_id, 1)
 
         else:
-            log.info('Recording disabled, skipping this track.')
+            # Set flag: current recording is BLUSE primary time.
+            redis_util.set_last_rec_bluse(self.red, product_id, 0)
+            # Disable recording; automator will re-enable.
+            redis_util.disable_recording(self.red, product_id)
+
+        # Proceed with recording.
+        # Target information (required here to check list of allowed sources):
+        target_str, ra, dec = self.target(product_id)
+        # If we have a track which starts without any pointing information,
+        # abort:
+        if ra == "UNKNOWN" or dec == "UNKNOWN":
+            log.error(f"""Could not retrieve pointing information for
+                        current track, aborting for {product_id}""")
+            return
+        # Check for list of allowed sources. If the list is not empty, record
+        # only if these sources are present.
+        # If the list is empty, proceed with recording the current track/scan.
+        allowed_key = f"{product_id}:allowed"
+        if self.red.exists(allowed_key): # Only this step needed (empty lists don't exist)
+            allowed_sources = self.red.lrange(allowed_key, 0, self.red.llen(allowed_key))
+            log.info(f"Filter by the following source names: {allowed_sources}")
+            if target_str in allowed_sources:
+                self.record_track(target_str, ra, dec, product_id)
+            else:
+                log.info(f"Target {target_str} not in list of allowed sources, skipping...")
+        else:
+            log.info('No list of allowed sources, proceeding...')
+            self.record_track(target_str, ra, dec, product_id)
+
 
     def retrieve_cals(self, product_id):
         """Retrieves calibration solutions and saves them to Redis. They are 
