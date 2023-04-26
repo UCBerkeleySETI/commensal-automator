@@ -22,7 +22,7 @@ class Automator(object):
       
     The recording is more directly controlled by the coordinator.
     The automator instructs the coordinator when it can record by setting
-    an `enabled` key in redis.
+    a `rec_enabled:<array>` key in redis.
 
     Processing is done with slurm wrapping seticore and hpguppi_proc.
 
