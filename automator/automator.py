@@ -22,7 +22,7 @@ class Automator(object):
       
     The recording is more directly controlled by the coordinator.
     The automator instructs the coordinator when it can record by setting
-    a `rec_enabled:<array>` key in redis.
+    a `rec_enabled:<array>` key to 1 in redis.
 
     Processing is done with slurm wrapping seticore and hpguppi_proc.
 
@@ -34,8 +34,9 @@ class Automator(object):
     could still be intensively processing a different subarray.
 
     2. When the automator isn't doing any processing on a set of machines that
-    the coordinator has allocated to a subarray, it uses the redis key: 
-    `rec_enabled:<subarray name>` to tell the coordinator it can record on them.
+    the coordinator has allocated to a subarray, it sets the Redis key:
+    `rec_enabled:<subarray name>` to 1 to tell the coordinator it can record
+    on them.
 
     3. When the automator notices the coordinator is done recording, it runs
     processing. When processing finishes, the automator has deleted the raw files.
