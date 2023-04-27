@@ -195,7 +195,8 @@ class Coordinator(object):
             f"{product_id}: Coordinator configuring DAQs."
             )
         log.info(f"New subarray built: {product_id}")
-        tracking = 0 # Initialise tracking state to 0
+        # Initialise tracking state to 0
+        self.red.set(f"coordinator:tracking:{product_id}", '0')
         # Reset primary time flag:
         redis_util.set_last_rec_bluse(self.red, product_id, 0)
         # Initialise cal_solutions timestamp to 0 to ensure the most recent
