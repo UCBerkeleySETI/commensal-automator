@@ -350,7 +350,7 @@ class Coordinator(object):
             redis_util.set_last_rec_bluse(self.red, product_id, 1)
 
         else:
-            # Set flag: current recording is BLUSE primary time.
+            # Set flag: current recording is not BLUSE primary time.
             redis_util.set_last_rec_bluse(self.red, product_id, 0)
             # Disable recording; automator will re-enable.
             redis_util.disable_recording(self.red, product_id)
