@@ -335,8 +335,8 @@ class Automator(object):
             # If a primary sequence has ended, we don't want to record
             # the next track.
             if redis_util.primary_sequence_end(self.redis_server, subarray):
-                log.info(f"""A primary sequence has ended for {subarray},
-                therefore not recording.""")
+                log.info(f"A primary sequence has ended for {subarray},"
+                " therefore not recording.")
             else:
                 log.info(f"subarray {subarray} is ready for recording")
                 redis_util.enable_recording(self.redis_server, subarray)
