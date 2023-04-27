@@ -130,7 +130,7 @@ def get_last_rec_bluse(r, subarray_name):
     """Return True if last recording was made under the BLUSE
     proposal ID (thus primary time). 
     """
-    key = f"{subarray_name}:primary_time"
+    key = f"{subarray_name}:last_rec_primary_t"
     val = r.get(key)
     try:
         val = int(val)
@@ -142,7 +142,7 @@ def set_last_rec_bluse(r, subarray_name, value):
     """Set the value (bool) of the last recording proposal
     ID flag (True if BLUSE ID, False if not).
     """ 
-    key = f"{subarray_name}:primary_time"
+    key = f"{subarray_name}:last_rec_primary_t"
     log.info(f"setting primary time status for {subarray_name}: {value}")
     r.set(key, value)
 
