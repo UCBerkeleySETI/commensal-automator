@@ -155,6 +155,20 @@ def primary_sequence_end(r, subarray):
         return True
     return False
 
+def get_n_proc(r):
+    """Retrieve the absolute number of times processing has been run.
+    """
+    n_proc = r.get("automator:n_proc")
+    if n_proc is None:
+        r.set("automator:n_proc", 0)
+        return 0
+    return int(n_proc)
+
+def increment_n_proc(r):
+    """Add 1 to the number of times processing has been run.
+    """
+    n_proc = get_n_proc(r)
+    r.set("automator:n_proc", n_proc + 1)
 
 def all_hosts(r):
     return sorted(key.split("//")[-1].split("/")[0]
@@ -439,7 +453,7 @@ def set_group_key(r, group_name, gateway_domain, key, value):
     # Message to set key:
     message = f"{key}={value}"
     r.publish(group_channel, message)
-    log.info(f"Set {key} to {value} for {gateway_domain} instances in group {group_name}"
+    log.info(f"Set {key} to {value} for {gateway_domain} instances in group {group_name}")
 
 def hpguppi_procstat(r):
     """Returns a map from hpguppi states to a list of hosts in them.
