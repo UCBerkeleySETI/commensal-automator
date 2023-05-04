@@ -33,13 +33,27 @@ optional arguments:
   --buffer_length BUFFER_LENGTH
                         Max recording length at max data rate (sec)
 
-  --nshot_chan NSHOT_CHAN
-                        Redis channel for changing nshot
-
-  --nshot_msg NSHOT_MSG
-                        Format of message for changing nshot
+  --partition PARTITION
+                        Name of destination partition for seticore output
 
 ```
+
+### Operation
+
+The diagrams here try to represent as closely as possible how the system
+ functions at the moment (rather than a vision for how the system should 
+ function). They will be updated as the system is improved and simplified. 
+
+The automator and coordinator together control recording and processing during
+ commensal observations. The following diagram illustrates the possible states
+  and state transitions. 
+
+![diagram](docs/states.png)
+
+Several different observing scenarios and the associated transitions made by
+ the automator and coordinator are illustrated below.
+
+![diagram](docs/observing-flow.pdf)
 
 ### Dependencies
 
@@ -98,6 +112,6 @@ Notes on transplanting/subsuming the coordinator from
 
 Requirements:  
 
-katsdptelstate >= 0.11: https://github.com/ska-sa/katsdptelstate
+- katsdptelstate >= 0.11: https://github.com/ska-sa/katsdptelstate
 
 
