@@ -225,7 +225,7 @@ class Automator(object):
             return False
 
         if self.processing.intersection(hosts):
-            log.error(f"currently processing {self.processing} so cannot double-process {hosts}"
+            log.error(f"currently processing {self.processing} so cannot double-process {hosts}")
             return False
         self.processing = self.processing.union(hosts)
 
@@ -236,7 +236,8 @@ class Automator(object):
         
         # Run seticore
         self.alert("running seticore...")
-        result_seticore = run_seticore(sorted(hosts), BFRDIR, input_dir, timestamped_dir, partition)
+        result_seticore = run_seticore(sorted(hosts), BFRDIR, input_dir,
+                                timestamped_dir, partition, self.redis_server)
         if result_seticore > 1:
             if result_seticore > 128:
                 self.pause(f"seticore killed with signal {result_seticore - 128}")
@@ -314,7 +315,7 @@ class Automator(object):
                 return True
             time.sleep(2)
 
-        self.pause(f"failed to delete buf0 on {len(hosts)} hosts: {" ".join(sorted(hosts))}")
+        self.pause(f"failed to delete buf0 on {len(hosts)} hosts: " + " ".join(sorted(hosts)))
         return False
     
             
@@ -327,7 +328,7 @@ class Automator(object):
         """
         broken = redis_util.broken_daqs(self.redis_server)
         if broken:
-            self.pause(f"{len(broken)} daqs appear to be broken: {" ".join(broken)}")
+            self.pause(f"{len(broken)} daqs appear to be broken: " + " ".join(broken))
             return
         subarrays = redis_util.suggest_recording(self.redis_server,
                                                  processing=self.processing)
