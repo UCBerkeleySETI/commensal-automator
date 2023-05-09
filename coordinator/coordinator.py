@@ -106,7 +106,7 @@ class Coordinator(object):
         self.alert('starting up')
         try:
             self.hashpipe_instances, self.streams_per_instance = self.config(self.cfg_file)
-            log.info(f"Configured from {cfg_file}")
+            log.info(f"Configured from {self.cfg_file}")
         except:
             log.warning('Configuration not updated; old configuration might be present.')
         # Attempt to read list of available hosts. If key does not exist, recreate from 
@@ -489,7 +489,7 @@ class Coordinator(object):
         dec_deg = self.dec_degrees(dec_s)
         # For the minimal target selector (temporary):
         fecenter = self.centre_freq(product_id) 
-        target_information = f"{obsid}:{target_str}:{ra_deg}:{dec_deg}:{fecenter}")
+        target_information = f"{obsid}:{target_str}:{ra_deg}:{dec_deg}:{fecenter}"
         self.red.publish(TARGETS_CHANNEL, target_information)
 
         self.alert(f"Instructed recording for {product_id} to {datadir}")
@@ -997,7 +997,7 @@ class Coordinator(object):
         """
         s_num = product_id[-1] # subarray number
         cbf_prefix = self.red.get(f"{product_id}:cbf_prefix")
-        stream_sensor = f"{product_id}:subarray_{s_num}_streams_{cbf_prefix}_{sensor}")
+        stream_sensor = f"{product_id}:subarray_{s_num}_streams_{cbf_prefix}_{sensor}"
         return stream_sensor
 
 
