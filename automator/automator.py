@@ -149,7 +149,8 @@ class Automator(object):
         # we may want to process in about `DWELL` + margin seconds.
         allocated_hosts = redis_util.allocated_hosts(self.redis_server, subarray_name)
         log.info(f"allocated hosts for {subarray_name}: {allocated_hosts}")
-        dwell = self.retrieve_dwell(allocated_hosts, DEFAULT_DWELL)
+        dwell = redis_util.retrieve_dwell(self.redis_server, self.hpgdomain,
+            allocated_hosts, DEFAULT_DWELL)
         log.info(f"dwell: {dwell}")
         duration = dwell + self.margin
 
@@ -343,57 +344,3 @@ class Automator(object):
             else:
                 log.info(f"subarray {subarray} is ready for recording")
                 redis_util.enable_recording(self.redis_server, subarray)
-        
-        
-    def retrieve_dwell(self, host_list, default_dwell):
-        """Retrieve the current value of `DWELL` from the Hashpipe-Redis 
-        Gateway for a specific set of hosts. 
-        Note that this assumes all instances are host/0.
-
-        Args:
-
-            host_list (str): The list of hosts allocated to the current subarray. 
-
-        Returns:
-
-            DWELL (float): The duration for which the processing nodes will record
-            for the current subarray (in seconds). 
-        """
-        dwell = default_dwell
-        dwell_values = []
-        for host in host_list:
-            host_key = f"{self.hpgdomain}://{host}/0/status"
-            host_status = self.redis_server.hgetall(host_key)
-            if len(host_status) > 0:
-                if 'DWELL' in host_status:
-                    dwell_values.append(float(host_status['DWELL']))
-                else:
-                    log.warning(f"Cannot retrieve DWELL for {host}")
-            else:
-                log.warning(f"Cannot access {host}")
-        if len(dwell_values) > 0:
-            dwell = self.mode_1d(dwell_values)
-            if len(np.unique(dwell_values)) > 1:
-                log.warning("DWELL disagreement")    
-        else:
-            log.warning(f"Could not retrieve DWELL. Using {default_dwell} sec by default.")
-        return dwell
-
-    
-    def mode_1d(self, data_1d):
-        """Calculate the mode of a one-dimensional list. 
-
-        Args:
-
-            data_1d (list): List of values for which to calculate the mode. 
-
-        Returns:
-
-            mode_1d (float): The most common value in the list.
-        """
-        vals, freqs = np.unique(data_1d, return_counts=True)
-        mode_index = np.argmax(freqs)
-        mode_1d = vals[mode_index]
-        return mode_1d
-
-    

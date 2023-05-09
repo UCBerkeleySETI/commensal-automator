@@ -8,6 +8,7 @@ import re
 import redis
 import sys
 import time
+import numpy
 
 from automator.logger import log
 
@@ -549,6 +550,52 @@ def alert(r, message, name, slack_channel=SLACK_CHANNEL,
     # Format: <Slack channel>:<Slack message text>
     alert_msg = f"{slack_channel}:[{timestring()}] {name}: {message}"
     r.publish(slack_proxy_channel, alert_msg)
+
+
+def retrieve_dwell(r, hpgdomain, host_list, default_dwell):
+    """Retrieve the current value of `DWELL` from the Hashpipe-Redis
+    Gateway for a specific set of hosts.
+    Note that this assumes all instances are host/0.
+    Args:
+        r (obj): Redis server.
+        hpgdomain (str): Hashpipe-Redis gateway domain.
+        host_list (str): The list of hosts allocated to the current subarray.
+    Returns:
+        DWELL (float): The duration for which the processing nodes will record
+        for the current subarray (in seconds).
+    """
+    dwell = default_dwell
+    dwell_values = []
+    for host in host_list:
+        host_key = f"{hpgdomain}://{host}/0/status"
+        host_status = r.hgetall(host_key)
+        if len(host_status) > 0:
+            if 'DWELL' in host_status:
+                dwell_values.append(float(host_status['DWELL']))
+            else:
+                log.warning(f"Cannot retrieve DWELL for {host}")
+        else:
+            log.warning(f"Cannot access {host}")
+    if len(dwell_values) > 0:
+        dwell = mode_1d(dwell_values)
+        if len(np.unique(dwell_values)) > 1:
+            log.warning("DWELL disagreement")
+    else:
+        log.warning(f"Could not retrieve DWELL. Using {default_dwell} sec by default.")
+    return dwell
+
+
+def mode_1d(data_1d):
+    """Calculate the mode of a one-dimensional list.
+    Args:
+        data_1d (list): List of values for which to calculate the mode.
+    Returns:
+        mode_1d (float): The most common value in the list.
+    """
+    vals, freqs = np.unique(data_1d, return_counts=True)
+    mode_index = np.argmax(freqs)
+    mode_1d = vals[mode_index]
+    return mode_1d
 
 
 def show_status(r):
