@@ -1,4 +1,5 @@
 import subprocess
+from automator import redis_util
 
 from .logger import log
 
