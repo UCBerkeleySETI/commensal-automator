@@ -276,7 +276,9 @@ class Automator(object):
         # If we have just processed for a sequence of primary time
         # observations, we want to preserve the data in the buffers and
         # prevent further recording and processing.
-        if redis_util.primary_sequence_end(self.redis_server, subarray_name):
+        #NOTE: Temporary; for now we will select array_1 for primary obs:
+        subarray = 'array_1'
+        if redis_util.primary_sequence_end(self.redis_server, subarray):
             log.info("Primary sequence processed, therefore pausing.")
             self.paused = True
         else:
