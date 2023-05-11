@@ -1076,9 +1076,7 @@ class Coordinator(object):
         """
         sensor_key = self.stream_sensor_name(product_id,
             'antenna_channelised_voltage_centre_frequency')
-        log.info(sensor_key)
         centre_freq = self.red.get(sensor_key)
-        log.info(centre_freq)
         centre_freq = float(centre_freq)/1e6
         centre_freq = '{0:.17g}'.format(centre_freq)
         return centre_freq
