@@ -8,7 +8,7 @@ import re
 import redis
 import sys
 import time
-import numpy
+import numpy as np
 
 from automator.logger import log
 
@@ -226,7 +226,7 @@ def ready_to_record(r):
     subarrays = coordinator_subarrays(r)
     for subarray in subarrays:
         # If recording enabled
-        if redis_util.is_rec_enabled(r, subarray):
+        if is_rec_enabled(r, subarray):
             answer = answer.union(allocated_hosts(r, subarray))
     return sorted(answer)
 
