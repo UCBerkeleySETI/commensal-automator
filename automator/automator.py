@@ -126,15 +126,15 @@ class Automator(object):
         if self.paused:
             log.info("Paused, taking no action")
             return
-        
-        self.maybe_start_recording()
-        self.maybe_start_processing()
-        
+
         if subarray_state == 'tracking':
             self.tracking(subarray_name)
+            return
         elif subarray_state == 'not-tracking':
-            self.not_tracking(subarray_name)
-    
+            self.not_tracking(subarray_name) # at this point we still want to process!
+
+        self.maybe_start_recording()
+        self.maybe_start_processing()
             
     def tracking(self, subarray_name):
         """Handle the telescope going into a tracking state.
@@ -148,7 +148,7 @@ class Automator(object):
         # If this is the last recording before the buffers will be full, 
         # we may want to process in about `DWELL` + margin seconds.
         allocated_hosts = redis_util.allocated_hosts(self.redis_server, subarray_name)
-        log.info(f"allocated hosts for {subarray_name}: {allocated_hosts}")
+        log.info(f"allocated hosts for {subarray_name} are: {allocated_hosts}")
         dwell = redis_util.retrieve_dwell(self.redis_server, self.hpgdomain,
             allocated_hosts, DEFAULT_DWELL)
         log.info(f"dwell: {dwell}")
@@ -199,6 +199,7 @@ class Automator(object):
         if not self.process(input_dir, hosts, self.partition):
             return
         self.maybe_start_processing()
+
 
 
     def alert_seticore_error(self):
