@@ -662,9 +662,9 @@ class Coordinator(object):
             self.pub_gateway_msg(self.red, subarray_group, 'RA_STR', ra_str, log, False)
         # Azimuth and elevation (in degrees):
         elif 'azim' in description:
-            self.pub_gateway_msg(self.red, subarray_group, 'AZ', value, log, False)
+            self.pub_gateway_msg(self.red, subarray_group, 'AZ', value, None, False)
         elif 'elev' in description:
-            self.pub_gateway_msg(self.red, subarray_group, 'EL', value, log, False)
+            self.pub_gateway_msg(self.red, subarray_group, 'EL', value, None, False)
 
     def offset_ut(self, msg_type, value):
         """Publish UT1_UTC, the difference (in seconds) between UT1 and UTC
@@ -928,7 +928,8 @@ class Coordinator(object):
         if write:
             red_server.hset(chan_name, msg_name, msg_val)
             logger.info(f"Wrote {msg} for channel {chan_name} to Redis")
-        logger.info(f"Published {msg} to channel {chan_name}")
+        if logger is not None:
+            logger.info(f"Published {msg} to channel {chan_name}")
 
     def parse_redis_msg(self, message):
         """Process incoming Redis messages from the various pub/sub channels. 
