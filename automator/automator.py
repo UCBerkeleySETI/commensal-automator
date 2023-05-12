@@ -198,6 +198,7 @@ class Automator(object):
         input_dir, hosts = list(dirmap.items())[0]
         if not self.process(input_dir, hosts, self.partition):
             return
+        self.maybe_start_recording()
         self.maybe_start_processing()
 
 
