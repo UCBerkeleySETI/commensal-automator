@@ -355,8 +355,6 @@ class Coordinator(object):
         else:
             # Set flag: current recording is not BLUSE primary time.
             redis_util.set_last_rec_bluse(self.red, product_id, 0)
-            # Disable recording; automator will re-enable.
-            redis_util.disable_recording(self.red, product_id)
 
         # Proceed with recording.
         # Target information (required here to check list of allowed sources):
@@ -491,11 +489,27 @@ class Coordinator(object):
         target_information = f"{obsid}:{target_str}:{ra_deg}:{dec_deg}:{fecenter}"
         self.red.publish(TARGETS_CHANNEL, target_information)
 
-        self.alert(f"Instructed recording for {product_id} to {datadir}")
+        # Check if we are recording.
+        # If recording, alert we are recording and disable new recordings.
+        self.check_recording(product_id, 0)
 
-        if redis_util.is_primary_time(self.red, product_id):
-            self.alert(f"Primary time observation for {product_id}")
-        
+    def check_recording(self, array, retries):
+        """Check if we are recording, and if so, send alerts and disable
+        any future new recordings.
+        """
+        if redis_util.get_recording_by_array(self.red, array):
+            self.alert(f"Recording from {array} to {datadir}")
+            # Disable recording; automator will re-enable when appropriate.
+            redis_util.disable_recording(self.red, array)
+        elif retries < 5:
+            log.warning(f"Recording not started for {array}, retrying")
+            time.sleep(1)
+            retries += 1
+            self.check_recording(array, retries)
+        else:
+            log.error(f"Recording appears not to have started for {array}")
+
+
     def tracking_stop(self, product_id):
         """If the subarray stops tracking a source (more specifically, if the incoming 
            data is no longer to be trusted or used), the following actions are taken:
