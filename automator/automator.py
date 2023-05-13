@@ -124,14 +124,13 @@ class Automator(object):
             log.info("Paused, taking no action")
             return
 
-        if subarray_state == 'tracking':
-            self.tracking(subarray_name)
-            return
-        elif subarray_state == 'not-tracking':
-            self.not_tracking(subarray_name) # at this point we still want to process!
-
         self.maybe_start_recording()
         self.maybe_start_processing()
+
+        if subarray_state == 'tracking':
+            self.tracking(subarray_name)
+        elif subarray_state == 'not-tracking':
+            self.not_tracking(subarray_name)
             
     def tracking(self, subarray_name):
         """Handle the telescope going into a tracking state.
