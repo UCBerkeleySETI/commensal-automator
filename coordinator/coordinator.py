@@ -322,6 +322,9 @@ class Coordinator(object):
                product_id (str): name of current subarray. 
         """
 
+        # Set subarray state to 'tracking':
+        self.red.set(f"coordinator:tracking:{product_id}", '1')
+
         # Check if recording is enabled:
         if not redis_util.is_rec_enabled(self.red, product_id):
             log.info(f"Recording disabled for {product_id}, skipping.")
@@ -473,9 +476,6 @@ class Coordinator(object):
         # all been delivered:
         self.pub_gateway_msg(self.red, subarray_group, 'PKTSTART', 
             pktstart, log, False)
-
-        # Set subarray state to 'tracking':
-        self.red.set(f"coordinator:tracking:{product_id}", '1')
         
         # Recording process started:
         self.annotate(
