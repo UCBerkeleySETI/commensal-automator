@@ -7,7 +7,6 @@ import logging
 import sys
 import redis
 import numpy as np
-import string
 import ast
 
 from .redis_tools import REDIS_CHANNELS, write_list_redis

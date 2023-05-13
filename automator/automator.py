@@ -1,9 +1,6 @@
 import redis
 import threading
-import numpy as np
-import os
 import subprocess
-import sys
 import time
 
 from automator import redis_util
