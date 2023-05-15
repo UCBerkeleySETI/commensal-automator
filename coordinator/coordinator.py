@@ -502,7 +502,7 @@ class Coordinator(object):
             # Disable recording; automator will re-enable when appropriate.
             redis_util.disable_recording(self.red, array)
         elif retries < 5:
-            log.warning(f"Recording not started for {array}, retrying")
+            log.warning(f"Recording not started for {array}, rechecking in 1 second")
             time.sleep(1)
             retries += 1
             self.check_recording(array, retries)
