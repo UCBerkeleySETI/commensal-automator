@@ -500,7 +500,8 @@ class Coordinator(object):
         if redis_util.get_recording_by_array(self.red, array):
             self.alert(f"Recording from {array} to {datadir}")
             # Disable recording; automator will re-enable when appropriate.
-            redis_util.disable_recording(self.red, array)
+            if not redis_util.is_primary_time(self.red, array):
+                redis_util.disable_recording(self.red, array)
         elif retries < 5:
             log.warning(f"Recording not started for {array}, rechecking in 1 second")
             time.sleep(1)
