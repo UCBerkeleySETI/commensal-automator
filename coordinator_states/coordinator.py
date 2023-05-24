@@ -1,3 +1,5 @@
+import redis
+
 from automator import util, redis_util
 from automator.logger import log
 
@@ -11,8 +13,8 @@ class Coordinator(object):
         config = util.load_config(config_file)
         self.free = config['instances']
         self.streams_per_instance = config['streams_per_instance']
-        self.r = redis.StrictRedis(host=config[], 
-                                   port=config[], 
+        self.r = redis.StrictRedis(host=config['redis_host'], 
+                                   port=config['redis_port'], 
                                    decode_responses=True)
 
     def start(self):
