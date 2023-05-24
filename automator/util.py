@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 # General helper functions used by the coordinator 
-# (Should these go in `redis_util.py`?)
 
 import zmq
 import os
@@ -24,9 +23,7 @@ def config(cfg_file):
         with open(cfg_file, 'r') as f:
             try:
                 cfg = yaml.safe_load(f)
-                params = {'instances':cfg['hashpipe_instances'],
-                          'streams_per_instance':cfg['streams_per_instance'][0]}
-                return params
+                return cfg
             except yaml.YAMLError as e:
                 log.error(e)
     except IOError:
