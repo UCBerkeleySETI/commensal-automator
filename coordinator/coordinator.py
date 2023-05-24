@@ -7,7 +7,6 @@ import logging
 import sys
 import redis
 import numpy as np
-import string
 import ast
 
 from .redis_tools import REDIS_CHANNELS, write_list_redis
@@ -323,6 +322,9 @@ class Coordinator(object):
                product_id (str): name of current subarray. 
         """
 
+        # Set subarray state to 'tracking':
+        self.red.set(f"coordinator:tracking:{product_id}", '1')
+
         # Check if recording is enabled:
         if not redis_util.is_rec_enabled(self.red, product_id):
             log.info(f"Recording disabled for {product_id}, skipping.")
@@ -353,8 +355,6 @@ class Coordinator(object):
         else:
             # Set flag: current recording is not BLUSE primary time.
             redis_util.set_last_rec_bluse(self.red, product_id, 0)
-            # Disable recording; automator will re-enable.
-            redis_util.disable_recording(self.red, product_id)
 
         # Proceed with recording.
         # Target information (required here to check list of allowed sources):
@@ -474,9 +474,6 @@ class Coordinator(object):
         # all been delivered:
         self.pub_gateway_msg(self.red, subarray_group, 'PKTSTART', 
             pktstart, log, False)
-
-        # Set subarray state to 'tracking':
-        self.red.set(f"coordinator:tracking:{product_id}", '1')
         
         # Recording process started:
         self.annotate(
@@ -492,11 +489,28 @@ class Coordinator(object):
         target_information = f"{obsid}:{target_str}:{ra_deg}:{dec_deg}:{fecenter}"
         self.red.publish(TARGETS_CHANNEL, target_information)
 
-        self.alert(f"Instructed recording for {product_id} to {datadir}")
+        # Check if we are recording.
+        # If recording, alert we are recording and disable new recordings.
+        self.check_recording(product_id, 0)
 
-        if redis_util.is_primary_time(self.red, product_id):
-            self.alert(f"Primary time observation for {product_id}")
-        
+    def check_recording(self, array, retries):
+        """Check if we are recording, and if so, send alerts and disable
+        any future new recordings.
+        """
+        if redis_util.get_recording_by_array(self.red, array):
+            self.alert(f"Recording from {array} to {datadir}")
+            # Disable recording; automator will re-enable when appropriate.
+            if not redis_util.is_primary_time(self.red, array):
+                redis_util.disable_recording(self.red, array)
+        elif retries < 5:
+            log.warning(f"Recording not started for {array}, rechecking in 1 second")
+            time.sleep(1)
+            retries += 1
+            self.check_recording(array, retries)
+        else:
+            log.error(f"Recording appears not to have started for {array}")
+
+
     def tracking_stop(self, product_id):
         """If the subarray stops tracking a source (more specifically, if the incoming 
            data is no longer to be trusted or used), the following actions are taken:
@@ -662,9 +676,9 @@ class Coordinator(object):
             self.pub_gateway_msg(self.red, subarray_group, 'RA_STR', ra_str, log, False)
         # Azimuth and elevation (in degrees):
         elif 'azim' in description:
-            self.pub_gateway_msg(self.red, subarray_group, 'AZ', value, log, False)
+            self.pub_gateway_msg(self.red, subarray_group, 'AZ', value, None, False)
         elif 'elev' in description:
-            self.pub_gateway_msg(self.red, subarray_group, 'EL', value, log, False)
+            self.pub_gateway_msg(self.red, subarray_group, 'EL', value, None, False)
 
     def offset_ut(self, msg_type, value):
         """Publish UT1_UTC, the difference (in seconds) between UT1 and UTC
@@ -928,7 +942,8 @@ class Coordinator(object):
         if write:
             red_server.hset(chan_name, msg_name, msg_val)
             logger.info(f"Wrote {msg} for channel {chan_name} to Redis")
-        logger.info(f"Published {msg} to channel {chan_name}")
+        if logger is not None:
+            logger.info(f"Published {msg} to channel {chan_name}")
 
     def parse_redis_msg(self, message):
         """Process incoming Redis messages from the various pub/sub channels. 
@@ -1076,9 +1091,7 @@ class Coordinator(object):
         """
         sensor_key = self.stream_sensor_name(product_id,
             'antenna_channelised_voltage_centre_frequency')
-        log.info(sensor_key)
         centre_freq = self.red.get(sensor_key)
-        log.info(centre_freq)
         centre_freq = float(centre_freq)/1e6
         centre_freq = '{0:.17g}'.format(centre_freq)
         return centre_freq

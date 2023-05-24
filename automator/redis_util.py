@@ -8,7 +8,7 @@ import re
 import redis
 import sys
 import time
-import numpy
+import numpy as np
 
 from automator.logger import log
 
@@ -226,7 +226,7 @@ def ready_to_record(r):
     subarrays = coordinator_subarrays(r)
     for subarray in subarrays:
         # If recording enabled
-        if redis_util.is_rec_enabled(r, subarray):
+        if is_rec_enabled(r, subarray):
             answer = answer.union(allocated_hosts(r, subarray))
     return sorted(answer)
 
@@ -260,6 +260,16 @@ def get_recording(r):
             continue
     raise IOError("get_recording failed even after retry")
 
+def get_recording_by_array(r, array):
+    """Check if recording has started for a subarray.
+    ToDo: should we consider recording to have started even if a few
+    hosts have failed to begin recording?
+    """
+    allocated = allocated_hosts(r, array)
+    recording = get_recording(r)
+    if len(allocated) == len(allocated.intersection(recording)):
+        return True
+    return False
 
 def coordinator_hosts(r):
     """Returns a list of all hosts the coordinator is using.
