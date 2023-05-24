@@ -7,7 +7,6 @@ import zmq
 import os
 import requests
 import json
-from datetime import datetime
 import time
 import yaml
 
