@@ -608,6 +608,18 @@ def mode_1d(data_1d):
     return mode_1d
 
 
+def parse_msg(msg):
+    """Attempts to parse incoming message from other backend processes.
+    Expects a message of the form: <origin>:<message>
+    """
+    data = msg['data']
+    components = msg_data.split(':')
+    if len(components) != 2:
+        log.warning(f"Unrecognised message: {data}")
+        return
+    return components
+
+
 def show_status(r):
     broken = broken_daqs(r)
     if broken:
