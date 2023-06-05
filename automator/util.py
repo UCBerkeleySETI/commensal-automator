@@ -86,3 +86,18 @@ def annotate_grafana(tag, text, url=GRAFANA_ANNOTATIONS_URL, auth=GRAFANA_AUTH):
         data=json.dumps(annotation)
     )
 
+def retry(retries, delay, function, *args):
+    """Generic retries. Will retry if function returns None.
+    Returns None if unsuccessful.
+    """
+    for _ in range(retries):
+        try:
+            output = function(*args)
+            if not output:
+                time.sleep(delay)
+                continue
+            return output
+        except Exception as e:
+            log.error(f"Exception: {e}")
+            continue
+    log.error(f"Unsuccessful after {retries} retries.")
