@@ -1,10 +1,15 @@
-from datetime import datetime
+import threading
 
 import util
 from automator.logger import log
 
-def record(r, array):
-    """Start and check recording for a non-primary time track. 
+def record(r, array, instances):
+    """Start and check recording for a non-primary time track.
+
+    Calibration solutions are retrieved, formatted in the background
+    after a 60 second delay and saved to Redis. This 60 second delay
+    is needed to ensure that the calibration solutions provided by
+    Telstate are current.
     """
 
     # Attempt to get current target information:
@@ -12,6 +17,12 @@ def record(r, array):
     if not target_data:
         log.error(f"Could not retrieve current target for {array}")
         return
+
+    # Retrieve calibration solutions after 60 seconds have passed (see above
+    # for explanation of this delay):
+    delay = threading.Timer(60, lambda:self.retrieve_cals(r, array))
+    log.info("Starting delay to retrieve cal solutions in background")
+    delay.start()
 
 def get_primary_target(r, array, length, delimiter = "|"):
     """Attempt to determine the current track's target. 
@@ -75,5 +86,37 @@ def get_primary_target(r, array, length, delimiter = "|"):
         log.warning(f"Target name and description incomplete for {array}.")
         return
 
+def get_cals(r, array):
+    """Retrieves calibration solutions and saves them to Redis. They are
+    also formatted and indexed.
+    """
+    # Retrieve current telstate endpoint:
+    endpoint_key = r.get(f"{array}:telstate_sensor")
+    endpoint_val = r.get(endpoint_key)
+    # Parse endpoint. Arrives as string in specific format:
+    # "('10.98.2.128', 31029)"
+    components = endpoint_val.strip("()").split(",")
+    telstate_endpoint = f"{components[0]}:{components[1].strip()}"
+    # Initialise telstate interface object
+    TelInt = TelstateInterface(self.redis_endpoint, telstate_endpoint)
 
+    # Before requesting solutions, check first if they have been delivered
+    # since this subarray was last configured:
+    last_config_ts = float(r.get(f"{array}:last-config")) # last config ts
+    current_cal_ts = TelInt.get_phaseup_time() # current cal ts
+    if current_cal_ts < last_config_ts:
+        log.warning(f"Calibration solutions not yet available for {array}")
+        return
 
+    # Next, check if they are newer than the most recent set that was
+    # retrieved. Note that a set is always requested if this is the
+    # first recording for a particular subarray configuration.
+    last_cal_ts = float(r.get(f"{array}:last-cal"))
+    if last_cal_ts < current_cal_ts:
+        # Retrieve and save calibration solutions:
+        TelInt.query_telstate(array)
+        log.info(f"New calibration solutions retrieved for {array}")
+        r.set(f"{array}:last-cal", current_cal_ts)
+        return "success"
+    else:
+        self.alert("No calibration solution updates.")
