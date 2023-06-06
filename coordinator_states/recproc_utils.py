@@ -6,8 +6,8 @@ from automator import util, redis_util
 from automator.logger import log
 
 HPGDOMAIN = 'bluse'
-# Safety margin for setting index of first packet to record.
 PKTIDX_MARGIN = 2048
+TARGETS_CHANNEL = 'target-selector:new-pointing'
 
 def record(r, array, instances):
     """Start and check recording for a non-primary time track.
@@ -33,13 +33,19 @@ def record(r, array, instances):
     # Supply Hashpipe-Redis gateway keys to the instances which will conduct
     # recording:
 
-    # join gateway group:
+    # Join gateway group:
     array_group = f"{HPGDOMAIN}:{array}///set"
 
     # Calculate PKTSTART:
     pktstart_data = get_pktstart(r, instances, PKTIDX_MARGIN, array)
     if not pktstart_data:
         log.error(f"Could not calculate PKTSTART for {array}")
+        return
+
+    # Retrieve fecenter:
+    fecenter = centre_freq(array)
+    if not fecenter:
+        log.error(f"Could not retreive FECENTER for {array}")
         return
 
     # DATADIR
@@ -61,8 +67,11 @@ def record(r, array, instances):
     # Grafana annotation that recording has started:
     annotate('RECORD', f"{array}: Coordinator instructed DAQs to record")
 
-
-
+    # Alert the target selector to the new pointing:
+    ra_d = util.ra_degrees(target_data["ra"])
+    dec_d = util.dec_degrees(target_data["dec"])
+    targets_req = f"{obsid}:{target_data["target"]}:{ra_d}:{dec_d}:{fecenter}"
+    r.publish(TARGETS_CHANNEL, target_information)
 
 def get_primary_target(r, array, length, delimiter = "|"):
     """Attempt to determine the current track's target. 
@@ -246,3 +255,19 @@ def gateway_msg(r, channel, msg_key, msg_val, write):
 def annotate(tag, text):
     response = util.annotate_grafana(tag, text)
     log.info(f"Annotating Grafana, response: {response}")
+
+def centre_freq(array):
+    """Centre frequency (FECENTER).
+    """
+    try:
+        # build the specific sensor ID for retrieval
+        s_num = product_id[-1] # subarray number
+        sensor = "antenna_channelised_voltage_centre_frequency"
+        cbf_prefix = r.get(f"{array}:cbf_prefix")
+        sensor_key = f"{array}:subarray_{s_num}_streams_{cbf_prefix}_{sensor}"
+        centre_freq = r.get(sensor_key)
+        centre_freq = float(centre_freq)/1e6
+        centre_freq = '{0:.17g}'.format(centre_freq)
+        return centre_freq
+    except Exception as e:
+        log.error(e)
