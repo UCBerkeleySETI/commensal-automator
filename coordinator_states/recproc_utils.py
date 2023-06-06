@@ -42,6 +42,11 @@ def record(r, array, instances):
         log.error(f"Could not calculate PKTSTART for {array}")
         return
 
+    # DATADIR
+    sb_id = redis_util.sb_id(r, array)
+    datadir = f"/buf0/{pktstart["pktstart_str"]}-{sb_id}"
+    gateway_msg(r, array_group, 'DATADIR', datadir, False)
+
 
 def get_primary_target(r, array, length, delimiter = "|"):
     """Attempt to determine the current track's target. 
@@ -178,25 +183,45 @@ def get_pktstart(r, instances, margin, array):
         log.warning(f"Could not retrieve PKTIDX for {array}")
 
 
-    def get_pkt_idx(r, instance_key):
-        """Get PKTIDX for an HPGUPPI_DAQ instance.
+def get_pkt_idx(r, instance_key):
+    """Get PKTIDX for an HPGUPPI_DAQ instance.
 
-        Returns:
-            pkt_idx (str): Current packet index (PKTIDX) for a particular
-            active host. Returns None if host is not active.
-        """
-        pkt_idx = None
-        # get the status hash from the DAQ instance
-        daq_status = r.hgetall(instance_key)
-        if len(daq_status) > 0:
-            if 'NETSTAT' in daq_status:
-                if daq_status['NETSTAT'] != 'idle':
-                    if 'PKTIDX' in daq_status:
-                        pkt_idx = daq_status['PKTIDX']
-                    else:
-                        log.warning(f"PKTIDX is missing for {instance_key}")
+    Returns:
+        pkt_idx (str): Current packet index (PKTIDX) for a particular
+        active host. Returns None if host is not active.
+    """
+    pkt_idx = None
+    # get the status hash from the DAQ instance
+    daq_status = r.hgetall(instance_key)
+    if len(daq_status) > 0:
+        if 'NETSTAT' in daq_status:
+            if daq_status['NETSTAT'] != 'idle':
+                if 'PKTIDX' in daq_status:
+                    pkt_idx = daq_status['PKTIDX']
                 else:
-                    log.warning(f"NETSTAT is missing for {instance_key}")
+                    log.warning(f"PKTIDX is missing for {instance_key}")
         else:
-            log.warning(f"Cannot acquire {instance_key}")
-        return pkt_idx
+            log.warning(f"NETSTAT is missing for {instance_key}")
+    else:
+        log.warning(f"Cannot acquire {instance_key}")
+    return pkt_idx
+
+
+def gateway_msg(r, channel, msg_key, msg_val, write):
+    """Format and publish a hashpipe-Redis gateway message. Save messages
+    in a Redis hash for later use by reconfig tool.
+
+    Args:
+        r: Redis server.
+        channel (str): Name of channel to be published to.
+        msg_key (str): Name of key in status buffer.
+        msg_val (str): Value associated with key.
+        write (bool): If true, also write message to Redis database.
+    """
+    msg = f"{msg_key}={msg_val}"
+    r.publish(channel, msg)
+    log.info(f"Published {msg} to channel {chan_name}")
+    # save hash of most recent messages
+    if write:
+        red_server.hset(channel, msg_key, msg_val)
+        log.info(f"Wrote {msg} for channel {chan_name} to Redis")
