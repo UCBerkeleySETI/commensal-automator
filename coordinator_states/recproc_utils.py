@@ -2,7 +2,7 @@ import threading
 import numpy as np
 import datetime, timedelta
 
-import util
+from automator import util, redis_util
 from automator.logger import log
 
 HPGDOMAIN = 'bluse'
@@ -53,6 +53,15 @@ def record(r, array, instances):
     # OBSID (unique identifier for a particular observation):
     obsid = f"MeerKAT:{array}:{pktstart_data["pktstart_str"]}"
     gateway_msg(r, array_group, 'OBSID', obsid, False)
+
+    # Set PKTSTART separately after all the above messages have
+    # all been delivered:
+    gateway_msg(r, array_group, 'PKTSTART', pktstart_data["pktstart"], False)
+
+    # Grafana annotation that recording has started:
+    annotate('RECORD', f"{array}: Coordinator instructed DAQs to record")
+
+
 
 
 def get_primary_target(r, array, length, delimiter = "|"):
@@ -232,3 +241,8 @@ def gateway_msg(r, channel, msg_key, msg_val, write):
     if write:
         red_server.hset(channel, msg_key, msg_val)
         log.info(f"Wrote {msg} for channel {chan_name} to Redis")
+
+
+def annotate(tag, text):
+    response = util.annotate_grafana(tag, text)
+    log.info(f"Annotating Grafana, response: {response}")
