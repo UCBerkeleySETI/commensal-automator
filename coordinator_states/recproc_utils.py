@@ -71,7 +71,11 @@ def record(r, array, instances):
     ra_d = util.ra_degrees(target_data["ra"])
     dec_d = util.dec_degrees(target_data["dec"])
     targets_req = f"{obsid}:{target_data["target"]}:{ra_d}:{dec_d}:{fecenter}"
-    r.publish(TARGETS_CHANNEL, target_information)
+    r.publish(TARGETS_CHANNEL, targets_req)
+
+    # Return set of nodes which are actually now recording:
+    return get_recording(r, instances)
+
 
 def get_primary_target(r, array, length, delimiter = "|"):
     """Attempt to determine the current track's target. 
@@ -271,3 +275,10 @@ def centre_freq(array):
         return centre_freq
     except Exception as e:
         log.error(e)
+
+
+def get_recording(r, instances):
+    """Check if given instances are recording.
+    """
+    ins = redis_util.multiget_by_instance(r, HPGDOMAIN, instances, "DAQSTATE")
+    return set([inst[0] for inst in ins if inst[1][0] == "LISTEN"])

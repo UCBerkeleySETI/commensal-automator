@@ -198,6 +198,19 @@ def multiget_status(r, domain, keys):
     return list(zip(hosts, results))
 
 
+def multiget_by_instance(r, domain, instances, keys):
+    """Fetches status from hashpipe processes.
+    domain is "bluse" or "blproc".
+
+    Returns a list of (instance, value-list) tuples.
+    """
+    pipe = r.pipeline()
+    for instance in instances:
+        redis_key = f"{domain}://{instance}/status"
+        pipe.hmget(redis_key, keys)
+    results = pipe.execute()
+    return list(zip(instances, results))
+
 def get_status(r, domain, key):
     """Like multiget_status but just one key.
 
