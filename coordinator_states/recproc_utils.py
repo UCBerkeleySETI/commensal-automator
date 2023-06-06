@@ -1,7 +1,13 @@
 import threading
+import numpy as np
+import datetime, timedelta
 
 import util
 from automator.logger import log
+
+HPGDOMAIN = 'bluse'
+# Safety margin for setting index of first packet to record.
+PKTIDX_MARGIN = 2048
 
 def record(r, array, instances):
     """Start and check recording for a non-primary time track.
@@ -23,6 +29,19 @@ def record(r, array, instances):
     delay = threading.Timer(60, lambda:self.retrieve_cals(r, array))
     log.info("Starting delay to retrieve cal solutions in background")
     delay.start()
+
+    # Supply Hashpipe-Redis gateway keys to the instances which will conduct
+    # recording:
+
+    # join gateway group:
+    array_group = f"{HPGDOMAIN}:{array}///set"
+
+    # Calculate PKTSTART:
+    pktstart = get_pktstart(r, instances, PKTIDX_MARGIN, array)
+    if not pktstart:
+        log.error(f"Could not calculate PKTSTART for {array}")
+        return
+
 
 def get_primary_target(r, array, length, delimiter = "|"):
     """Attempt to determine the current track's target. 
@@ -120,3 +139,64 @@ def get_cals(r, array):
         return "success"
     else:
         self.alert("No calibration solution updates.")
+
+
+def get_pktstart(r, instances, margin, array):
+    """Calculate PKTSTART for specified DAQ instances.
+    """
+
+    # Get current packet indices for each instance:
+    pkt_indices = []
+    for instance in instances:
+        key = f"{HPGDOMAIN}://{instance}/status"
+        pkt_index = get_pkt_idx(r, key)
+        if not pkt_index:
+            pkt_indices.append(pkt_index)
+
+    # Calculate PKTSTART
+    if len(pkt_indices) > 0:
+
+        pkt_indices = np.asarray(pkt_indices, dtype = np.int64)
+        max_index = redis_util.pktidx_to_timestamp(r, np.max(pkt_indices), array)
+        med_index = redis_util.pktidx_to_timestamp(r, np.median(pkt_indices), array)
+        min_index = redis_util.pktidx_to_timestamp(r, np.min(pkt_indices), array)
+
+        pktstart = np.max(pkt_indices) + margin
+        log.info(f"PKTIDX: Min {min_index}, Med {med_index}, Max {max_index}, PKTSTART {pktstart}")
+
+        pktstart_timestamp = redis_util.pktidx_to_timestamp(r, pktstart, array)
+        pktstart_dt = datetime.utcfromtimestamp(pktstart_timestamp)
+        pktstart_str = pktstart_dt.strftime("%Y%m%dT%H%M%SZ")
+
+        # Check that calculated pktstart is plausible:
+        if abs(pktstart_dt - datetime.utcnow()) > timedelta(minutes=1):
+            log.error(f"bad pktstart: {pktstart_str} for {array}")
+            return
+
+        return {"pktstart":pktstart, "pktstart_str":pktstart_str}
+    else:
+        log.warning(f"Could not retrieve PKTIDX for {array}")
+
+
+    def get_pkt_idx(r, instance_key):
+        """Get PKTIDX for an HPGUPPI_DAQ instance.
+
+        Returns:
+            pkt_idx (str): Current packet index (PKTIDX) for a particular
+            active host. Returns None if host is not active.
+        """
+        pkt_idx = None
+        # get the status hash from the DAQ instance
+        daq_status = r.hgetall(instance_key)
+        if len(daq_status) > 0:
+            if 'NETSTAT' in daq_status:
+                if daq_status['NETSTAT'] != 'idle':
+                    if 'PKTIDX' in daq_status:
+                        pkt_idx = daq_status['PKTIDX']
+                    else:
+                        log.warning(f"PKTIDX is missing for {instance_key}")
+                else:
+                    log.warning(f"NETSTAT is missing for {instance_key}")
+        else:
+            log.warning(f"Cannot acquire {instance_key}")
+        return pkt_idx
