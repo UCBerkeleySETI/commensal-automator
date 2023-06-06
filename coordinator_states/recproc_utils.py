@@ -37,15 +37,22 @@ def record(r, array, instances):
     array_group = f"{HPGDOMAIN}:{array}///set"
 
     # Calculate PKTSTART:
-    pktstart = get_pktstart(r, instances, PKTIDX_MARGIN, array)
-    if not pktstart:
+    pktstart_data = get_pktstart(r, instances, PKTIDX_MARGIN, array)
+    if not pktstart_data:
         log.error(f"Could not calculate PKTSTART for {array}")
         return
 
     # DATADIR
     sb_id = redis_util.sb_id(r, array)
-    datadir = f"/buf0/{pktstart["pktstart_str"]}-{sb_id}"
+    datadir = f"/buf0/{pktstart_data["pktstart_str"]}-{sb_id}"
     gateway_msg(r, array_group, 'DATADIR', datadir, False)
+
+    # SRC_NAME:
+    gateway_msg(r, array_group, 'SRC_NAME', target_data["target"], False)
+
+    # OBSID (unique identifier for a particular observation):
+    obsid = f"MeerKAT:{array}:{pktstart_data["pktstart_str"]}"
+    gateway_msg(r, array_group, 'OBSID', obsid, False)
 
 
 def get_primary_target(r, array, length, delimiter = "|"):
