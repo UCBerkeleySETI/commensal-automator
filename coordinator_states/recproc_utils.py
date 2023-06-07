@@ -6,7 +6,7 @@ from automator import util, redis_util
 from automator.logger import log
 
 HPGDOMAIN = 'bluse'
-PKTIDX_MARGIN = 2048
+PKTIDX_MARGIN = 2048 # in packets
 TARGETS_CHANNEL = 'target-selector:new-pointing'
 
 def record(r, array, instances):
@@ -281,4 +281,4 @@ def get_recording(r, instances):
     """Check if given instances are recording.
     """
     ins = redis_util.multiget_by_instance(r, HPGDOMAIN, instances, "DAQSTATE")
-    return set([inst[0] for inst in ins if inst[1][0] == "LISTEN"])
+    return set([inst[0] for inst in ins if inst[1][0] == "RECORD"])
