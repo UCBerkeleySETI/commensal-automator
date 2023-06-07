@@ -2,6 +2,7 @@ from automator.logger import log
 from automator import redis_util
 from automator import recproc_utils as recproc
 
+DEFAULT_DWELL = 290 # in seconds
 
 class State(object):
     """State object for use with the coordinator state machine. 
@@ -56,11 +57,11 @@ class Record(RecProc):
 
     def on_entry(self, data):
 
-        subscribed = set(data["subscribed"])
-        ready = set(data["ready"])
+        subscribed = data["subscribed"]
+        ready = data["ready"]
 
         if ready == subscribed.intersection(ready):
-            result = recproc.record(r, self.array, list(ready))
+            result = recproc.record(self.r, self.array, list(ready))
             # update data:
             data["recording"] = result
             data["ready"] = ready^result
@@ -71,6 +72,7 @@ class Record(RecProc):
         super().handle_event(event, data)
         if event == "TRACK_STOP":
             log.info(f"{self.array} stopped tracking before DWELL complete")
+            redis_util.reset_dwell(self.r, data["recording"], DEFAULT_DWELL)
             return self.states["REC_COMPLETE"]
         elif event == "REC_END"
             return self.states["REC_COMPLETE"]
