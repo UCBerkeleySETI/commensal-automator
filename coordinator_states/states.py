@@ -30,7 +30,7 @@ class RecProc(State):
     """State for use with the Record-Process state machine. 
     """
     def __init__(self, array):
-        suoer().__init__(array)
+        super().__init__(array)
         self.states = {
             "READY":Ready(array)
             "RECORD":Record(array)
@@ -56,11 +56,16 @@ class Record(RecProc):
 
     def on_entry(self, data):
 
-        susbcribed = set(data["subscribed"])
+        subscribed = set(data["subscribed"])
         ready = set(data["ready"])
 
         if ready == subscribed.intersection(ready):
             result = recproc.record(r, self.array, list(ready))
+            # update data:
+            data["recording"] = result
+            data["ready"] = ready^result
+        else:
+            log.error("Not all ready instances are subscribed.")
 
     def handle_event(self, event, data):
         super().handle_event(event, data)
