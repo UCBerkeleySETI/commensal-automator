@@ -27,6 +27,42 @@ class State(object):
         """
         pass
 
+class FreeSubscribe(State):
+    """State for use with the Free-Subscribe state machine.
+    """
+    def __init__(self, array):
+        super().__init__(array)
+        self.states = {
+            "SUBSCRIBE":Subscribed(array)
+            "FREE":Free(array)
+        }
+
+
+class Free(FreeSubscribe):
+    """State in which the subarray is not configured and no nodes are
+    subscribed.
+    """
+
+    def handle_event(self, event, data):
+        super().handle_event(event, data)
+        if event == "CONFIGURE":
+            return self.states["SUBSCRIBE"]
+        else:
+            return self
+
+
+class Subscribed(FreeSubscribe):
+    """State in which DAQ instances are assigned to a particular
+    subarray.
+    """
+
+    def handle_event(self, event, data):
+        super().handle_event(event, data)
+        if event == "DECONFIGURE":
+            return self.states["FREE"]
+        else:
+            return self
+
 class RecProc(State):
     """State for use with the Record-Process state machine. 
     """
