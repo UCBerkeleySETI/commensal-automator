@@ -101,3 +101,25 @@ def retry(retries, delay, function, *args):
             log.error(f"Exception: {e}")
             continue
     log.error(f"Unsuccessful after {retries} retries.")
+
+def dec_degrees(dec_s):
+    """Convert RA from sexagesimal form to degree form.
+    """
+    dec = dec_s.split(':')
+    d = int(dec[0])
+    m = int(dec[1])
+    s = float(dec[2])
+    if dec[0][0] == '-':
+        dec_d = d - m/60.0 - s/3600.0
+    else:
+        dec_d = d + m/60.0 + s/3600.0
+    return dec_d
+
+def ra_degrees(ra_s):
+    """Convert RA from sexagesimal form to degree form.
+    """
+    ra = ra_s.split(':')
+    h = int(ra[0])
+    m = int(ra[1])
+    s = float(ra[2])
+    return h*15 + m*0.25 + s*15.0/3600.0
