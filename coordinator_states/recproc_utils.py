@@ -172,7 +172,7 @@ def get_cals(r, array):
         r.set(f"{array}:last-cal", current_cal_ts)
         return "success"
     else:
-        self.alert("No calibration solution updates.")
+        redis_utils.alert(r, "No calibration solution updates", "coordinator")
 
 
 def get_pktstart(r, instances, margin, array):
