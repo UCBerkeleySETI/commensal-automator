@@ -3,23 +3,105 @@ import numpy as np
 
 from automator import util, redis_util
 
-FENG_TYPE = 'wide.antenna-channelised-voltage'
-STREAM_TYPE = 'cbf.antenna_channelised_voltage'
+FENG_TYPE = "wide.antenna-channelised-voltage"
+STREAM_TYPE = "cbf.antenna_channelised_voltage"
+HPGDOMAIN = "bluse"
 
 def subscribe(r, array, instances, streams_per_instance):
     """Subscribe the specified instances to the appropriate multicast groups
     when a new subarray has been configured. 
     """
+
     # Configuration process started:
     util.annotate_grafana("CONFIGURE", 
             f"{product_id}: Coordinator configuring DAQs.")
     redis_util.alert(r, "Subscribing to new multicast groups", "coordinator")
+
     # Reset keys:
     r.set(f"coordinator:cal_ts:{array}", 0)
+
+    # Join Hashpipe-Redis gateway group for the current subarray:
+    redis_util.join_gateway_group(r, instances, array, HPGDOMAIN)
+    array_group = f"{HPGDOMAIN}:array:///set"
+
     # Apportion multicast groups:
-    addr_list, port = alloc_multicast_groups(r, array, len(instances),
+    addr_list, port, n_addrs= alloc_multicast_groups(r, array, len(instances),
         streams_per_instance)
 
+    # Publish necessary gateway keys:
+
+    # Name of current subarray (SUBARRAY)
+    redis_util.gateway_msg(r, array_group, 'SUBARRAY', array, False)
+
+    # Port (BINDPORT)
+    redis_util.gateway_msg(r, array_group, 'BINDPORT', port, False)
+
+    # Total number of streams (FENSTRM)
+    redis_util.gateway_msg(r, array_group, 'FENSTRM', n_addrs, False)
+
+    # Sync time (UNIX, seconds)
+    t_sync = sync_time(r, array)
+    redis_util.gateway_msg(r, array_group, 'SYNCTIME', t_sync, False)
+
+    # Centre frequency (FECENTER)
+    fecenter = centre_freq(r, array)
+    redis_util.gateway_msg(r, array_group, 'FECENTER', fecenter, False)
+
+    # Total number of frequency channels (FENCHAN)
+    n_freq_chans = r.get(f"{array}:n_channels")
+    redis_util.gateway_msg(r, array_group, 'FENCHAN', n_freq_chans, False)
+
+    # Coarse channel bandwidth (from F engines): CHANBW
+    # Note: no sign information!
+    chan_bw = coarse_chan_bw(r, array, n_freq_chans)
+    redis_util.gateway_msg(r, array_group, 'CHAN_BW', chan_bw, False)
+
+
+
+
+def coarse_chan_bw(r, array, n_freq_chans):
+    """Coarse channel bandwidth (from F engines). Formatted for Hashpipe-Redis
+    gateway.
+    NOTE: no sign information! Equivalent to CHAN_BW.
+    """
+    sensor_key = cbf_sensor_name(r, array, 'adc_sample_rate')
+    adc_sample_rate = r.get(sensor_key)
+    coarse_chan_bw = float(adc_sample_rate)/2.0/int(n_freq_chans)/1e6
+    coarse_chan_bw = '{0:.17g}'.format(coarse_chan_bw)
+    return coarse_chan_bw
+
+def centre_freq(r, array):
+    """Acquire the current centre frequency (FECENTER). Format for use with
+    the Hashpipe-Redis gateway.
+    """
+    sensor_key = self.stream_sensor_name(array,
+        'antenna_channelised_voltage_centre_frequency')
+    centre_freq = r.get(sensor_key)
+    centre_freq = float(centre_freq)/1e6
+    centre_freq = '{0:.17g}'.format(centre_freq)
+    return centre_freq
+
+def sync_time(r, array):
+    """Retrieve the current sync time.
+    """
+    sensor_key = cbf_sensor_name(r, array, 'sync_time')
+    sync_time = int(float(r.get(sensor_key))) # Is there a cleaner way?
+    return sync_time
+
+def stream_sensor_name(r, array, sensor):
+    """Builds full name of a stream sensor according to the CAM convention.
+    """
+    arr_num = array[-1] # subarray number
+    cbf_prefix = r.get(f"{array}:cbf_prefix")
+    return f"{array}:subarray_{arr_num}_streams_{cbf_prefix}_{sensor}"
+
+def cbf_sensor_name(r, array, sensor):
+    """Builds the full name of a CBF sensor according to the CAM convention.
+    """
+    cbf_name = r.get(f"{array}:cbf_name")
+    cbf_prefix = r.get(f"{array}:cbf_prefix")
+    cbf_sensor = f"{array}:{cbf_name}_{cbf_prefix}_{sensor}"
+    return cbf_sensor
 
 def alloc_multicast_groups(r, array, n_instances, streams_per_instance):
     """Apportion multicast groups evenly among specified instances.
@@ -39,7 +121,7 @@ def alloc_multicast_groups(r, array, n_instances, streams_per_instance):
     addrs, port = addrs.split(':')
     try:
         addr0, n_addrs = addrs.split('+')
-        n_addrs = int(n_addrs) + 1
+        n_addrs = int(n_addrs) + 1 # Total number of addresses
 
         # allocate evenly:
         first_octets, last_octet = addr0.rsplit(".", 1)
@@ -65,4 +147,4 @@ def alloc_multicast_groups(r, array, n_instances, streams_per_instance):
     # If there is only one address:
     except ValueError:
         addr_list = [addrs + '+0']
-    return addr_list, port
+    return addr_list, port, n_addrs
