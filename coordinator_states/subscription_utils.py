@@ -56,8 +56,36 @@ def subscribe(r, array, instances, streams_per_instance):
     chan_bw = coarse_chan_bw(r, array, n_freq_chans)
     redis_util.gateway_msg(r, array_group, 'CHAN_BW', chan_bw, False)
 
+    # Number of channels per substream (HNCHAN)
+    hnchan = r.get(cbf_sensor_name(r, array,
+            'antenna_channelised_voltage_n_chans_per_substream'))
+    redis_util.gateway_msg(r, array_group, 'HNCHAN', hnchan, False)
+
+    # Number of spectra per heap (HNTIME)
+    hntime = r.get(cbf_sensor_name(r, array,
+            'tied_array_channelised_voltage_0x_spectra_per_heap'))
+    redis_util.gateway_msg(r, array_group, 'HNTIME', hntime, False)
+
+    # Number of ADC samples per heap (HCLOCKS)
+    adc_per_heap = samples_per_heap(r, array, hntime)
+    redis_util.gateway_msg(r, array_group, 'HCLOCKS', adc_per_heap, False)
+
+    # Number of antennas (NANTS)
+    nants = r.llen(f"{array}:antennas")
+    redis_util.gateway_msg(r, array_group, 'NANTS', nants, False)
+
+    # Make sure PKTSTART is 0 on configure
+    redis_util.gateway_msg(r, array_group, 'PKTSTART', 0, False)
 
 
+def samples_per_heap(r, array, spectra_per_heap):
+    """Equivalent to HCLOCKS.
+    """
+    sensor_key = cbf_sensor_name(r, array,
+        'antenna_channelised_voltage_n_samples_between_spectra')
+    adc_per_spectra = r.get(sensor_key)
+    adc_per_heap = int(adc_per_spectra)*int(spectra_per_heap)
+    return adc_per_heap
 
 def coarse_chan_bw(r, array, n_freq_chans):
     """Coarse channel bandwidth (from F engines). Formatted for Hashpipe-Redis
