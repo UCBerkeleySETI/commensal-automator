@@ -25,7 +25,7 @@ def subscribe(r, array, instances, streams_per_instance):
     array_group = f"{HPGDOMAIN}:array:///set"
 
     # Apportion multicast groups:
-    addr_list, port, n_addrs= alloc_multicast_groups(r, array, len(instances),
+    addr_list, port, n_addrs, n_last = alloc_multicast_groups(r, array, len(instances),
         streams_per_instance)
 
     # Publish necessary gateway keys:
@@ -77,6 +77,21 @@ def subscribe(r, array, instances, streams_per_instance):
     # Make sure PKTSTART is 0 on configure
     redis_util.gateway_msg(r, array_group, 'PKTSTART', 0, False)
 
+    # SCHAN, NSTRM and DESTIP by instance:
+    for i in range(len(instances)):
+        # Number of streams for instance i (NSTRM)
+        if i == len(instances)-1:
+            nstrm = n_last
+        else:
+            nstrm = streams_per_instance
+        redis_util.gateway_msg(r, array_group, 'NSTRM', nstrm, False)
+        # Absolute starting channel for instance i (SCHAN)
+        schan = i*nstrm*int(hnchan)
+        redis_util.gateway_msg(r, array_group, 'SCHAN', schan, False)
+        # Destination IP addresses for instance i (DESTIP)
+        redis_util.gateway_msg(r, array_group, 'DESTIP', addr_list[i], False)
+
+    redis_util.alert(r, f"Subscribed: {array}", "coordinator")
 
 def samples_per_heap(r, array, spectra_per_heap):
     """Equivalent to HCLOCKS.
@@ -175,4 +190,4 @@ def alloc_multicast_groups(r, array, n_instances, streams_per_instance):
     # If there is only one address:
     except ValueError:
         addr_list = [addrs + '+0']
-    return addr_list, port, n_addrs
+    return addr_list, port, n_addrs, last_added
