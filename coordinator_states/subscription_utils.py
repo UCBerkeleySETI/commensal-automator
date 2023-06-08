@@ -1,11 +1,13 @@
 import json
 import numpy as np
+import time
 
 from automator import util, redis_util
 
 FENG_TYPE = "wide.antenna-channelised-voltage"
 STREAM_TYPE = "cbf.antenna_channelised_voltage"
 HPGDOMAIN = "bluse"
+DEFAULT_DWELL = 290
 
 def subscribe(r, array, instances, streams_per_instance):
     """Subscribe the specified instances to the appropriate multicast groups
@@ -92,6 +94,43 @@ def subscribe(r, array, instances, streams_per_instance):
         redis_util.gateway_msg(r, array_group, 'DESTIP', addr_list[i], False)
 
     redis_util.alert(r, f"Subscribed: {array}", "coordinator")
+
+
+def unsubscribe(r, array, instances):
+    """Ensure that all the specified instances unsubscribe from the
+    multicast IP groups.
+    """
+
+    # Unsubscription process started:
+    self.annotate("UNSUBSCRIBE",
+        f"{description}: Coordinator instructing DAQs to unsubscribe.")
+
+    # Set DESTIP to 0.0.0.0 individually for robustness.
+    for instance in instances:
+        channel = f"{HPGDOMAIN}://{instance}/set"
+        redis_util.gateway_msg(r, channel, "DESTIP", "0.0.0.0", False)
+    redis_util.alert(f"Instructed DAQs for {array} to unsubscribe.")
+    time.sleep(3) # give them a chance to respond
+
+    # Belt and braces restart DAQs
+    hostnames_only = [instance.split('/')[0] for instance in instances]
+    result = util.restart_pipeline(hostnames_only, "bluse_hashpipe")
+    if len(result) > 0:
+        redis_util.alert(f"Failed to restart bluse_hashpipe on: {result}")
+    else:
+        redis_util.alert(f"Restarted bluse_hashpipe on DAQs for {array}")
+
+    # Instruct gateways to leave current subarray group:
+    redis_util.leave_gateway_group(r, array, HPGDOMAIN)
+    log.info(f"Disbanded gateway group: {array}")
+
+    # Sleep for 20 seconds to allow pipelines to restart:
+    time.sleep(20)
+
+    # Reset DWELL for all hosts after pipeline restart:
+    redis_util.reset_dwell(r, instances, DEFAULT_DWELL)
+    log.info(f"DWELL has been reset for instances assigned to {array}")
+
 
 def samples_per_heap(r, array, spectra_per_heap):
     """Equivalent to HCLOCKS.
