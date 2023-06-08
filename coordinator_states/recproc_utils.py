@@ -33,7 +33,7 @@ def record(r, array, instances):
     # Supply Hashpipe-Redis gateway keys to the instances which will conduct
     # recording:
 
-    # Join gateway group:
+    # Gateway group:
     array_group = f"{HPGDOMAIN}:{array}///set"
 
     # Calculate PKTSTART:
@@ -51,18 +51,18 @@ def record(r, array, instances):
     # DATADIR
     sb_id = redis_util.sb_id(r, array)
     datadir = f"/buf0/{pktstart_data["pktstart_str"]}-{sb_id}"
-    gateway_msg(r, array_group, 'DATADIR', datadir, False)
+    redis_util.gateway_msg(r, array_group, 'DATADIR', datadir, False)
 
     # SRC_NAME:
-    gateway_msg(r, array_group, 'SRC_NAME', target_data["target"], False)
+    redis_util.gateway_msg(r, array_group, 'SRC_NAME', target_data["target"], False)
 
     # OBSID (unique identifier for a particular observation):
     obsid = f"MeerKAT:{array}:{pktstart_data["pktstart_str"]}"
-    gateway_msg(r, array_group, 'OBSID', obsid, False)
+    redis_util.gateway_msg(r, array_group, 'OBSID', obsid, False)
 
     # Set PKTSTART separately after all the above messages have
     # all been delivered:
-    gateway_msg(r, array_group, 'PKTSTART', pktstart_data["pktstart"], False)
+    redis_util.gateway_msg(r, array_group, 'PKTSTART', pktstart_data["pktstart"], False)
 
     # Grafana annotation that recording has started:
     annotate('RECORD', f"{array}: Coordinator instructed DAQs to record")
@@ -234,27 +234,6 @@ def get_pkt_idx(r, instance_key):
     else:
         log.warning(f"Cannot acquire {instance_key}")
     return pkt_idx
-
-
-def gateway_msg(r, channel, msg_key, msg_val, write):
-    """Format and publish a hashpipe-Redis gateway message. Save messages
-    in a Redis hash for later use by reconfig tool.
-
-    Args:
-        r: Redis server.
-        channel (str): Name of channel to be published to.
-        msg_key (str): Name of key in status buffer.
-        msg_val (str): Value associated with key.
-        write (bool): If true, also write message to Redis database.
-    """
-    msg = f"{msg_key}={msg_val}"
-    r.publish(channel, msg)
-    log.info(f"Published {msg} to channel {chan_name}")
-    # save hash of most recent messages
-    if write:
-        red_server.hset(channel, msg_key, msg_val)
-        log.info(f"Wrote {msg} for channel {chan_name} to Redis")
-
 
 def annotate(tag, text):
     response = util.annotate_grafana(tag, text)

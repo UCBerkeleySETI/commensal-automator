@@ -438,6 +438,24 @@ def suggest_processing(r, processing=None, verbose=False):
 
     return answer
 
+def gateway_msg(r, channel, msg_key, msg_val, write):
+    """Format and publish a hashpipe-Redis gateway message. Save messages
+    in a Redis hash for later use by reconfig tool.
+
+    Args:
+        r: Redis server.
+        channel (str): Name of channel to be published to.
+        msg_key (str): Name of key in status buffer.
+        msg_val (str): Value associated with key.
+        write (bool): If true, also write message to Redis database.
+    """
+    msg = f"{msg_key}={msg_val}"
+    r.publish(channel, msg)
+    log.info(f"Published {msg} to channel {chan_name}")
+    # save hash of most recent messages
+    if write:
+        red_server.hset(channel, msg_key, msg_val)
+        log.info(f"Wrote {msg} for channel {chan_name} to Redis")
 
 def join_gateway_group(r, instances, group_name, gateway_domain):
     """Instruct hashpipe instances to join a hashpipe-redis gateway group.
