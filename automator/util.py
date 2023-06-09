@@ -29,14 +29,14 @@ def config(cfg_file):
     except IOError:
         log.error('Could not open config file.')
 
-def restart_pipeline(hosts, pipeline):
-    """Use ZMQ to restart pipelines on deconfigure to ensure they have
-    correctly unsubscribed.
+
+def zmq_circus_cmd(hosts, name, command):
+    """Construct and issue ZMQ messages to control Circus processes.
     """
-    command = {
-        "command":"restart",
+    message = {
+        "command":command,
         "properties":{
-            "name":pipeline,
+            "name":name,
             "waiting":False,
             "match":"simple"
             }
@@ -46,7 +46,7 @@ def restart_pipeline(hosts, pipeline):
     failed = []
     for host in hosts:
         s.connect(f"tcp://{host}:5555")
-        s.send_json(command)
+        s.send_json(message)
         r = s.recv_json()
         if r['status'] != 'ok':
             # log warning/error
