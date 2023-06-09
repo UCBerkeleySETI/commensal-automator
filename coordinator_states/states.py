@@ -43,6 +43,14 @@ class Free(FreeSubscribe):
     subscribed.
     """
 
+    def on_entry(self, data, free):
+        """Deallocate instances from a subarray and instruct them to
+        unsubscribe from their assigned multicast groups.
+        """
+        subscription_utils.unsubscribe(self.r, self.array, data["subscribed"])
+        while data["subscribed"]:
+            free.add(data["subscribed"].pop())
+
     def handle_event(self, event, free, data):
         super().handle_event(event, data)
         if free and event == "CONFIGURE":
@@ -73,9 +81,10 @@ class Subscribed(FreeSubscribe):
         # Initiate subscription process:
         subscription_utils.subscribe(self.r, array, instances)
 
-    def handle_event(self, event, data):
+    def handle_event(self, event, free, data):
         super().handle_event(event, data)
         if event == "DECONFIGURE":
+            self.states["FREE"].on_entry(data, free)
             return self.states["FREE"]
         else:
             return self
