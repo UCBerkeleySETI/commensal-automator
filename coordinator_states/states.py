@@ -1,5 +1,5 @@
 from automator.logger import log
-from automator import redis_util
+from automator import redis_util, subscription_utils
 from automator import recproc_utils as recproc
 
 DEFAULT_DWELL = 290 # in seconds
@@ -43,9 +43,10 @@ class Free(FreeSubscribe):
     subscribed.
     """
 
-    def handle_event(self, event, data):
+    def handle_event(self, event, free, data):
         super().handle_event(event, data)
-        if event == "CONFIGURE":
+        if free and event == "CONFIGURE":
+            self.states["SUBSCRIBE"].on_entry(data, free)
             return self.states["SUBSCRIBE"]
         else:
             return self
@@ -55,6 +56,22 @@ class Subscribed(FreeSubscribe):
     """State in which DAQ instances are assigned to a particular
     subarray.
     """
+
+    def on_entry(self, data, free):
+        """Allocate instances to a new subarray.
+        """
+
+        # Attempt to claim the required number of instances from those that
+        # are free:
+        n_requested = subscription_utils.num_requested(self.r, self.array)
+        while len(free) > 0 and len(data["subscribed"]) < n_requested:
+            data["subscribed"].add(free.pop())
+        if len(data["subscribed"]) < n_requested:
+            message = f"{len(data["subscribed"])}/{n_requested} available."
+            redis_util.alert(self.r, message, "coordinator")
+
+        # Initiate subscription process:
+        subscription_utils.subscribe(self.r, array, instances)
 
     def handle_event(self, event, data):
         super().handle_event(event, data)
