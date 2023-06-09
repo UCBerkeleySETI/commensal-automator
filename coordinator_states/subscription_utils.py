@@ -8,9 +8,10 @@ FENG_TYPE = "wide.antenna-channelised-voltage"
 STREAM_TYPE = "cbf.antenna_channelised_voltage"
 HPGDOMAIN = "bluse"
 DEFAULT_DWELL = 290
+STREAMS_PER_INSTANCE = 4
 
-def subscribe(r, array, instances, streams_per_instance):
-    """Subscribe the specified instances to the appropriate multicast groups
+def subscribe(r, array, instances, streams_per_instance=STREAMS_PER_INSTANCE):
+    """Allocate instances to the appropriate multicast groups
     when a new subarray has been configured. 
     """
 
@@ -185,7 +186,28 @@ def cbf_sensor_name(r, array, sensor):
     cbf_sensor = f"{array}:{cbf_name}_{cbf_prefix}_{sensor}"
     return cbf_sensor
 
-def alloc_multicast_groups(r, array, n_instances, streams_per_instance):
+def num_requested(r, array, streams_per_instance=STREAMS_PER_INSTANCE):
+    """Return the number of DAQ instances that would be sufficient to process
+    the full bandwidth for the current subarray.
+    """
+    # Get dictionary of all stream data.
+    stream_data = r.get(f"{array}:streams")
+
+    # format for json:
+    stream_data = stream_data.replace('\'', '"')
+    stream_data = stream_data.replace('u', '')
+    stream_data = json.loads(stream_data)
+    stream_addresses = stream_data[STREAM_TYPE][FENG_TYPE]
+
+    # Address format: spead://<ip>+<count>:<port>
+    addrs = stream_addresses.split('/')[-1]
+    addrs, port = addrs.split(':')
+    addr0, n_addrs = addrs.split('+')
+    total_addrs = int(n_addrs) + 1 # Total number of addresses
+    return int(np.ceil(total_addrs/float(streams_per_instance)))
+
+def alloc_multicast_groups(r, array, n_instances,
+                           streams_per_instance=STREAMS_PER_INSTANCE):
     """Apportion multicast groups evenly among specified instances.
     """
 
@@ -205,7 +227,7 @@ def alloc_multicast_groups(r, array, n_instances, streams_per_instance):
         addr0, n_addrs = addrs.split('+')
         n_addrs = int(n_addrs) + 1 # Total number of addresses
 
-        # allocate evenly:
+        # allocate, filling in sequence:
         first_octets, last_octet = addr0.rsplit(".", 1)
         last_octet = int(last_octet)
         addr_list = []
