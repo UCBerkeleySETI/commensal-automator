@@ -11,7 +11,7 @@ class State(object):
     def __init__(self, array, r):
         self.array = array
         self.r = r
-    
+
     def handle_event(self, event, data):
         """Respond to an incoming event as appropriate.
         """
@@ -53,9 +53,14 @@ class Free(FreeSubscribe):
 
     def handle_event(self, event, free, data):
         super().handle_event(event, data)
-        if free and event == "CONFIGURE":
-            self.states["SUBSCRIBE"].on_entry(data, free)
-            return self.states["SUBSCRIBE"]
+        if event == "CONFIGURE":
+            if free:
+                self.states["SUBSCRIBE"].on_entry(data, free)
+                return self.states["SUBSCRIBE"]
+            else:
+                message = f"No free instances, not configuring {array}"
+                redis_util.alert(self.r, message, "coordinator")
+                return self
         else:
             return self
 
@@ -100,7 +105,7 @@ class RecProc(State):
         }
 
 class Ready(RecProc):
-    """The subarray is in the READY state. 
+    """The coordinator is in the READY state.
     """
 
     def handle_event(self, event, data):
@@ -112,9 +117,9 @@ class Ready(RecProc):
                 return self.states["RECORD"]
         else:
             return self
-            
+
 class Record(RecProc):
-    """The subarray is in the RECORD state
+    """The coordinator is in the RECORD state
     """
 
     def on_entry(self, data):
@@ -135,8 +140,16 @@ class Record(RecProc):
         if event == "TRACK_STOP":
             log.info(f"{self.array} stopped tracking before DWELL complete")
             redis_util.reset_dwell(self.r, data["recording"], DEFAULT_DWELL)
-            return self.states["REC_COMPLETE"]
+            if redis_util.is_primary_time(self.array):
+                # move them back into the ready state
+                while data["recording"]:
+                    data["ready"].add(data["recording"].pop())
+                return self.states["READY"]
+            else:
+                self.states["PROCESS"].on_entry(data)
+                return self.states["PROCESS"]
         elif event == "REC_END"
-            return self.states["REC_COMPLETE"]
+            self.states["PROCESS"].on_entry(data)
+            return self.states["PROCESS"]
         else:
             return self
