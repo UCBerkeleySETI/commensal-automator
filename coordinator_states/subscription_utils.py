@@ -3,6 +3,7 @@ import numpy as np
 import time
 
 from automator import util, redis_util
+from automator.logger import log
 
 FENG_TYPE = "wide.antenna-channelised-voltage"
 STREAM_TYPE = "cbf.antenna_channelised_voltage"
