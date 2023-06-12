@@ -112,9 +112,10 @@ class Ready(RecProc):
         super().handle_event(event, data)
         if event == "RECORD":
             if redis_util.is_primary_time(self.array):
+                self.states["RECORD_PRIMARY"].on_entry(data)
                 return self.states["RECORD_PRIMARY"]
-            else:
-                return self.states["RECORD"]
+            self.states["RECORD"].on_entry(data)
+            return self.states["RECORD"]
         else:
             return self
 
@@ -153,6 +154,7 @@ class Record(RecProc):
             return self.states["PROCESS"]
         else:
             return self
+
 
 class Process(RecProc):
     """The coordinator is in the PROCESS state.
