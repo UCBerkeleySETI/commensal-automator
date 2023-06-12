@@ -73,8 +73,20 @@ def record(r, array, instances):
     targets_req = f"{obsid}:{target_data["target"]}:{ra_d}:{dec_d}:{fecenter}"
     r.publish(TARGETS_CHANNEL, targets_req)
 
-    # Return set of nodes which are actually now recording:
-    return get_recording(r, instances)
+    # Those which are actually recording:
+    recording = get_recording(r, array)
+
+    # Write datadir to the list of unprocessed directories for this subarray:
+    add_unprocessed(r, recording, datadir)
+
+    return recording
+
+
+def add_unprocessed(r, recording, datadir):
+    """Set the list of unprocessed directories.
+    """
+    for instance in recording:
+        r.lpush(f"{instance}:unprocessed", datadir)
 
 
 def get_primary_target(r, array, length, delimiter = "|"):
