@@ -1,6 +1,6 @@
 from automator.logger import log
 from automator import redis_util, subscription_utils
-from automator import recproc_utils as recproc
+from automator import rec_util as rec
 
 DEFAULT_DWELL = 290 # in seconds
 
@@ -128,7 +128,7 @@ class Record(RecProc):
         ready = data["ready"]
 
         if ready == subscribed.intersection(ready):
-            result = recproc.record(self.r, self.array, list(ready))
+            result = rec.record(self.r, self.array, list(ready))
             # update data:
             data["recording"] = result
             data["ready"] = ready^result
@@ -153,3 +153,19 @@ class Record(RecProc):
             return self.states["PROCESS"]
         else:
             return self
+
+class Process(RecProc):
+    """The coordinator is in the PROCESS state.
+    """
+
+    def on_entry(self, data):
+        """Initiate processing on the appropriate processing nodes.
+        """
+
+        # Move from recording to processing:
+        while data["recording"]:
+            data["processing"].add(data["recording"].pop())
+
+        # Use circus to start the processing script for each
+
+        # Handle return events
