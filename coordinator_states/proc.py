@@ -1,12 +1,23 @@
+"""
+Processing module intended to run on each processing node. There should be one
+Circus-controlled processing script per instance. They are expected to be
+named as follows: proc_<instance number>
+"""
+
 import subprocess
 import redis
 import logging
 import sys
 import argparse
+import os
+
+from automator import proc_util
 
 RESULT_CHANNEL = "proc_result"
 LOG_FORMAT = "[%(asctime)s - %(levelname)s - %(filename)s:%(lineno)s] %(message)s"
 LOGGER_NAME = "BLUSE.interface"
+BFRDIR = "/home/obs/bfr5"
+PARTITION = "scratch"
 
 def run_seticore(bfrdir, inputdir, tsdir, partition, r, log):
     """Processes the incoming data using seticore.
@@ -40,7 +51,7 @@ def run_seticore(bfrdir, inputdir, tsdir, partition, r, log):
 
     # Check number of times a processing sequence has been run and write .h5
     # files for each beamformer output for every tenth run.
-    n = get_n_proc(r)
+    n = proc_util.get_n_proc(r)
     if n%10 == 0:
         # create directory for h5 files
         h5dir = f"/{partition}/data/{tsdir}/seticore_beamformer"
@@ -49,26 +60,11 @@ def run_seticore(bfrdir, inputdir, tsdir, partition, r, log):
         subprocess.run(cmd)
         # add --h5_dir arg to seticore command
         seticore_command.extend(["--h5_dir", h5dir])
-    increment_n_proc(r)
+    proc_util.increment_n_proc(r)
 
     # run seticore
     log.info(f"running seticore: {seticore_command}")
     return subprocess.run(seticore_command).returncode
-
-def increment_n_proc(r):
-    """Add 1 to the number of times processing has been run.
-    """
-    n_proc = get_n_proc(r)
-    r.set("automator:n_proc", n_proc + 1)
-
-def get_n_proc(r):
-    """Retrieve the absolute number of times processing has been run.
-    """
-    n_proc = r.get("automator:n_proc")
-    if n_proc is None:
-        r.set("automator:n_proc", 0)
-        return 0
-    return int(n_proc)
 
 def cli(args = sys.argv[0]):
     """CLI for instance-specific processing controller. 
@@ -101,23 +97,54 @@ def process(name):
     # Redis server
     r = redis.StrictRedis(decode_responses=True)
 
-    # Look for hash for specific node
-    params = r.hgetall(f"{name}:proc")
+    # Set of unprocessed directories:
+    unprocessed = proc_util.get_items(r, name, "unprocessed")
 
-    # Run seticore
-    result = run_seticore(
-        params["bfrdir"],
-        params["inputdir"],
-        params["tsdir"],
-        params["partition"],
-        r, 
-        log)
+    # Set of directories that should be kept after processing (these are
+    # directories associated with a primary observation)
+    preserved = proc_util.get_items(r, name, "preserved")
 
-    # Publish result back to central coordinator via Redis:
-    r.publish(RESULT_CHANNEL, f"{name}:{result}")
+    results = dict()
+
+    for datadir in unprocessed:
+        if not os.path.exists(datadir):
+            log.warning(f"{datadir} does not exist, skipping.")
+            continue
+        # Timestamped directory name:
+        tsdir = proc_util.timestamped_dir_from_filename(datadir)
+        # Run seticore
+        result = run_seticore(
+            BFRDIR,
+            datadir,
+            tsdir,
+            PARTITION,
+            r,
+            log)
+        results[datadir] = result
 
     # Done
     log.info(f"Processing completed for {name} with code: {result}")
+
+    # Clean up
+    to_clean = unprocessed.difference(preserved)
+
+    # can we have an arg here for specific directory?
+    for datadir in to_clean:
+        res = results[datadir]
+        if res > 1:
+            log.error(f"Not deleting since seticore returned {res} for {datadir}")
+            continue
+        cmd = ["bash",
+                "-c",
+                f"/home/obs/bin/cleanmybuf0.sh --force --dir {datadir}"]
+        result = subprocess.run(cmd)
+        if result == 0:
+            log.info(f"Deleted {datadir}")
+            continue
+        log.error(f"Failed to delete {datadir}, code {result}")
+
+    # Publish result back to central coordinator via Redis:
+    r.publish(RESULT_CHANNEL, f"{name}:{result}")
 
 if __name__ == "__main__":
     cli()
