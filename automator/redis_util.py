@@ -309,19 +309,6 @@ def sb_id_from_filename(filename):
     return f"{x}/{y}"
 
 
-def timestamped_dir_from_filename(filename):
-    """Extracts timestamped section from filenames like:
-    /buf0/<timestamp-part>/blah/blah/etc
-    """
-    parts = filename.strip("/").split("/")
-    if len(parts) < 2:
-        return None
-    answer = parts[1]
-    if not re.match(r"^[0-9]{8}T[0-9]{6}Z-[^/]*$", answer):
-        return None
-    return answer
-
-
 def infer_subarray(r, hosts):
     """Guess what subarray the data on these hosts is from.
     If there is no exact match, return None.
