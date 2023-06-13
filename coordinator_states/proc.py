@@ -97,6 +97,10 @@ def process(name):
     # Redis server
     r = redis.StrictRedis(decode_responses=True)
 
+
+    # TODO: Put these in a hash! Save array details to simplify
+    # returning vals.
+
     # Set of unprocessed directories:
     unprocessed = proc_util.get_items(r, name, "unprocessed")
 
@@ -144,7 +148,7 @@ def process(name):
         log.error(f"Failed to delete {datadir}, code {result}")
 
     # Publish result back to central coordinator via Redis:
-    r.publish(RESULT_CHANNEL, f"{name}:{result}")
+    r.publish(RESULT_CHANNEL, f"RETURN:{name}:{result}")
 
 if __name__ == "__main__":
     cli()
