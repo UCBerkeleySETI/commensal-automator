@@ -30,7 +30,7 @@ def config(cfg_file):
         log.error('Could not open config file.')
 
 
-def zmq_circus_cmd(hosts, name, command):
+def zmq_multi_cmd(hosts, name, command):
     """Construct and issue ZMQ messages to control Circus processes.
     """
     message = {
@@ -53,6 +53,31 @@ def zmq_circus_cmd(hosts, name, command):
             failed.append(host)
         s.disconnect(f"tcp://{host}:5555")
     return failed
+
+
+
+def zmq_circus_cmd(host, name, command):
+    """Construct and issue ZMQ messages to control Circus processes.
+    """
+    message = {
+        "command":command,
+        "properties":{
+            "name":name,
+            "waiting":False,
+            "match":"simple"
+            }
+        }
+    ctx = zmq.Context.instance()
+    s = ctx.socket(zmq.DEALER)
+    s.connect(f"tcp://{host}:5555")
+    s.send_json(message)
+    r = s.recv_json()
+    if r['status'] != 'ok':
+        # log warning/error
+        failed.append(host)
+        return False
+    s.disconnect(f"tcp://{host}:5555")
+    return True
 
 
 def annotate_grafana(tag, text, url=GRAFANA_ANNOTATIONS_URL, auth=GRAFANA_AUTH):
