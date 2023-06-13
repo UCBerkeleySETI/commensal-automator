@@ -114,9 +114,6 @@ class Ready(RecProc):
     def handle_event(self, event, data):
         super().handle_event(event, data)
         if event == "RECORD":
-            if redis_util.is_primary_time(self.array):
-                self.states["RECORD_PRIMARY"].on_entry(data)
-                return self.states["RECORD_PRIMARY"]
             self.states["RECORD"].on_entry(data)
             return self.states["RECORD"]
         else:
@@ -178,7 +175,6 @@ class Process(RecProc):
             host, instance_number = instance.split("/")
             util.zmq_circus_cmd(host, f"proc_{instance_number}", "start")
 
-
     def handle_event(self, event, data):
         super().handle_event(event, data)
         # If a node completes processing:
@@ -189,7 +185,7 @@ class Process(RecProc):
                 data["completed"].add(instance)
                 # If all (or whatever preferred percentage) is completed,
                 # continue to the next state:
-                if(proc_util.check(data)):
+                if not data["processing"]:
                     self.states["READY"].on_entry(data)
                     return self.states["READY"]
             else:

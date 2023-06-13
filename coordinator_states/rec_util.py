@@ -79,6 +79,10 @@ def record(r, array, instances):
     # Write datadir to the list of unprocessed directories for this subarray:
     add_unprocessed(r, recording, datadir)
 
+    # If this is primary time, write datadir to the list of directories to
+    # preserve:
+    add_preserved(r, recording, datadir)
+
     return recording
 
 
@@ -87,6 +91,13 @@ def add_unprocessed(r, recording, datadir):
     """
     for instance in recording:
         r.lpush(f"{instance}:unprocessed", datadir)
+
+
+def add_preserved(r, recording, datadir):
+    """Set the list of unprocessed directories.
+    """
+    for instance in recording:
+        r.lpush(f"{instance}:preserved", datadir)
 
 
 def get_primary_target(r, array, length, delimiter = "|"):
