@@ -116,7 +116,11 @@ def unsubscribe(r, array, instances):
 
     # Belt and braces restart DAQs
     hostnames_only = [instance.split('/')[0] for instance in instances]
-    result = util.zmq_circus_cmd(hostnames_only, "bluse_hashpipe", "restart")
+    result = util.zmq_multi_cmd(hostnames_only, "bluse_hashpipe", "restart")
+    # When there are two instances per host, run again for the second
+    # bluse_hashpipe instance, for example:
+    # r_2 = util.zmq_multi_cmd(hostnames_only, "bluse_hashpipe_2", "restart")
+    # result.append(r_2)
     if len(result) > 0:
         redis_util.alert(f"Failed to restart bluse_hashpipe on: {result}")
     else:
