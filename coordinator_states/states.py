@@ -1,5 +1,5 @@
 from automator.logger import log
-from automator import redis_util, subscription_utils
+from automator import redis_util, subscription_utils, util
 from automator import rec_util as rec
 
 DEFAULT_DWELL = 290 # in seconds
@@ -108,6 +108,9 @@ class Ready(RecProc):
     """The coordinator is in the READY state.
     """
 
+    def on_entry(self, data):
+        log.info(f"{self.array} entering READY state")
+
     def handle_event(self, event, data):
         super().handle_event(event, data)
         if event == "RECORD":
@@ -149,7 +152,7 @@ class Record(RecProc):
             else:
                 self.states["PROCESS"].on_entry(data)
                 return self.states["PROCESS"]
-        elif event == "REC_END"
+        elif event == "REC_END":
             self.states["PROCESS"].on_entry(data)
             return self.states["PROCESS"]
         else:
@@ -168,6 +171,27 @@ class Process(RecProc):
         while data["recording"]:
             data["processing"].add(data["recording"].pop())
 
-        # Use circus to start the processing script for each
+        # Use circus to start the processing script for each instance. Note
+        # there could be more than one instance per host. Instance names
+        # must conform to the following format: <host>/<instance>
+        for instance in data["processing"]:
+            host, instance_number = instance.split("/")
+            util.zmq_circus_cmd(host, f"proc_{instance_number}", "start")
 
-        # Handle return events
+
+    def handle_event(self, event, data):
+        super().handle_event(event, data)
+        # If a node completes processing:
+        if "RETURN" in event:
+            _, instance, returncode = event.split(":")
+            if instance in data["processing"]:
+                data["processing"].remove(instance)
+                data["completed"].add(instance)
+                # If all (or whatever preferred percentage) is completed,
+                # continue to the next state:
+                if(proc_util.check(data)):
+                    self.states["READY"].on_entry(data)
+                    return self.states["READY"]
+            else:
+                log.warning(f"Unrecognised instance: {instance}")
+        return self
