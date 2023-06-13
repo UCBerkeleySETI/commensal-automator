@@ -1,5 +1,15 @@
 #Temporary configuration file for coordinator.py 
 
+channels:
+- alerts
+- proc_result
+
+arrays:
+- array_1
+- array_2
+- array_3
+- array_4
+
 redis_host: 127.0.0.1
 
 redis_port: 6379
