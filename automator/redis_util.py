@@ -632,7 +632,7 @@ def parse_msg(msg):
     """
     data = msg['data']
     components = msg_data.split(':')
-    if len(components) != 2:
+    if len(components) > 4:
         log.warning(f"Unrecognised message: {data}")
         return
     return components
