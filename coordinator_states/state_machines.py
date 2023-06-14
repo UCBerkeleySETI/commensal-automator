@@ -25,7 +25,7 @@ class RecProcMachine(object):
         self.state = initial_state
         
         self.data = {
-            "subscribed":subscribed
+            "subscribed":subscribed,
             "ready":set(),
             "recording":set(),
             "processing":set()

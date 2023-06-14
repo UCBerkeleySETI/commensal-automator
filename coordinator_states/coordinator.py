@@ -56,7 +56,7 @@ class Coordinator(object):
                     array = components[0]
                     event = component[1]
                     self.freesubscribed_machines[array].state.handle_event(event)
-                    self.recproc_machines[components[0].state.handle_event(event)
+                    self.recproc_machines[components[0]].state.handle_event(event)
 
     def processing_return(self, message):
         """Note, we must return these to every array's state machine for the

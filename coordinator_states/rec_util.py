@@ -50,14 +50,14 @@ def record(r, array, instances):
 
     # DATADIR
     sb_id = redis_util.sb_id(r, array)
-    datadir = f"/buf0/{pktstart_data["pktstart_str"]}-{sb_id}"
+    datadir = f"/buf0/{pktstart_data['pktstart_str']}-{sb_id}"
     redis_util.gateway_msg(r, array_group, 'DATADIR', datadir, False)
 
     # SRC_NAME:
     redis_util.gateway_msg(r, array_group, 'SRC_NAME', target_data["target"], False)
 
     # OBSID (unique identifier for a particular observation):
-    obsid = f"MeerKAT:{array}:{pktstart_data["pktstart_str"]}"
+    obsid = f"MeerKAT:{array}:{pktstart_data['pktstart_str']}"
     redis_util.gateway_msg(r, array_group, 'OBSID', obsid, False)
 
     # Set PKTSTART separately after all the above messages have
@@ -70,7 +70,7 @@ def record(r, array, instances):
     # Alert the target selector to the new pointing:
     ra_d = util.ra_degrees(target_data["ra"])
     dec_d = util.dec_degrees(target_data["dec"])
-    targets_req = f"{obsid}:{target_data["target"]}:{ra_d}:{dec_d}:{fecenter}"
+    targets_req = f"{obsid}:{target_data['target']}:{ra_d}:{dec_d}:{fecenter}"
     r.publish(TARGETS_CHANNEL, targets_req)
 
     # Those which are actually recording:
@@ -84,7 +84,6 @@ def record(r, array, instances):
     add_preserved(r, recording, datadir)
 
     return recording
-
 
 def add_unprocessed(r, recording, datadir):
     """Set the list of unprocessed directories.

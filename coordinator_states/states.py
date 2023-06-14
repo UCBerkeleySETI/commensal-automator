@@ -33,7 +33,7 @@ class FreeSubscribe(State):
     def __init__(self, array, r):
         super().__init__(array, r)
         self.states = {
-            "SUBSCRIBE":Subscribed(array)
+            "SUBSCRIBE":Subscribed(array),
             "FREE":Free(array)
         }
 
@@ -88,7 +88,7 @@ class Subscribed(FreeSubscribe):
         while len(free) > 0 and len(data["subscribed"]) < n_requested:
             data["subscribed"].add(free.pop())
         if len(data["subscribed"]) < n_requested:
-            message = f"{len(data["subscribed"])}/{n_requested} available."
+            message = f"{len(data['subscribed'])}/{n_requested} available."
             redis_util.alert(self.r, message, "coordinator")
 
         # Initiate subscription process:
@@ -108,8 +108,8 @@ class RecProc(State):
     def __init__(self, array, r):
         super().__init__(array, r)
         self.states = {
-            "READY":Ready(array)
-            "RECORD":Record(array)
+            "READY":Ready(array),
+            "RECORD":Record(array),
             "PROCESS":Process(array)
         }
 
