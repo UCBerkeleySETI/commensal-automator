@@ -30,8 +30,8 @@ class State(object):
 class FreeSubscribe(State):
     """State for use with the Free-Subscribe state machine.
     """
-    def __init__(self, array):
-        super().__init__(array)
+    def __init__(self, array, r):
+        super().__init__(array, r)
         self.states = {
             "SUBSCRIBE":Subscribed(array)
             "FREE":Free(array)
@@ -42,6 +42,10 @@ class Free(FreeSubscribe):
     """State in which the subarray is not configured and no nodes are
     subscribed.
     """
+
+    def __init__(self, array, r):
+        super().__init__(array, r)
+        self.name = "FREE"
 
     def on_entry(self, data, free):
         """Deallocate instances from a subarray and instruct them to
@@ -70,6 +74,10 @@ class Subscribed(FreeSubscribe):
     subarray.
     """
 
+    def __init__(self, array, r):
+        super().__init__(array, r)
+        self.name = "SUBSCRIBED"
+
     def on_entry(self, data, free):
         """Allocate instances to a new subarray.
         """
@@ -97,19 +105,21 @@ class Subscribed(FreeSubscribe):
 class RecProc(State):
     """State for use with the Record-Process state machine. 
     """
-    def __init__(self, array):
-        super().__init__(array)
+    def __init__(self, array, r):
+        super().__init__(array, r)
         self.states = {
             "READY":Ready(array)
             "RECORD":Record(array)
+            "PROCESS":Process(array)
         }
 
 class Ready(RecProc):
     """The coordinator is in the READY state.
     """
 
-    def on_entry(self, data):
-        log.info(f"{self.array} entering READY state")
+    def __init__(self, array, r):
+        super().__init__(array, r)
+        self.name = "READY"
 
     def handle_event(self, event, data):
         super().handle_event(event, data)
@@ -122,6 +132,10 @@ class Ready(RecProc):
 class Record(RecProc):
     """The coordinator is in the RECORD state
     """
+
+    def __init__(self, array, r):
+        super().__init__(array, r)
+        self.name = "RECORD"
 
     def on_entry(self, data):
 
@@ -159,6 +173,10 @@ class Record(RecProc):
 class Process(RecProc):
     """The coordinator is in the PROCESS state.
     """
+
+    def __init__(self, array, r):
+        super().__init__(array, r)
+        self.name = "PROCESS"
 
     def on_entry(self, data):
         """Initiate processing on the appropriate processing nodes.
