@@ -15,7 +15,7 @@ class State(object):
     def handle_event(self, event, data):
         """Respond to an incoming event as appropriate.
         """
-        log.info(f"{self.array} in state {self.name}, handling new event: {event}")
+        log.info(f"{self.array} handling new event: {event}")
 
     def on_entry(self, data):
         """Performs these actions on entry.
@@ -47,22 +47,22 @@ class Free(FreeSubscribe):
         super().__init__(array, r)
         self.name = "FREE"
 
-    def on_entry(self, data, free):
+    def on_entry(self, data):
         """Deallocate instances from a subarray and instruct them to
         unsubscribe from their assigned multicast groups.
         """
+        log.info(f"{self.array} entering state: {self.name}")
         subscription_utils.unsubscribe(self.r, self.array, data["subscribed"])
         while data["subscribed"]:
-            free.add(data["subscribed"].pop())
+            data["free"].add(data["subscribed"].pop())
 
-    def handle_event(self, event, free, data):
+    def handle_event(self, event, data):
         super().handle_event(event, data)
         if event == "CONFIGURE":
-            if free:
-                self.states["SUBSCRIBE"].on_entry(data, free)
+            if data["free"]:
                 return self.states["SUBSCRIBE"]
             else:
-                message = f"No free instances, not configuring {array}"
+                message = f"No free instances, not configuring {self.array}"
                 redis_util.alert(self.r, message, "coordinator")
                 return self
         else:
@@ -78,26 +78,26 @@ class Subscribed(FreeSubscribe):
         super().__init__(array, r)
         self.name = "SUBSCRIBED"
 
-    def on_entry(self, data, free):
+    def on_entry(self, data):
         """Allocate instances to a new subarray.
         """
+        log.info(f"{self.array} entering state: {self.name}")
 
         # Attempt to claim the required number of instances from those that
         # are free:
         n_requested = subscription_utils.num_requested(self.r, self.array)
-        while len(free) > 0 and len(data["subscribed"]) < n_requested:
-            data["subscribed"].add(free.pop())
+        while len(data["free"]) > 0 and len(data["subscribed"]) < n_requested:
+            data["subscribed"].add(data["free"].pop())
         if len(data["subscribed"]) < n_requested:
             message = f"{len(data['subscribed'])}/{n_requested} available."
             redis_util.alert(self.r, message, "coordinator")
 
         # Initiate subscription process:
-        subscription_utils.subscribe(self.r, array, instances)
+        subscription_utils.subscribe(self.r, self.array, data["subscribed"])
 
-    def handle_event(self, event, free, data):
+    def handle_event(self, event, data):
         super().handle_event(event, data)
         if event == "DECONFIGURE":
-            self.states["FREE"].on_entry(data, free)
             return self.states["FREE"]
         else:
             return self
@@ -121,10 +121,12 @@ class Ready(RecProc):
         super().__init__(array, r)
         self.name = "READY"
 
+    def on_entry(self, data):
+        log.info(f"{self.array} entering state: {self.name}")
+
     def handle_event(self, event, data):
         super().handle_event(event, data)
         if event == "RECORD":
-            self.states["RECORD"].on_entry(data)
             return self.states["RECORD"]
         else:
             return self
@@ -139,6 +141,8 @@ class Record(RecProc):
 
     def on_entry(self, data):
 
+        log.info(f"{self.array} entering state: {self.name}")
+
         subscribed = data["subscribed"]
         ready = data["ready"]
 
@@ -146,7 +150,7 @@ class Record(RecProc):
             result = rec.record(self.r, self.array, list(ready))
             # update data:
             data["recording"] = result
-            data["ready"] = ready^result
+            data["ready"] = ready.difference(result)
         else:
             log.error("Not all ready instances are subscribed.")
 
@@ -161,10 +165,8 @@ class Record(RecProc):
                     data["ready"].add(data["recording"].pop())
                 return self.states["READY"]
             else:
-                self.states["PROCESS"].on_entry(data)
                 return self.states["PROCESS"]
         elif event == "REC_END":
-            self.states["PROCESS"].on_entry(data)
             return self.states["PROCESS"]
         else:
             return self
@@ -182,6 +184,8 @@ class Process(RecProc):
         """Initiate processing on the appropriate processing nodes.
         """
 
+        log.info(f"{self.array} entering state: {self.name}")
+
         # Move from recording to processing:
         while data["recording"]:
             data["processing"].add(data["recording"].pop())
@@ -193,6 +197,7 @@ class Process(RecProc):
             host, instance_number = instance.split("/")
             util.zmq_circus_cmd(host, f"proc_{instance_number}", "start")
 
+
     def handle_event(self, event, data):
         super().handle_event(event, data)
         # If a node completes processing:
@@ -200,11 +205,10 @@ class Process(RecProc):
             _, instance, returncode = event.split(":")
             if instance in data["processing"]:
                 data["processing"].remove(instance)
-                data["completed"].add(instance)
+                data["ready"].add(instance)
                 # If all (or whatever preferred percentage) is completed,
                 # continue to the next state:
                 if not data["processing"]:
-                    self.states["READY"].on_entry(data)
                     return self.states["READY"]
             else:
                 log.warning(f"Unrecognised instance: {instance}")

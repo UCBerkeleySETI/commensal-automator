@@ -15,7 +15,11 @@ class FreeSubscribedMachine(object):
         }
 
     def handle_event(self, event):
-         self.state = current_state.handle_event(event, data)
+        new_state = self.state.handle_event(event, self.data)
+        # Run on_entry only if we are entering a new state
+        if new_state.name != self.state.name:
+            self.state = new_state
+            self.state.on_entry(self.data)
 
 
 class RecProcMachine(object):
@@ -23,7 +27,7 @@ class RecProcMachine(object):
     def __init__(self, initial_state, all_instances, subscribed):
 
         self.state = initial_state
-        
+
         self.data = {
             "subscribed":subscribed,
             "ready":set(),
@@ -31,7 +35,11 @@ class RecProcMachine(object):
             "processing":set()
         }
 
-        self.data[initial_state.name] = all_instances 
+        self.data[initial_state.name] = all_instances.copy()
 
     def handle_event(self, event):
-         self.state = current_state.handle_event(event, data)
+        new_state = self.state.handle_event(event, self.data)
+        # Run on_entry only if we are entering a new state
+        if new_state.name != self.state.name:
+            self.state = new_state
+            self.state.on_entry(self.data)
