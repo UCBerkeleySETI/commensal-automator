@@ -55,6 +55,7 @@ class Free(FreeSubscribe):
         subscription_utils.unsubscribe(self.r, self.array, data["subscribed"])
         while data["subscribed"]:
             data["free"].add(data["subscribed"].pop())
+        return True
 
     def handle_event(self, event, data):
         super().handle_event(event, data)
@@ -94,6 +95,7 @@ class Subscribed(FreeSubscribe):
 
         # Initiate subscription process:
         subscription_utils.subscribe(self.r, self.array, data["subscribed"])
+        return True
 
     def handle_event(self, event, data):
         super().handle_event(event, data)
@@ -110,7 +112,8 @@ class RecProc(State):
         self.states = {
             "READY":Ready(array),
             "RECORD":Record(array),
-            "PROCESS":Process(array)
+            "PROCESS":Process(array),
+            "ERROR":Error(array)
         }
 
 class Ready(RecProc):
@@ -123,6 +126,7 @@ class Ready(RecProc):
 
     def on_entry(self, data):
         log.info(f"{self.array} entering state: {self.name}")
+        return True
 
     def handle_event(self, event, data):
         super().handle_event(event, data)
@@ -151,8 +155,10 @@ class Record(RecProc):
             # update data:
             data["recording"] = result
             data["ready"] = ready.difference(result)
+            return True
         else:
             log.error("Not all ready instances are subscribed.")
+            return False
 
     def handle_event(self, event, data):
         super().handle_event(event, data)
@@ -179,6 +185,7 @@ class Process(RecProc):
     def __init__(self, array, r):
         super().__init__(array, r)
         self.name = "PROCESS"
+        self.returncodes = []
 
     def on_entry(self, data):
         """Initiate processing on the appropriate processing nodes.
@@ -196,6 +203,7 @@ class Process(RecProc):
         for instance in data["processing"]:
             host, instance_number = instance.split("/")
             util.zmq_circus_cmd(host, f"proc_{instance_number}", "start")
+        return True
 
 
     def handle_event(self, event, data):
@@ -206,10 +214,36 @@ class Process(RecProc):
             if instance in data["processing"]:
                 data["processing"].remove(instance)
                 data["ready"].add(instance)
+                self.returncodes.append(int(returncode))
                 # If all (or whatever preferred percentage) is completed,
                 # continue to the next state:
                 if not data["processing"]:
-                    return self.states["READY"]
+                    # Check and clear the returncodes:
+                    if max(self.returncodes) < 2:
+                        self.returncodes = []
+                        return self.states["READY"]
+                    else:
+                        return self.states["ERROR"]
             else:
                 log.warning(f"Unrecognised instance: {instance}")
+        return self
+
+
+class Error(RecProc):
+    """Error state for the record-process state machine.
+
+    Leaving the error state requires manual intervention.
+    """
+
+    def __init__(self, array, r):
+        super().__init__(array, r)
+        self.name = "ERROR"
+
+    def on_entry(self, data):
+        log.info(f"{self.array} entering state: {self.name}")
+        return True
+
+    def handle_event(self, event, data):
+        super().handle_event(event, data)
+        log.info(f"In ERROR state, therefore ignoring: {event}")
         return self
