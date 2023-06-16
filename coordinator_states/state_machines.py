@@ -18,8 +18,12 @@ class FreeSubscribedMachine(object):
         new_state = self.state.handle_event(event, self.data)
         # Run on_entry only if we are entering a new state
         if new_state.name != self.state.name:
-            self.state = new_state
-            self.state.on_entry(self.data)
+            # Attempt to enter the new state:
+            if new_state.on_entry(self.data):
+                self.state = new_state
+            else:
+                # stay in current state if entry failed
+                log.warning(f"Could not enter new state: {new_state.name}")
 
 
 class RecProcMachine(object):
@@ -41,5 +45,9 @@ class RecProcMachine(object):
         new_state = self.state.handle_event(event, self.data)
         # Run on_entry only if we are entering a new state
         if new_state.name != self.state.name:
-            self.state = new_state
-            self.state.on_entry(self.data)
+            # Attempt to enter the new state:
+            if new_state.on_entry(self.data):
+                self.state = new_state
+            else:
+                # stay in current state if entry failed
+                log.warning(f"Could not enter new state: {new_state.name}")
