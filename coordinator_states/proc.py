@@ -36,8 +36,8 @@ def run_seticore(bfrdir, inputdir, tsdir, partition, r, log):
     # Create search product output directory.
     outputdir = f"/{partition}/data/{tsdir}/seticore_search"
     log.info(f"Creating search output directory: {outputdir}")
-    cmd = ["mkdir", "-p", "-m", "1777", outputdir]
-    subprocess.run(cmd)
+    if not make_outputdir(outputdir, log):
+        return 2
 
     # Build command:
     seticore_command = ["/home/lacker/bin/seticore",
@@ -56,8 +56,8 @@ def run_seticore(bfrdir, inputdir, tsdir, partition, r, log):
         # create directory for h5 files
         h5dir = f"/{partition}/data/{tsdir}/seticore_beamformer"
         log.info(f"Creating beamformer output directory: {h5dir}")
-        cmd = ["mkdir", "-p", "-m", "1777", h5dir]
-        subprocess.run(cmd)
+        if not make_outputdir(h5dir, log):
+            return 2
         # add --h5_dir arg to seticore command
         seticore_command.extend(["--h5_dir", h5dir])
     proc_util.increment_n_proc(r)
@@ -84,6 +84,19 @@ def cli(args = sys.argv[0]):
         parser.exit()
     args = parser.parse_args()
     process(name = args.name)
+
+def make_outputdir(outputdir, log):
+    """Make an outputdir for seticore search products.
+    """
+    try:
+        os.path.makedirs(outputdir, mode=1777)
+        return True
+    except FileExistsError:
+        log.error("This directory already exists.")
+        return False
+    except Exception as e:
+        log.error(e)
+        return False
 
 def process(name):
     """Set up and run processing.
