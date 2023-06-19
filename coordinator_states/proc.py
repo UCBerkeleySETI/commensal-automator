@@ -10,9 +10,8 @@ import logging
 import sys
 import argparse
 import os
-import shutil
 
-from automator import proc_util
+import proc_util
 
 RESULT_CHANNEL = "proc_result"
 LOG_FORMAT = "[%(asctime)s - %(levelname)s - %(filename)s:%(lineno)s] %(message)s"
@@ -37,7 +36,7 @@ def run_seticore(bfrdir, inputdir, tsdir, partition, r, log):
     # Create search product output directory.
     outputdir = f"/{partition}/data/{tsdir}/seticore_search"
     log.info(f"Creating search output directory: {outputdir}")
-    if not make_outputdir(outputdir, log):
+    if not proc_util.make_outputdir(outputdir, log):
         return 2
 
     # Build command:
@@ -57,7 +56,7 @@ def run_seticore(bfrdir, inputdir, tsdir, partition, r, log):
         # create directory for h5 files
         h5dir = f"/{partition}/data/{tsdir}/seticore_beamformer"
         log.info(f"Creating beamformer output directory: {h5dir}")
-        if not make_outputdir(h5dir, log):
+        if not proc_util.make_outputdir(h5dir, log):
             return 2
         # add --h5_dir arg to seticore command
         seticore_command.extend(["--h5_dir", h5dir])
@@ -90,18 +89,6 @@ def cli(args = sys.argv[0]):
     args = parser.parse_args()
     process(host = args.host, n = args.number)
 
-def make_outputdir(outputdir, log):
-    """Make an outputdir for seticore search products.
-    """
-    try:
-        os.path.makedirs(outputdir, mode=1777)
-        return True
-    except FileExistsError:
-        log.error("This directory already exists.")
-        return False
-    except Exception as e:
-        log.error(e)
-        return False
 
 def process(host, n):
     """Set up and run processing.
@@ -154,7 +141,7 @@ def process(host, n):
         if res > 1:
             log.error(f"Not deleting since seticore returned {res} for {datadir}")
             continue
-        if not rm_datadir(datadir, n, log):
+        if not proc_util.rm_datadir(datadir, n, log):
             log.error(f"Failed to clear {datadir}")
             res = 2
         if res > max_returncode:
@@ -162,28 +149,6 @@ def process(host, n):
 
     # Publish result back to central coordinator via Redis:
     r.publish(RESULT_CHANNEL, f"RETURN:{name}:{max_returncode}")
-
-def rm_datadir(datadir, instance_number, log):
-    """Remove directory of RAW recordings after processing. DATADIR is
-    expected in the format:
-    "/buf0ro/<pktstart timestamp>-<schedule block ID>/..."
-    Note that "<pktstart timestamp>-<schedule block ID>" is globally unique
-    for a directory of raw recordings for the current instance.
-    """
-    components = datadir.split("/")
-    if components[1] != "buf0ro":
-        log.error(f"Not a valid datadir: {datadir}")
-        return False
-    datadir_id = components[2]
-    root = f"/buf{instance_number}"
-    rm_path = f"{root}/{datadir_id}"
-    try:
-        shutil.rmtree(rm_path)
-        return True
-    except Exception as e:
-        log.error(e)
-        return False
-
 
 
 if __name__ == "__main__":

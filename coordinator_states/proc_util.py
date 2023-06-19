@@ -1,4 +1,8 @@
 
+import re
+import os
+import shutil
+
 def get_items(r, name, type):
     """Return the set of items of <type> from Redis.
     """
@@ -24,7 +28,6 @@ def get_n_proc(r):
         return 0
     return int(n_proc)
 
-
 def timestamped_dir_from_filename(filename):
     """Extracts timestamped section from filenames like:
     /buf0/<timestamp-part>/blah/blah/etc
@@ -36,3 +39,37 @@ def timestamped_dir_from_filename(filename):
     if not re.match(r"^[0-9]{8}T[0-9]{6}Z-[^/]*$", answer):
         return None
     return answer
+
+def make_outputdir(outputdir, log):
+    """Make an outputdir for seticore search products.
+    """
+    try:
+        os.path.makedirs(outputdir, mode=1777)
+        return True
+    except FileExistsError:
+        log.error("This directory already exists.")
+        return False
+    except Exception as e:
+        log.error(e)
+        return False
+
+def rm_datadir(datadir, instance_number, log):
+    """Remove directory of RAW recordings after processing. DATADIR is
+    expected in the format:
+    "/buf0ro/<pktstart timestamp>-<schedule block ID>/..."
+    Note that "<pktstart timestamp>-<schedule block ID>" is globally unique
+    for a directory of raw recordings for the current instance.
+    """
+    components = datadir.split("/")
+    if components[1] != "buf0ro":
+        log.error(f"Not a valid datadir: {datadir}")
+        return False
+    datadir_id = components[2]
+    root = f"/buf{instance_number}"
+    rm_path = f"{root}/{datadir_id}"
+    try:
+        shutil.rmtree(rm_path)
+        return True
+    except Exception as e:
+        log.error(e)
+        return False
