@@ -97,10 +97,6 @@ def process(name):
     # Redis server
     r = redis.StrictRedis(decode_responses=True)
 
-
-    # TODO: Put these in a hash! Save array details to simplify
-    # returning vals.
-
     # Set of unprocessed directories:
     unprocessed = proc_util.get_items(r, name, "unprocessed")
 
@@ -133,8 +129,11 @@ def process(name):
     to_clean = unprocessed.difference(preserved)
 
     # can we have an arg here for specific directory?
+    max_returncode = 0
     for datadir in to_clean:
         res = results[datadir]
+        if res > max_returncode:
+            max_returncode = res
         if res > 1:
             log.error(f"Not deleting since seticore returned {res} for {datadir}")
             continue
@@ -148,7 +147,7 @@ def process(name):
         log.error(f"Failed to delete {datadir}, code {result}")
 
     # Publish result back to central coordinator via Redis:
-    r.publish(RESULT_CHANNEL, f"RETURN:{name}:{result}")
+    r.publish(RESULT_CHANNEL, f"RETURN:{name}:{max_returncode}")
 
 if __name__ == "__main__":
     cli()
