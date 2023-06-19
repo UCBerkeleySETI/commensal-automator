@@ -1,7 +1,6 @@
 """
 Processing module intended to run on each processing node. There should be one
-Circus-controlled processing script per instance. They are expected to be
-named as follows: proc_<instance number>
+Circus-controlled processing script per instance. 
 """
 
 import subprocess
@@ -10,6 +9,7 @@ import logging
 import sys
 import argparse
 import os
+import socket
 
 import proc_util
 
@@ -73,26 +73,23 @@ def cli(args = sys.argv[0]):
     description = "Add or remove sources from targets database."
     parser = argparse.ArgumentParser(usage = usage,
                                      description = description)
-    parser.add_argument("-h",
-                        "--host",
-                        type = str,
-                        default = "unknown",
-                        help = "Name of the current host.")
-    parser.add_argument("-n",
-                        "--number",
-                        type = str,
-                        default = "unknown",
+    parser.add_argument("-I",
+                        "--instance",
+                        type = int,
+                        default = 0,
                         help = "Current instance number.")
     if len(sys.argv[1:]) == 0:
         parser.print_help()
         parser.exit()
     args = parser.parse_args()
-    process(host = args.host, n = args.number)
+    process(n = args.instance)
 
 
-def process(host, n):
+def process(n):
     """Set up and run processing.
     """
+    # Get the hostname
+    host = socket.gethostname().split(".")[0]
 
     name = "f{host}/{n}"
 
@@ -140,6 +137,9 @@ def process(host, n):
         res = results[datadir]
         if res > 1:
             log.error(f"Not deleting since seticore returned {res} for {datadir}")
+            continue
+        if not os.exists(datadir):
+            log.warning("Directory doesn't exist")
             continue
         if not proc_util.rm_datadir(datadir, n, log):
             log.error(f"Failed to clear {datadir}")
