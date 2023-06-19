@@ -10,6 +10,7 @@ import logging
 import sys
 import argparse
 import os
+import shutil
 
 from automator import proc_util
 
@@ -73,17 +74,21 @@ def cli(args = sys.argv[0]):
     description = "Add or remove sources from targets database."
     parser = argparse.ArgumentParser(usage = usage,
                                      description = description)
-    parser.add_argument("-n",
-                        "--name",
+    parser.add_argument("-h",
+                        "--host",
                         type = str,
                         default = "unknown",
-                        help = "Name of the current instance.")
-
+                        help = "Name of the current host.")
+    parser.add_argument("-n",
+                        "--number",
+                        type = str,
+                        default = "unknown",
+                        help = "Current instance number.")
     if len(sys.argv[1:]) == 0:
         parser.print_help()
         parser.exit()
     args = parser.parse_args()
-    process(name = args.name)
+    process(host = args.host, n = args.number)
 
 def make_outputdir(outputdir, log):
     """Make an outputdir for seticore search products.
@@ -98,9 +103,11 @@ def make_outputdir(outputdir, log):
         log.error(e)
         return False
 
-def process(name):
+def process(host, n):
     """Set up and run processing.
     """
+
+    name = "f{host}/{n}"
 
     # Set up logging:
     log = logging.getLogger(LOGGER_NAME)
@@ -141,26 +148,43 @@ def process(name):
     # Clean up
     to_clean = unprocessed.difference(preserved)
 
-    # can we have an arg here for specific directory?
     max_returncode = 0
     for datadir in to_clean:
         res = results[datadir]
-        if res > max_returncode:
-            max_returncode = res
         if res > 1:
             log.error(f"Not deleting since seticore returned {res} for {datadir}")
             continue
-        cmd = ["bash",
-                "-c",
-                f"/home/obs/bin/cleanmybuf0.sh --force --dir {datadir}"]
-        result = subprocess.run(cmd)
-        if result == 0:
-            log.info(f"Deleted {datadir}")
-            continue
-        log.error(f"Failed to delete {datadir}, code {result}")
+        if not rm_datadir(datadir, n, log):
+            log.error(f"Failed to clear {datadir}")
+            res = 2
+        if res > max_returncode:
+            max_returncode = res
 
     # Publish result back to central coordinator via Redis:
     r.publish(RESULT_CHANNEL, f"RETURN:{name}:{max_returncode}")
+
+def rm_datadir(datadir, instance_number, log):
+    """Remove directory of RAW recordings after processing. DATADIR is
+    expected in the format:
+    "/buf0ro/<pktstart timestamp>-<schedule block ID>/..."
+    Note that "<pktstart timestamp>-<schedule block ID>" is globally unique
+    for a directory of raw recordings for the current instance.
+    """
+    components = datadir.split("/")
+    if components[1] != "buf0ro":
+        log.error(f"Not a valid datadir: {datadir}")
+        return False
+    datadir_id = components[2]
+    root = f"/buf{instance_number}"
+    rm_path = f"{root}/{datadir_id}"
+    try:
+        shutil.rmtree(rm_path)
+        return True
+    except Exception as e:
+        log.error(e)
+        return False
+
+
 
 if __name__ == "__main__":
     cli()
