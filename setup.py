@@ -3,26 +3,28 @@ import setuptools
 requires = [
     'numpy >= 1.18.1',
     'redis >= 3.4.1',
-    'katsdptelstate >= 0.11'
+    'katsdptelstate >= 0.11',
+    'PyYAML >= 6.0',
+    'pyzmq >= 25.0.0'
     ]
 
 setuptools.setup(
     name = 'automator',
-    version = '1.0',
+    version = '2.0',
     url = 'https://github.com/UCBerkeleySETI/commensal-automator',
     license = 'MIT',
-    author = 'Daniel Czech',
+    author = 'Daniel Czech', 'Dave MacMahon', 'Kevin Lacker'
     author_email = 'danielc@berkeley.edu',
     description = 'Automation for Breakthrough Listen\'s commensal observing',
     packages = [
-        'automator',
         'coordinator',
+        'bluse_analyzer'
         ],
     install_requires=requires,
     entry_points = {
         'console_scripts':[
-            'automator = automator.cli:cli',
-            'coordinator = coordinator.coordinator_start:cli', 
+            'coordinator = coordinator.cli:cli',
+            'bluse_analyzer = coordinator.bluse_analyzer:cli'
             ]
         },
 
