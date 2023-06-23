@@ -2,8 +2,8 @@ import json
 import numpy as np
 import time
 
-from automator import util, redis_util
-from automator.logger import log
+import util, redis_util
+from logger import log
 
 FENG_TYPE = "wide.antenna-channelised-voltage"
 STREAM_TYPE = "cbf.antenna_channelised_voltage"
@@ -81,6 +81,8 @@ def subscribe(r, array, instances, streams_per_instance=STREAMS_PER_INSTANCE):
     # Make sure PKTSTART is 0 on configure
     redis_util.gateway_msg(r, array_group, 'PKTSTART', 0, False)
 
+    # TODO: sort list of instances so each node typically gets the same piece of the band
+
     # SCHAN, NSTRM and DESTIP by instance:
     for i in range(len(instances)):
         # Number of streams for instance i (NSTRM)
@@ -88,6 +90,7 @@ def subscribe(r, array, instances, streams_per_instance=STREAMS_PER_INSTANCE):
             nstrm = n_last
         else:
             nstrm = streams_per_instance
+        # TODO: array groups here, really?
         redis_util.gateway_msg(r, array_group, 'NSTRM', nstrm, False)
         # Absolute starting channel for instance i (SCHAN)
         schan = i*nstrm*int(hnchan)

@@ -10,7 +10,7 @@ import sys
 import time
 import numpy as np
 
-from automator.logger import log
+from logger import log
 
 SLACK_CHANNEL = "meerkat-obs-log"
 SLACK_PROXY_CHANNEL = "slack-messages"
@@ -629,6 +629,19 @@ def mode_1d(data_1d):
 def parse_msg(msg):
     """Attempts to parse incoming message from other backend processes.
     Expects a message of the form: <origin>:<message>
+    """
+    data = msg['data']
+    components = msg_data.split(':')
+    if len(components) > 4:
+        log.warning(f"Unrecognised message: {data}")
+        return
+    return components
+
+
+# TODO: complete
+def classify_event(msg):
+    """Classify an incoming message as an event to which the state machines
+    must respond.
     """
     data = msg['data']
     components = msg_data.split(':')

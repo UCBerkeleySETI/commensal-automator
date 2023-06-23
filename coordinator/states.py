@@ -1,6 +1,6 @@
-from automator.logger import log
-from automator import redis_util, subscription_utils, util
-from automator import rec_util as rec
+from logger import log
+import redis_util, subscription_utils, util
+import rec_util as rec
 
 DEFAULT_DWELL = 290 # in seconds
 

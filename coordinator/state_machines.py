@@ -36,7 +36,7 @@ class RecProcMachine(object):
             "subscribed":subscribed,
             "ready":set(),
             "recording":set(),
-            "processing":set()
+            "processing":set(), 
         }
 
         self.data[initial_state.name] = all_instances.copy()

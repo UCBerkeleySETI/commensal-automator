@@ -1,9 +1,9 @@
 import threading
 import numpy as np
-import datetime, timedelta
+from datetime import datetime, timedelta
 
-from automator import util, redis_util
-from automator.logger import log
+import util, redis_util
+from logger import log
 
 HPGDOMAIN = 'bluse'
 PKTIDX_MARGIN = 2048 # in packets
@@ -81,7 +81,9 @@ def record(r, array, instances):
 
     # If this is primary time, write datadir to the list of directories to
     # preserve:
-    add_preserved(r, recording, datadir)
+    # TODO: check for primary time first
+    #if is_primary_time():
+    #    add_preserved(r, recording, datadir)
 
     return recording
 

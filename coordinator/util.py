@@ -9,10 +9,14 @@ import json
 import time
 import yaml
 
-from automator.logger import log
+from logger import log
 
 GRAFANA_ANNOTATIONS_URL = "http://blh0:3000/api/annotations"
-GRAFANA_AUTH = os.environ['GRAFANA_AUTH']
+try:
+    GRAFANA_AUTH = os.environ['GRAFANA_AUTH']
+except KeyError:
+    log.warning("Grafana token not set.")
+    GRAFANA_AUTH = None
 
 def config(cfg_file):
     """Configure the coordinator according to .yml config file.
