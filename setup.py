@@ -13,7 +13,7 @@ setuptools.setup(
     version = '2.0',
     url = 'https://github.com/UCBerkeleySETI/commensal-automator',
     license = 'MIT',
-    author = 'Daniel Czech', 'Dave MacMahon', 'Kevin Lacker'
+    author = 'Daniel Czech, Dave MacMahon, Kevin Lacker',
     author_email = 'danielc@berkeley.edu',
     description = 'Automation for Breakthrough Listen\'s commensal observing',
     packages = [
@@ -27,5 +27,4 @@ setuptools.setup(
             'bluse_analyzer = coordinator.bluse_analyzer:cli'
             ]
         },
-
     )
