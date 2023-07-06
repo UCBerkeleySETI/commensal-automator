@@ -10,7 +10,7 @@ import sys
 import time
 import numpy as np
 
-from logger import log
+from coordinator.logger import log
 
 SLACK_CHANNEL = "meerkat-obs-log"
 SLACK_PROXY_CHANNEL = "slack-messages"

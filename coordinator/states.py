@@ -1,6 +1,6 @@
-from logger import log
-import redis_util, subscription_utils, util
-import rec_util as rec
+from coordinator.logger import log
+from coordinator import redis_util, subscription_utils, util
+from coordinator import rec_util as rec
 
 DEFAULT_DWELL = 290 # in seconds
 

@@ -2,8 +2,8 @@ import json
 import numpy as np
 import time
 
-import util, redis_util
-from logger import log
+from coordinator import util, redis_util
+from coordinator.logger import log
 
 FENG_TYPE = "wide.antenna-channelised-voltage"
 STREAM_TYPE = "cbf.antenna_channelised_voltage"

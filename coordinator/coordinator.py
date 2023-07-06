@@ -1,10 +1,10 @@
 import redis
 
-import util, redis_util
-from logger import log
+from coordinator import util, redis_util
+from coordinator.logger import log
 
-from states import Ready, Free
-from state_machines import RecProcMachine, FreeSubscribedMachine
+from coordinator.states import Ready, Free
+from coordinator.state_machines import RecProcMachine, FreeSubscribedMachine
 
 class Coordinator(object):
     """Coordinator that runs on the headnode and allocates instances to

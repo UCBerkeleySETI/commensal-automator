@@ -9,7 +9,7 @@ import json
 import time
 import yaml
 
-from logger import log
+from coordinator.logger import log
 
 GRAFANA_ANNOTATIONS_URL = "http://blh0:3000/api/annotations"
 try:

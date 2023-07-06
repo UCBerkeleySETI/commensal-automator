@@ -5,9 +5,8 @@ the headnode.
 
 import argparse
 import sys
-
-from coordinator import Coordinator
-from logger import log, set_logger
+from coordinator.coordinator import Coordinator
+from coordinator.logger import log, set_logger
 
 
 def cli(args = sys.argv[0]):

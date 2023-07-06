@@ -2,8 +2,8 @@ import threading
 import numpy as np
 from datetime import datetime, timedelta
 
-import util, redis_util
-from logger import log
+from coordinator import util, redis_util
+from coordinator.logger import log
 
 HPGDOMAIN = 'bluse'
 PKTIDX_MARGIN = 2048 # in packets
