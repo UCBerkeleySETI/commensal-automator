@@ -22,7 +22,7 @@ setuptools.setup(
     entry_points = {
         'console_scripts':[
             'coordinator = coordinator.cli:cli',
-            'bluse_analyzer = coordinator.bluse_analyzer:cli'
+            'bluse_analyzer = coordinator.analyzer:cli'
             ]
         },
     )

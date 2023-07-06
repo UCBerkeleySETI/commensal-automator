@@ -11,7 +11,7 @@ import argparse
 import os
 import socket
 
-import proc_util
+from coordinator import proc_util
 
 RESULT_CHANNEL = "proc_result"
 LOG_FORMAT = "[%(asctime)s - %(levelname)s - %(filename)s:%(lineno)s] %(message)s"
