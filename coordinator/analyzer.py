@@ -70,7 +70,7 @@ def cli(args = sys.argv[0]):
     """CLI for instance-specific processing controller. 
     """
     usage = f"{args} [options]"
-    description = "Add or remove sources from targets database."
+    description = "Run processing actions for specified instance."
     parser = argparse.ArgumentParser(usage = usage,
                                      description = description)
     parser.add_argument("-I",
