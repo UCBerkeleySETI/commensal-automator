@@ -54,10 +54,24 @@ class Coordinator(object):
                 if components[0] == "RETURN":
                     self.processing_return(message)
                 else:
-                    array = components[0]
-                    event = components[1]
+                    array = components[1]
+                    event = self.message_to_event(components[0])
                     self.freesubscribed_machines[array].state.handle_event(event)
-                    self.recproc_machines[components[0]].state.handle_event(event)
+                    self.recproc_machines[array].state.handle_event(event)
+
+    def message_to_event(self, message):
+        """Convert an incoming message into an event transition.
+        """
+        if message == "configure":
+            return "CONFIGURE"
+        elif message == "deconfigure":
+            return "DECONFIGURE"
+        elif message == "tracking":
+            return "RECORD"
+        elif message == "not-tracking":
+            return "TRACK_STOP"
+        else:
+            return message
 
     def processing_return(self, message):
         """Note, we must return these to every array's state machine for the
