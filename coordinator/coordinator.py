@@ -70,6 +70,8 @@ class Coordinator(object):
             return "RECORD"
         elif message == "not-tracking":
             return "TRACK_STOP"
+        elif message == "rec-timeout":
+            return "REC_END"
         else:
             return message
 

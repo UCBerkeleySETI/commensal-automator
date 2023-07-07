@@ -79,6 +79,11 @@ def record(r, array, instances):
     # Write datadir to the list of unprocessed directories for this subarray:
     add_unprocessed(r, recording, datadir)
 
+    # Start recording timeout timer, with 10 second safety margin:
+    rec_timer = threading.Timer(300, lambda:self.timeout(r, array, "rec_result"))
+    log.info("Starting recording timeout timer.")
+    rec_timer.start()
+
     # If this is primary time, write datadir to the list of directories to
     # preserve:
     # TODO: check for primary time first
@@ -285,3 +290,9 @@ def get_recording(r, instances):
     """
     ins = redis_util.multiget_by_instance(r, HPGDOMAIN, instances, "DAQSTATE")
     return set([inst[0] for inst in ins if inst[1][0] == "RECORD"])
+
+
+def timeout(r, array, channel):
+    """Temporary timeout mechanism for recordings.
+    """
+    r.publish(channel, f"rec-timeout:{array}")

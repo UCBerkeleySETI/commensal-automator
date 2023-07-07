@@ -3,6 +3,7 @@
 channels:
 - alerts
 - proc_result
+- rec_result
 
 arrays:
 - array_1
