@@ -24,7 +24,7 @@ def cli(args = sys.argv[0]):
         parser.print_help()
         parser.exit()
     args = parser.parse_args()
-    start(config_file = args.redis_endpoint)
+    start(config_file = args.config)
 
 
 def start(config_file):

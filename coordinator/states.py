@@ -33,8 +33,8 @@ class FreeSubscribe(State):
     def __init__(self, array, r):
         super().__init__(array, r)
         self.states = {
-            "SUBSCRIBE":Subscribed(array),
-            "FREE":Free(array)
+            "SUBSCRIBE":Subscribed(array, r),
+            "FREE":Free(array, r)
         }
 
 
@@ -76,7 +76,9 @@ class Subscribed(FreeSubscribe):
     """
 
     def __init__(self, array, r):
+        log.info("init subscribed")
         super().__init__(array, r)
+        log.info("set name")
         self.name = "SUBSCRIBED"
 
     def on_entry(self, data):

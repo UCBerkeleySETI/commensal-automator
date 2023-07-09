@@ -15,21 +15,22 @@ class Coordinator(object):
 
     def __init__(self, config_file):
 
-        config = util.load_config(config_file)
+        config = util.config(config_file)
         self.channels = config["channels"]
-        self.free = set(config["instances"])
-        self.all_instances = set(config["instances"].copy()) # is copy() needed here?
+        self.free = set(config["hashpipe_instances"])
+        self.all_instances = set(config["hashpipe_instances"].copy()) # is copy() needed here?
         self.arrays = config["arrays"]
         self.r = redis.StrictRedis(host=config["redis_host"],
                                    port=config["redis_port"],
                                    decode_responses=True)
         self.recproc_machines = dict()
         self.freesubscribed_machines = dict()
+        self.subscribed = dict()
 
     def start(self):
         """Start the coordinator.
         """
-        self.alert("Starting up")
+        #self.alert("Starting up")
 
         for array in self.arrays:
 
@@ -84,7 +85,7 @@ class Coordinator(object):
             machine.state.handle_event(message)
 
     def alert(self, message):
-        redis_util.alert(self.red, message, "coordinator")
+        redis_util.alert(self.r, message, "[test] coordinator")
     
     def annotate(self, tag, text):
         response = util.annotate_grafana(tag, text)
