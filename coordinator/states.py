@@ -17,15 +17,6 @@ class State(object):
         """
         log.info(f"{self.array} handling new event: {event}")
 
-    def on_entry(self, data):
-        """Performs these actions on entry.
-        """
-        pass
-
-    def on_exit(self):
-        """Performs these actions on exit.
-        """
-        pass
 
 class FreeSubscribe(State):
     """State for use with the Free-Subscribe state machine.
