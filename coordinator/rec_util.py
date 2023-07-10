@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 
 from coordinator import util, redis_util
 from coordinator.logger import log
+from coordinator.telstate_interface import TelstateInterface
 
 HPGDOMAIN = 'bluse'
 PKTIDX_MARGIN = 2048 # in packets
@@ -26,7 +27,7 @@ def record(r, array, instances):
 
     # Retrieve calibration solutions after 60 seconds have passed (see above
     # for explanation of this delay):
-    delay = threading.Timer(60, lambda:self.retrieve_cals(r, array))
+    delay = threading.Timer(60, lambda:get_cals(r, array))
     log.info("Starting delay to retrieve cal solutions in background")
     delay.start()
 

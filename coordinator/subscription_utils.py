@@ -18,7 +18,7 @@ def subscribe(r, array, instances, streams_per_instance=STREAMS_PER_INSTANCE):
 
     # Configuration process started:
     util.annotate_grafana("CONFIGURE", 
-            f"{product_id}: Coordinator configuring DAQs.")
+            f"{array}: Coordinator configuring DAQs.")
     redis_util.alert(r, "Subscribing to new multicast groups", "coordinator")
 
     # Reset keys:
@@ -107,7 +107,7 @@ def unsubscribe(r, array, instances):
     """
 
     # Unsubscription process started:
-    self.annotate("UNSUBSCRIBE",
+    self.annotate_grafana("UNSUBSCRIBE",
         f"{description}: Coordinator instructing DAQs to unsubscribe.")
 
     # Set DESTIP to 0.0.0.0 individually for robustness.
@@ -165,7 +165,7 @@ def centre_freq(r, array):
     """Acquire the current centre frequency (FECENTER). Format for use with
     the Hashpipe-Redis gateway.
     """
-    sensor_key = self.stream_sensor_name(array,
+    sensor_key = stream_sensor_name(r, array,
         'antenna_channelised_voltage_centre_frequency')
     centre_freq = r.get(sensor_key)
     centre_freq = float(centre_freq)/1e6

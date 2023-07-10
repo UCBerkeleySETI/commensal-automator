@@ -24,7 +24,7 @@ import json
 
 import katsdptelstate
 
-from automator.logger import log, set_logger
+from coordinator.logger import log, set_logger
 
 class TelstateInterface(object):
     """This class is used to interface with Telstate to retrieve calibration

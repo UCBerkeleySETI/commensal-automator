@@ -438,11 +438,11 @@ def gateway_msg(r, channel, msg_key, msg_val, write):
     """
     msg = f"{msg_key}={msg_val}"
     r.publish(channel, msg)
-    log.info(f"Published {msg} to channel {chan_name}")
+    log.info(f"Published {msg} to channel {channel}")
     # save hash of most recent messages
     if write:
         red_server.hset(channel, msg_key, msg_val)
-        log.info(f"Wrote {msg} for channel {chan_name} to Redis")
+        log.info(f"Wrote {msg} for channel {channel} to Redis")
 
 def join_gateway_group(r, instances, group_name, gateway_domain):
     """Instruct hashpipe instances to join a hashpipe-redis gateway group.
@@ -452,8 +452,8 @@ def join_gateway_group(r, instances, group_name, gateway_domain):
     <gateway_domain>:<group_name>///set
     """
     # Instruct each instance to join specified group:
-    for i in range(len(instances)):
-        node_gateway_channel = f"{gateway_domain}://{instances[i]}/gateway"
+    for instance in instances:
+        node_gateway_channel = f"{gateway_domain}://{instance}/gateway"
         msg = f"join={group_name}"
         r.publish(node_gateway_channel, msg)
     log.info(f"Instances {instances} instructed to join gateway group: {group_name}")
@@ -577,7 +577,7 @@ def alert(r, message, name, slack_channel=SLACK_CHANNEL,
     log.info(message)
     # Format: <Slack channel>:<Slack message text>
     alert_msg = f"{slack_channel}:[{timestring()}] {name}: {message}"
-    r.publish(slack_proxy_channel, alert_msg)
+    #r.publish(slack_proxy_channel, alert_msg)
 
 
 def retrieve_dwell(r, hpgdomain, host_list, default_dwell):
