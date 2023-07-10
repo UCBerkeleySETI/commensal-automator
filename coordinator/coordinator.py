@@ -30,6 +30,7 @@ class Coordinator(object):
     def start(self):
         """Start the coordinator.
         """
+        log.info("Starting coordinator")
         #self.alert("Starting up")
 
         for array in self.arrays:
@@ -43,7 +44,7 @@ class Coordinator(object):
 
         # Listen for events and respond:
 
-        ps = self.redis_server.pubsub(ignore_subscribe_messages=True)
+        ps = self.r.pubsub(ignore_subscribe_messages=True)
         ps.subscribe(self.channels)
 
         for message in ps.listen():
