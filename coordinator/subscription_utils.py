@@ -107,14 +107,15 @@ def unsubscribe(r, array, instances):
     """
 
     # Unsubscription process started:
-    self.annotate_grafana("UNSUBSCRIBE",
-        f"{description}: Coordinator instructing DAQs to unsubscribe.")
+    util.annotate_grafana("UNSUBSCRIBE",
+        f"{array}: Coordinator instructing DAQs to unsubscribe.")
 
     # Set DESTIP to 0.0.0.0 individually for robustness.
     for instance in instances:
         channel = f"{HPGDOMAIN}://{instance}/set"
         redis_util.gateway_msg(r, channel, "DESTIP", "0.0.0.0", False)
-    redis_util.alert(f"Instructed DAQs for {array} to unsubscribe.")
+    redis_util.alert(r, f"Instructed DAQs for {array} to unsubscribe.",
+        "[test] new-coordinator")
     time.sleep(3) # give them a chance to respond
 
     # Belt and braces restart DAQs
@@ -125,9 +126,11 @@ def unsubscribe(r, array, instances):
     # r_2 = util.zmq_multi_cmd(hostnames_only, "bluse_hashpipe_2", "restart")
     # result.append(r_2)
     if len(result) > 0:
-        redis_util.alert(f"Failed to restart bluse_hashpipe on: {result}")
+        redis_util.alert(r, f"Failed to restart bluse_hashpipe on: {result}",
+            "[test] new-coordinator")
     else:
-        redis_util.alert(f"Restarted bluse_hashpipe on DAQs for {array}")
+        redis_util.alert(r, f"Restarted bluse_hashpipe on DAQs for {array}",
+            "[test] new-coordinator")
 
     # Instruct gateways to leave current subarray group:
     redis_util.leave_gateway_group(r, array, HPGDOMAIN)
