@@ -18,18 +18,7 @@ class State(object):
         log.info(f"{self.array} handling new event: {event}")
 
 
-class FreeSubscribe(State):
-    """State for use with the Free-Subscribe state machine.
-    """
-    def __init__(self, array, r):
-        super().__init__(array, r)
-        self.states = {
-            "SUBSCRIBE":Subscribed(array, r),
-            "FREE":Free(array, r)
-        }
-
-
-class Free(FreeSubscribe):
+class Free(State):
     """State in which the subarray is not configured and no nodes are
     subscribed.
     """
@@ -52,24 +41,21 @@ class Free(FreeSubscribe):
         super().handle_event(event, data)
         if event == "CONFIGURE":
             if data["free"]:
-                return self.states["SUBSCRIBE"]
+                return Subscribed(array, r)
             else:
                 message = f"No free instances, not configuring {self.array}"
                 redis_util.alert(self.r, message, "coordinator")
                 return self
-        else:
-            return self
+        return self
 
 
-class Subscribed(FreeSubscribe):
+class Subscribed(State):
     """State in which DAQ instances are assigned to a particular
     subarray.
     """
 
     def __init__(self, array, r):
-        log.info("init subscribed")
         super().__init__(array, r)
-        log.info("set name")
         self.name = "SUBSCRIBED"
 
     def on_entry(self, data):
@@ -93,23 +79,11 @@ class Subscribed(FreeSubscribe):
     def handle_event(self, event, data):
         super().handle_event(event, data)
         if event == "DECONFIGURE":
-            return self.states["FREE"]
-        else:
-            return self
+            return Free(array, r)
+        return self
 
-class RecProc(State):
-    """State for use with the Record-Process state machine. 
-    """
-    def __init__(self, array, r):
-        super().__init__(array, r)
-        self.states = {
-            "READY":Ready(array),
-            "RECORD":Record(array),
-            "PROCESS":Process(array),
-            "ERROR":Error(array)
-        }
 
-class Ready(RecProc):
+class Ready(State):
     """The coordinator is in the READY state.
     """
 
@@ -124,11 +98,10 @@ class Ready(RecProc):
     def handle_event(self, event, data):
         super().handle_event(event, data)
         if event == "RECORD":
-            return self.states["RECORD"]
-        else:
-            return self
+            return Record(array, r)
+        return self
 
-class Record(RecProc):
+class Record(State):
     """The coordinator is in the RECORD state
     """
 
@@ -162,16 +135,16 @@ class Record(RecProc):
                 # move them back into the ready state
                 while data["recording"]:
                     data["ready"].add(data["recording"].pop())
-                return self.states["READY"]
+                return Ready(array, r)
             else:
-                return self.states["PROCESS"]
+                return Process(array, r)
         elif event == "REC_END":
-            return self.states["PROCESS"]
+            return Process(array, r)
         else:
             return self
 
 
-class Process(RecProc):
+class Process(State):
     """The coordinator is in the PROCESS state.
     """
 
@@ -214,15 +187,15 @@ class Process(RecProc):
                     # Check and clear the returncodes:
                     if max(self.returncodes) < 2:
                         self.returncodes = []
-                        return self.states["READY"]
+                        return Ready(array, r)
                     else:
-                        return self.states["ERROR"]
+                        return Error(array, r)
             else:
                 log.warning(f"Unrecognised instance: {instance}")
         return self
 
 
-class Error(RecProc):
+class Error(State):
     """Error state for the record-process state machine.
 
     Leaving the error state requires manual intervention.
