@@ -631,7 +631,7 @@ def parse_msg(msg):
     Expects a message of the form: <origin>:<message>
     """
     data = msg['data']
-    components = msg_data.split(':')
+    components = data.split(':')
     if len(components) > 4:
         log.warning(f"Unrecognised message: {data}")
         return
