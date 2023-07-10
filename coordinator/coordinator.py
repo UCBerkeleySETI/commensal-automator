@@ -30,8 +30,7 @@ class Coordinator(object):
     def start(self):
         """Start the coordinator.
         """
-        log.info("Starting coordinator")
-        #self.alert("Starting up")
+        self.alert("Starting up")
 
         for array in self.arrays:
 
@@ -58,12 +57,13 @@ class Coordinator(object):
                 else:
                     array = components[1]
                     event = self.message_to_event(components[0])
-                    self.freesubscribed_machines[array].state.handle_event(event)
-                    self.recproc_machines[array].state.handle_event(event)
+                    self.freesubscribed_machines[array].handle_event(event)
+                    self.recproc_machines[array].handle_event(event)
 
     def message_to_event(self, message):
         """Convert an incoming message into an event transition.
         """
+        log.info(message)
         if message == "configure":
             return "CONFIGURE"
         elif message == "deconfigure":
