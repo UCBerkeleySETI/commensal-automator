@@ -41,7 +41,7 @@ class Free(State):
         super().handle_event(event, data)
         if event == "CONFIGURE":
             if data["free"]:
-                return Subscribed(array, r)
+                return Subscribed(self.array, self.r)
             else:
                 message = f"No free instances, not configuring {self.array}"
                 redis_util.alert(self.r, message, "coordinator")
@@ -79,7 +79,7 @@ class Subscribed(State):
     def handle_event(self, event, data):
         super().handle_event(event, data)
         if event == "DECONFIGURE":
-            return Free(array, r)
+            return Free(self.array, self.r)
         return self
 
 
@@ -98,7 +98,7 @@ class Ready(State):
     def handle_event(self, event, data):
         super().handle_event(event, data)
         if event == "RECORD":
-            return Record(array, r)
+            return Record(self.array, self.r)
         return self
 
 class Record(State):
@@ -135,11 +135,11 @@ class Record(State):
                 # move them back into the ready state
                 while data["recording"]:
                     data["ready"].add(data["recording"].pop())
-                return Ready(array, r)
+                return Ready(self.array, self.r)
             else:
-                return Process(array, r)
+                return Process(self.array, self.r)
         elif event == "REC_END":
-            return Process(array, r)
+            return Process(self.array, self.r)
         else:
             return self
 
@@ -187,9 +187,9 @@ class Process(State):
                     # Check and clear the returncodes:
                     if max(self.returncodes) < 2:
                         self.returncodes = []
-                        return Ready(array, r)
+                        return Ready(self.array, self.r)
                     else:
-                        return Error(array, r)
+                        return Error(self.array, self.r)
             else:
                 log.warning(f"Unrecognised instance: {instance}")
         return self
