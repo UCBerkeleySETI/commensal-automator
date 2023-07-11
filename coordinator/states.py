@@ -115,7 +115,6 @@ class Record(State):
 
         subscribed = data["subscribed"]
         ready = data["ready"]
-
         if ready == subscribed.intersection(ready):
             result = rec.record(self.r, self.array, list(ready))
             # update data:
@@ -131,7 +130,7 @@ class Record(State):
         if event == "TRACK_STOP":
             log.info(f"{self.array} stopped tracking before DWELL complete")
             redis_util.reset_dwell(self.r, data["recording"], DEFAULT_DWELL)
-            if redis_util.is_primary_time(self.array):
+            if redis_util.is_primary_time(self.r, self.array):
                 # move them back into the ready state
                 while data["recording"]:
                     data["ready"].add(data["recording"].pop())

@@ -44,7 +44,7 @@ def record(r, array, instances):
         return
 
     # Retrieve fecenter:
-    fecenter = centre_freq(array)
+    fecenter = centre_freq(r, array)
     if not fecenter:
         log.error(f"Could not retreive FECENTER for {array}")
         return
@@ -180,7 +180,9 @@ def get_cals(r, array):
     # "('10.98.2.128', 31029)"
     try:
         components = endpoint_val.strip("()").split(",")
-        telstate_endpoint = f"{components[0]}:{components[1].strip()}"
+        ip = components[0].strip("'")
+        port = components[1].strip()
+        telstate_endpoint = f"{ip}:{port}"
     except:
         log.error(f"Could not parse Telstate endpoint: {endpoint_val}")
         return
@@ -234,7 +236,8 @@ def get_pktstart(r, instances, margin, array):
         key = f"{HPGDOMAIN}://{instance}/status"
         pkt_index = get_pkt_idx(r, key)
         if not pkt_index:
-            pkt_indices.append(pkt_index)
+            continue
+        pkt_indices.append(pkt_index)
 
     # Calculate PKTSTART
     if len(pkt_indices) > 0:
@@ -252,7 +255,7 @@ def get_pktstart(r, instances, margin, array):
         pktstart_str = pktstart_dt.strftime("%Y%m%dT%H%M%SZ")
 
         # Check that calculated pktstart is plausible:
-        if abs(pktstart_dt - datetime.utcnow()) > timedelta(minutes=1):
+        if abs(pktstart_dt - datetime.utcnow()) > timedelta(minutes=2):
             log.error(f"bad pktstart: {pktstart_str} for {array}")
             return
 
@@ -288,12 +291,12 @@ def annotate(tag, text):
     response = util.annotate_grafana(tag, text)
     log.info(f"Annotating Grafana, response: {response}")
 
-def centre_freq(array):
+def centre_freq(r, array):
     """Centre frequency (FECENTER).
     """
     try:
         # build the specific sensor ID for retrieval
-        s_num = product_id[-1] # subarray number
+        s_num = array[-1] # subarray number
         sensor = "antenna_channelised_voltage_centre_frequency"
         cbf_prefix = r.get(f"{array}:cbf_prefix")
         sensor_key = f"{array}:subarray_{s_num}_streams_{cbf_prefix}_{sensor}"

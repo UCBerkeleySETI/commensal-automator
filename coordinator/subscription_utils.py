@@ -82,12 +82,11 @@ def subscribe(r, array, instances, streams_per_instance=STREAMS_PER_INSTANCE):
     redis_util.gateway_msg(r, array_group, 'PKTSTART', 0, False)
 
     # TODO: sort list of instances so each node typically gets the same piece of the band
-
     # SCHAN, NSTRM and DESTIP by instance:
+    inst_list = list(instances)
     for i in range(len(instances)):
         # Instance channel:
-
-        channel = f"{HPGDOMAIN}://{instance}/set"
+        channel = f"{HPGDOMAIN}://{inst_list[i]}/set"
         # Number of streams for instance i (NSTRM)
         if i == len(instances)-1:
             nstrm = n_last
