@@ -6,7 +6,7 @@ import shutil
 def get_items(r, name, type):
     """Return the set of items of <type> from Redis.
     """
-    items = {}
+    items = set()
     item = r.rpop(f"{name}:{type}")
     while item:
         items.add(item)
@@ -44,7 +44,7 @@ def make_outputdir(outputdir, log):
     """Make an outputdir for seticore search products.
     """
     try:
-        os.path.makedirs(outputdir, mode=1777)
+        os.makedirs(outputdir, mode=0o1777)
         return True
     except FileExistsError:
         log.error("This directory already exists.")
@@ -56,12 +56,12 @@ def make_outputdir(outputdir, log):
 def rm_datadir(datadir, instance_number, log):
     """Remove directory of RAW recordings after processing. DATADIR is
     expected in the format:
-    "/buf0ro/<pktstart timestamp>-<schedule block ID>/..."
+    "/buf0/<pktstart timestamp>-<schedule block ID>/..."
     Note that "<pktstart timestamp>-<schedule block ID>" is globally unique
     for a directory of raw recordings for the current instance.
     """
     components = datadir.split("/")
-    if components[1] != "buf0ro":
+    if components[1] != "buf0":
         log.error(f"Not a valid datadir: {datadir}")
         return False
     datadir_id = components[2]
