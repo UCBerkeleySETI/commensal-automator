@@ -178,14 +178,27 @@ def get_cals(r, array):
     endpoint_val = r.get(endpoint_key)
     # Parse endpoint. Arrives as string in specific format:
     # "('10.98.2.128', 31029)"
-    components = endpoint_val.strip("()").split(",")
-    telstate_endpoint = f"{components[0]}:{components[1].strip()}"
+    try:
+        components = endpoint_val.strip("()").split(",")
+        telstate_endpoint = f"{components[0]}:{components[1].strip()}"
+    except:
+        log.error(f"Could not parse Telstate endpoint: {endpoint_val}")
+        return
     # Initialise telstate interface object
-    TelInt = TelstateInterface(r, telstate_endpoint)
-
+    try:
+        TelInt = TelstateInterface(r, telstate_endpoint)
+    except Exception as e:
+        log.error("Could not connect to TelState, details follow:")
+        log.error(e)
+        return
     # Before requesting solutions, check first if they have been delivered
     # since this subarray was last configured:
-    last_config_ts = float(r.get(f"{array}:last-config")) # last config ts
+    last_config_ts = r.get(f"{array}:last-config") # last config ts
+    if not last_config_ts:
+        log.warning("No key set for last_config_ts.")
+        last_config_ts = 0
+    else:
+        last_config_ts = float(last_config_ts)
     current_cal_ts = TelInt.get_phaseup_time() # current cal ts
     if current_cal_ts < last_config_ts:
         log.warning(f"Calibration solutions not yet available for {array}")
@@ -194,7 +207,12 @@ def get_cals(r, array):
     # Next, check if they are newer than the most recent set that was
     # retrieved. Note that a set is always requested if this is the
     # first recording for a particular subarray configuration.
-    last_cal_ts = float(r.get(f"{array}:last-cal"))
+    last_cal_ts = r.get(f"{array}:last-cal")
+    if not last_cal_ts:
+        log.warning("No key set for last_cal_ts.")
+        last_cal_ts = 0
+    else:
+        last_cal_ts = float(last_cal_ts)
     if last_cal_ts < current_cal_ts:
         # Retrieve and save calibration solutions:
         TelInt.query_telstate(array)
