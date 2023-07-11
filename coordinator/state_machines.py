@@ -39,7 +39,8 @@ class RecProcMachine(object):
             "processing":set(), 
         }
 
-        self.data[initial_state.name] = all_instances.copy()
+        # For now, we always start with all instances in "ready"
+        self.data["ready"] = all_instances.copy()
 
     def handle_event(self, event):
         new_state = self.state.handle_event(event, self.data)
