@@ -11,11 +11,12 @@ class State(object):
     def __init__(self, array, r):
         self.array = array
         self.r = r
+        self.name = "NEW_STATE"
 
     def handle_event(self, event, data):
         """Respond to an incoming event as appropriate.
         """
-        log.info(f"{self.array} handling new event: {event}")
+        log.info(f"{self.name} handling new event: {event} for {self.array}")
 
 
 class Free(State):
