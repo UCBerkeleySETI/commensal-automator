@@ -1,10 +1,9 @@
-"""
-State machine class for use with the coordinator.
-"""
-
+from coordinator.logger import log
 
 class FreeSubscribedMachine(object):
-
+    """State machine to handle subscribing and unsubscribing from
+    multicast groups.
+    """
     def __init__(self, initial_state, free, subscribed):
 
         self.state = initial_state
@@ -27,7 +26,8 @@ class FreeSubscribedMachine(object):
 
 
 class RecProcMachine(object):
-
+    """State machine to handle recording, processing and cleanup.
+    """
     def __init__(self, initial_state, all_instances, subscribed):
 
         self.state = initial_state
