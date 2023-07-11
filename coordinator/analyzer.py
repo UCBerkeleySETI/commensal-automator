@@ -18,6 +18,7 @@ LOG_FORMAT = "[%(asctime)s - %(levelname)s - %(filename)s:%(lineno)s] %(message)
 LOGGER_NAME = "BLUSE.interface"
 BFRDIR = "/home/obs/bfr5"
 PARTITION = "scratch"
+REDIS_HOST = "blh0.bl.pvt"
 
 def run_seticore(bfrdir, inputdir, tsdir, partition, r, log):
     """Processes the incoming data using seticore.
@@ -33,6 +34,9 @@ def run_seticore(bfrdir, inputdir, tsdir, partition, r, log):
     Returns:
         None
     """
+    # Create raw file input directory. Note we assume GUPPI RAW path with
+    # "Unknown/GUPPI" subdirectories containing the actual raw files. 
+    inputdir = f"{inputdir}/Unknown/GUPPI"
     # Create search product output directory.
     outputdir = f"/{partition}/data/{tsdir}/seticore_search"
     log.info(f"Creating search output directory: {outputdir}")
@@ -88,21 +92,23 @@ def cli(args = sys.argv[0]):
 def process(n):
     """Set up and run processing.
     """
-    # Get the hostname
-    host = socket.gethostname().split(".")[0]
-
-    name = "f{host}/{n}"
-
     # Set up logging:
     log = logging.getLogger(LOGGER_NAME)
     logging.basicConfig(format=LOG_FORMAT)
     log.setLevel(level=logging.DEBUG)
 
+    # Get the hostname
+    host = socket.gethostname().split(".")[0]
+    name = f"{host}/{n}"
+    log.info(f"Launching analyzer for {name}")
+
     # Redis server
-    r = redis.StrictRedis(decode_responses=True)
+    r = redis.StrictRedis(host=REDIS_HOST, decode_responses=True)
 
     # Set of unprocessed directories:
     unprocessed = proc_util.get_items(r, name, "unprocessed")
+
+    log.info(f"{len(unprocessed)} unprocessed directorie(s)")
 
     max_returncode = 0
 
@@ -140,9 +146,10 @@ def process(n):
             if res > 1:
                 log.error(f"Not deleting since seticore returned {res} for {datadir}")
                 continue
-            if not os.exists(datadir):
+            if not os.path.exists(datadir):
                 log.warning("Directory doesn't exist")
                 continue
+            log.info(f"Deleting: {datadir}")
             if not proc_util.rm_datadir(datadir, n, log):
                 log.error(f"Failed to clear {datadir}")
                 res = 2
