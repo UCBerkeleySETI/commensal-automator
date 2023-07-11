@@ -77,8 +77,6 @@ def zmq_circus_cmd(host, name, command):
     s.send_json(message)
     r = s.recv_json()
     if r['status'] != 'ok':
-        # log warning/error
-        failed.append(host)
         return False
     s.disconnect(f"tcp://{host}:5555")
     return True
