@@ -26,7 +26,7 @@ def subscribe(r, array, instances, streams_per_instance=STREAMS_PER_INSTANCE):
 
     # Join Hashpipe-Redis gateway group for the current subarray:
     redis_util.join_gateway_group(r, instances, array, HPGDOMAIN)
-    array_group = f"{HPGDOMAIN}:array:///set"
+    array_group = f"{HPGDOMAIN}:{array}:///set"
 
     # Apportion multicast groups:
     addr_list, port, n_addrs, n_last = alloc_multicast_groups(r, array, len(instances),
@@ -85,18 +85,20 @@ def subscribe(r, array, instances, streams_per_instance=STREAMS_PER_INSTANCE):
 
     # SCHAN, NSTRM and DESTIP by instance:
     for i in range(len(instances)):
+        # Instance channel:
+
+        channel = f"{HPGDOMAIN}://{instance}/set"
         # Number of streams for instance i (NSTRM)
         if i == len(instances)-1:
             nstrm = n_last
         else:
             nstrm = streams_per_instance
-        # TODO: array groups here, really?
-        redis_util.gateway_msg(r, array_group, 'NSTRM', nstrm, False)
+        redis_util.gateway_msg(r, channel, 'NSTRM', nstrm, False)
         # Absolute starting channel for instance i (SCHAN)
         schan = i*nstrm*int(hnchan)
-        redis_util.gateway_msg(r, array_group, 'SCHAN', schan, False)
+        redis_util.gateway_msg(r, channel, 'SCHAN', schan, False)
         # Destination IP addresses for instance i (DESTIP)
-        redis_util.gateway_msg(r, array_group, 'DESTIP', addr_list[i], False)
+        redis_util.gateway_msg(r, channel, 'DESTIP', addr_list[i], False)
 
     redis_util.alert(r, f"Subscribed: {array}", "coordinator")
 
