@@ -104,48 +104,50 @@ def process(n):
     # Set of unprocessed directories:
     unprocessed = proc_util.get_items(r, name, "unprocessed")
 
-    # Set of directories that should be kept after processing (these are
-    # directories associated with a primary observation)
-    preserved = proc_util.get_items(r, name, "preserved")
-
-    results = dict()
-
-    for datadir in unprocessed:
-        if not os.path.exists(datadir):
-            log.warning(f"{datadir} does not exist, skipping.")
-            continue
-        # Timestamped directory name:
-        tsdir = proc_util.timestamped_dir_from_filename(datadir)
-        # Run seticore
-        result = run_seticore(
-            BFRDIR,
-            datadir,
-            tsdir,
-            PARTITION,
-            r,
-            log)
-        results[datadir] = result
-
-    # Done
-    log.info(f"Processing completed for {name} with code: {result}")
-
-    # Clean up
-    to_clean = unprocessed.difference(preserved)
-
     max_returncode = 0
-    for datadir in to_clean:
-        res = results[datadir]
-        if res > 1:
-            log.error(f"Not deleting since seticore returned {res} for {datadir}")
-            continue
-        if not os.exists(datadir):
-            log.warning("Directory doesn't exist")
-            continue
-        if not proc_util.rm_datadir(datadir, n, log):
-            log.error(f"Failed to clear {datadir}")
-            res = 2
-        if res > max_returncode:
-            max_returncode = res
+
+    if unprocessed:
+        # Set of directories that should be kept after processing (these are
+        # directories associated with a primary observation)
+        preserved = proc_util.get_items(r, name, "preserved")
+
+        results = dict()
+
+        for datadir in unprocessed:
+            if not os.path.exists(datadir):
+                log.warning(f"{datadir} does not exist, skipping.")
+                continue
+            # Timestamped directory name:
+            tsdir = proc_util.timestamped_dir_from_filename(datadir)
+            # Run seticore
+            result = run_seticore(
+                BFRDIR,
+                datadir,
+                tsdir,
+                PARTITION,
+                r,
+                log)
+            results[datadir] = result
+
+        # Done
+        log.info(f"Processing completed for {name} with code: {result}")
+
+        # Clean up
+        to_clean = unprocessed.difference(preserved)
+
+        for datadir in to_clean:
+            res = results[datadir]
+            if res > 1:
+                log.error(f"Not deleting since seticore returned {res} for {datadir}")
+                continue
+            if not os.exists(datadir):
+                log.warning("Directory doesn't exist")
+                continue
+            if not proc_util.rm_datadir(datadir, n, log):
+                log.error(f"Failed to clear {datadir}")
+                res = 2
+            if res > max_returncode:
+                max_returncode = res
 
     # Publish result back to central coordinator via Redis:
     r.publish(RESULT_CHANNEL, f"RETURN:{name}:{max_returncode}")
