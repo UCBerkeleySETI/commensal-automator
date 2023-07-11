@@ -81,7 +81,7 @@ def record(r, array, instances):
     add_unprocessed(r, recording, datadir)
 
     # Start recording timeout timer, with 10 second safety margin:
-    rec_timer = threading.Timer(300, lambda:self.timeout(r, array, "rec_result"))
+    rec_timer = threading.Timer(300, lambda:timeout(r, array, "rec_result"))
     log.info("Starting recording timeout timer.")
     rec_timer.start()
 
@@ -181,7 +181,7 @@ def get_cals(r, array):
     components = endpoint_val.strip("()").split(",")
     telstate_endpoint = f"{components[0]}:{components[1].strip()}"
     # Initialise telstate interface object
-    TelInt = TelstateInterface(self.redis_endpoint, telstate_endpoint)
+    TelInt = TelstateInterface(r, telstate_endpoint)
 
     # Before requesting solutions, check first if they have been delivered
     # since this subarray was last configured:
@@ -209,6 +209,7 @@ def get_pktstart(r, instances, margin, array):
     """Calculate PKTSTART for specified DAQ instances.
     """
 
+    log.info(f"instances: {instances}")
     # Get current packet indices for each instance:
     pkt_indices = []
     for instance in instances:
