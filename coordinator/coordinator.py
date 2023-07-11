@@ -64,7 +64,7 @@ class Coordinator(object):
         """Convert an incoming message into an event transition.
         """
         log.info(message)
-        if message == "configure":
+        if message == "conf_complete":
             return "CONFIGURE"
         elif message == "deconfigure":
             return "DECONFIGURE"
