@@ -35,14 +35,11 @@ class TelstateInterface(object):
         """Initialise the interface and logging. 
         
            Args:
-               local_redis (str): Local Redis endpoint of the form <host>:<port>
+               local_redis (obj): Redis object
                telstate_redis (str): Redis endpoint for Telstate (host:port)
         """
         log = set_logger(level=logging.DEBUG)
-        local_redis_host = local_redis.split(':')[0]
-        local_redis_port = local_redis.split(':')[1]
-        self.red = redis.StrictRedis(host=local_redis_host, 
-            port=local_redis_port, decode_responses=True) 
+        self.red = local_redis 
         # Create TelescopeState object for current subarray:
         self.telstate = katsdptelstate.TelescopeState(telstate_redis)
  
