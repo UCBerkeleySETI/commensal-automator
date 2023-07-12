@@ -2,80 +2,82 @@
 
 Automation for Breakthrough Listen's commensal observing.
 
-The Commensal Automator or `automator` process is designed to enable 
-commensal observing and processing cycles to take place without human 
-intervention.
+The `coordinator` is designed to enable commensal observing and processing
+cycles to take place without human intervention. It consists of a central
+`coordinator` process, designed to run on a head node, which controls
+processing on many processing nodes or instances via ZMQ. Each processing
+node or instance has a copy of the `bluse_analyzer` process, controlled by
+circus using ZMQ. Transfer of metadata is handled via Redis. 
 
-### Usage:
+<img src="docs/coordinator.png" alt="coordinator" width=70%/>
 
+
+## Usage:
+
+Headnode `coordinator` process:  
 ```
-automator -h
+usage: coordinator [options]
 
-usage: automator [options]
-
-Start the Commensal Automator
+Start the coordinator
 
 optional arguments:
-
-  -h, --help            show this help message and exit
-
-  --redis_endpoint REDIS_ENDPOINT
-                        Local Redis endpoint
-
-  --redis_channel REDIS_CHANNEL
-                        Name of the Redis channel to subscribe to
-
-  --margin MARGIN       Safety margin for recording duration (sec)
-
-  --hpgdomain HPGDOMAIN
-                        Hashpipe-Redis gateway domain
-
-  --buffer_length BUFFER_LENGTH
-                        Max recording length at max data rate (sec)
-
-  --partition PARTITION
-                        Name of destination partition for seticore output
+  -h, --help       show this help message and exit
+  --config CONFIG  Config file location.
 
 ```
 
-### Operation
+Instance-specific `bluse_analyzer` process:  
+```
+usage: bluse_analyzer [options]
 
-The diagrams here try to represent as closely as possible how the system
- functions at the moment (rather than a vision for how the system should 
- function). They will be updated as the system is improved and simplified. 
+Run processing actions for specified instance.
 
-The automator and coordinator together control recording and processing during
- commensal observations. The following diagram illustrates the possible states
-  and state transitions. 
+optional arguments:
+  -h, --help            show this help message and exit
+  -I INSTANCE, --instance INSTANCE
+                        Current instance number.
+```
 
-![diagram](docs/states.png)
+## Operation
 
-Several different observing scenarios and the associated transitions made by
- the automator and coordinator are illustrated below.
+The coordinator controls recording and processing during commensal 
+observations. For each active subarray, two separate state machines are
+instantiated and run. The first controls processing node/instance allocation
+and multicast group subscriptions. The second controls recording, processing
+and other ancillary tasks.
 
-![diagram](docs/observing-flow.pdf)
+### `FreeSubscribed` states:
 
-### Dependencies
+<img src="docs/free_subscribe.png" alt="free_subscribe" width=40%/>
 
-Requires Python >= 3.5.4
+### `RecProc` states:
 
-Packages:
-```    
-numpy >= 1.18.1  
-redis >= 3.4.1  
+<img src="docs/rec_proc.png" alt="rec_proc" width=80%/>
+
+## Dependencies
+
+```
+Python >= 3.9.12
+pyzmq >= 25.0.0
+PyYAML >= 6.0
+katsdptelstate >= 0.11 (see https://github.com/ska-sa/katsdptelstate)
+redis >= 3.4.1
+requests == 2.28.1 
+numpy >= 1.18.1 
+circusd >= 0.12.1 
 ```  
 
-### Installation and Deployment (BLUSE)
+## Installation and Deployment (BLUSE)
 
 Instructions for installation and deployment on the BLUSE headnode:
 
 - Clone repository into desired location: `git clone https://github.com/UCBerkeleySETI/commensal-automator.git`
 - `cd commensal-automator`
-- Install into the `bluse3.9` virtual environment: `sudo /opt/virtualenv/bluse3.9/bin/python setup.py install` 
-- Restart the automator (for now, only when the subarray is deconfigured): `circusctl --endpoint tcp://<IP address>:<port> restart automator`
+- Install into the `automator` virtual environment: `sudo /opt/virtualenv/automator/bin/python setup.py install` 
+- Start the automator: `circusctl --endpoint tcp://<IP address>:<port> start automator`
 - If desired, check the automator logs for errors: `less /var/log/bluse/automator/automator.err`
 
-### Installation (generic)
+## Installation (generic)
 
 Consider installing within an appropriate virtual environment. 
 Then:
@@ -84,11 +86,11 @@ Then:
 
 For use as a daemonised process with `circus`, follow these steps:
 
--    Ensure `automator.ini` is copied to the correct location (eg 
-     `/etc/circus/conf.d/automator/automator.ini`)
+-    Ensure `coordinator.ini` is copied to the correct location (eg 
+     `/etc/circus/conf.d/coordinator/coordinator.ini`)
 
 -    Ensure the environment initialisation file refers correctly to the 
-     `automator.ini` file, eg:
+     `coordinator.ini` file, eg:
 
      ```
      [env:automator]
@@ -99,19 +101,41 @@ For use as a daemonised process with `circus`, follow these steps:
 -    Ensure logging is set up correctly and that a location for the log files
      exists, eg:  
 
-     `mkdir /var/log/bluse/automator`
+     `mkdir /var/log/bluse/coordinator`
 
 -    Run `circusctl --endpoint <endpoint> reloadconfig`
 
--    Run `circusctl --endpoint <endpoint> start automator`
+-    Run `circusctl --endpoint <endpoint> start coordinator`
 
-### Coordinator requirements  
+## Running the coordinator alongside the old automator/coordinator
 
-Notes on transplanting/subsuming the coordinator from 
-`meerkat-backend-interface` to the automator. 
+This is specific to the BLUSE configuration. To switch from the existing
+automator/coordinator to the new coordinator:
 
-Requirements:  
+```
+source /opt/virtualenv/automator/bin/activate
+cd scripts 
+./stop.sh coordinator
+./stop.sh automator
+./start.sh new_coordinator
+```
 
-- katsdptelstate >= 0.11: https://github.com/ska-sa/katsdptelstate
+The `new_coordinator` log files are available here:
 
+```
+/var/log/bluse/new_coordinator
+```
 
+The `bluse_analyzer` log files are available in `/tmp` on each processing
+node. The log files are written as: `bluse_analyzer.<instance #>.err` and
+`bluse_analyzer.<instance #>.out`.
+
+To switch back to the original automator/coordinator:
+
+```
+source /opt/virtualenv/automator/bin/activate
+cd scripts 
+./stop.sh new_coordinator
+./start.sh coordinator
+./start.sh automator
+```
