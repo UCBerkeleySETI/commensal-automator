@@ -4,9 +4,9 @@ PROCESS_NAME=$1
 $SCRIPTS_DIR/check_env.sh
 
 
-if [ "$PROCESS_NAME" != "new_coordinator" ] && [ "$PROCESS_NAME" != "automator" ] 
+if [ "$PROCESS_NAME" != "new_coordinator" ] && [ "$PROCESS_NAME" != "automator" ] && [ "$PROCESS_NAME" != "coordinator" ]
 then
-    echo "Process can be either: automator OR new_coordinator"
+    echo "Process can be either: automator OR coordinator OR new_coordinator"
     exit 0
 fi
 
