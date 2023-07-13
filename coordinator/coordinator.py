@@ -83,7 +83,7 @@ class Coordinator(object):
         communication.
         """
         for machine in self.recproc_machines.values():
-            machine.state.handle_event(message)
+            machine.handle_event(message)
 
     def alert(self, message):
         redis_util.alert(self.r, message, "[test] coordinator")
