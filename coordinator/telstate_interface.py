@@ -129,7 +129,7 @@ class TelstateInterface(object):
         # Fill multidimensional array:
         # Detect if data is complex:
         if(np.iscomplexobj(cals['m{}h'.format(str(ant_n[0]).zfill(3))])):
-            result_array = np.zeros((nchans, 2, nants), dtype=np.complex)
+            result_array = np.zeros((nchans, 2, nants), dtype=complex)
         else:
             result_array = np.zeros((nchans, 2, nants))
         for i in range(len(ant_n)):
