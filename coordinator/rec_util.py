@@ -96,6 +96,7 @@ def record(r, array, instances):
 def add_unprocessed(r, recording, datadir):
     """Set the list of unprocessed directories.
     """
+    log.info(f"Adding {datadir} to {recording}")
     for instance in recording:
         r.lpush(f"{instance}:unprocessed", datadir)
 

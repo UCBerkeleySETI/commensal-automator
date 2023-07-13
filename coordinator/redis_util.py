@@ -438,7 +438,7 @@ def gateway_msg(r, channel, msg_key, msg_val, write):
     """
     msg = f"{msg_key}={msg_val}"
     r.publish(channel, msg)
-    log.info(f"Published {msg} to channel {channel}")
+    log.info(f"[active] Published {msg} to channel {channel}")
     # save hash of most recent messages
     if write:
         red_server.hset(channel, msg_key, msg_val)
@@ -577,7 +577,7 @@ def alert(r, message, name, slack_channel=SLACK_CHANNEL,
     log.info(message)
     # Format: <Slack channel>:<Slack message text>
     alert_msg = f"{slack_channel}:[{timestring()}] {name}: {message}"
-    #r.publish(slack_proxy_channel, alert_msg)
+    r.publish(slack_proxy_channel, alert_msg)
 
 
 def retrieve_dwell(r, hpgdomain, host_list, default_dwell):
