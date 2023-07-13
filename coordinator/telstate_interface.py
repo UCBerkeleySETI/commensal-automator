@@ -43,7 +43,7 @@ class TelstateInterface(object):
         # Create TelescopeState object for current subarray:
         self.telstate = katsdptelstate.TelescopeState(telstate_redis)
  
-    def query_telstate(self, output_path, product_id):
+    def query_telstate(self, product_id, output_path=None):
         """Query the current Telstate Redis DB for the latest calibration solutions. 
            They are also written to an .npz file temporarily for diagnostic purposes.   
 
@@ -73,15 +73,16 @@ class TelstateInterface(object):
         r_time = datetime.utcnow()
         r_time = r_time.strftime("%Y%m%dT%H%M%SZ")
 
-        # Save .npz file for diagnostic purposes.
-        output_file = os.path.join(output_path, 'cal_solutions_{}'.format(timestamp))
-        log.info('Saving cal solutions to {}'.format(output_file))
-        try:
-            np.savez(output_file, cal_G=cal_G, cal_B=cal_B, cal_K=cal_K, 
-                cal_all=corrections, refant=refant)
-        except Exception as e:
-            log.error(e)
-            
+        if output_path:
+            # Save .npz file for diagnostic purposes.
+            output_file = os.path.join(output_path, 'cal_solutions_{}'.format(timestamp))
+            log.info('Saving cal solutions to {}'.format(output_file))
+            try:
+                np.savez(output_file, cal_G=cal_G, cal_B=cal_B, cal_K=cal_K, 
+                    cal_all=corrections, refant=refant)
+            except Exception as e:
+                log.error(e)
+
         # Antenna list:
         ant_key = '{}:antennas'.format(product_id)
         nants = self.red.llen(ant_key)
