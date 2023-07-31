@@ -16,6 +16,22 @@ SLACK_CHANNEL = "meerkat-obs-log"
 SLACK_PROXY_CHANNEL = "slack-messages"
 PROPOSAL_ID = 'EXT-20220504-DM-01' 
 
+
+def save_state(array, machine, state, data, r):
+    """Write or update the current state for the specified array into Redis.
+     machine = state machine
+    """
+    log.info(f"Updating {array}:{machine} in {state}, data:")
+    log.info(f"{data}")
+    array_hash = f"{array}:state"
+    for key, value in data.items():
+        r.hset(array_hash, key, list(value))
+
+def read_state(array, r):
+    """Read state and associated information if available.
+    """
+    state_dict = r.hgetall(f"{array}:state")
+
 def raw_files(r):
     """Returns a dict mapping host name to a list of raw files on the host."""
     hosts = [key.split(":")[-1] for key in r.keys("bluse_raw_watch:*")]
