@@ -9,6 +9,7 @@ from coordinator.telstate_interface import TelstateInterface
 HPGDOMAIN = 'bluse'
 PKTIDX_MARGIN = 2048 # in packets
 TARGETS_CHANNEL = 'target-selector:new-pointing'
+DEFAULT_DWELL = 290
 
 def record(r, array, instances):
     """Start and check recording for a non-primary time track.
@@ -36,6 +37,9 @@ def record(r, array, instances):
 
     # Gateway group:
     array_group = f"{HPGDOMAIN}:{array}///set"
+
+    # Set DWELL in preparation for recording:
+    redis_util.gateway_msg(r, array_group, 'DWELL', DEFAULT_DWELL, True)
 
     # Calculate PKTSTART:
     pktstart_data = get_pktstart(r, instances, PKTIDX_MARGIN, array)

@@ -78,6 +78,9 @@ def subscribe(r, array, instances, streams_per_instance=STREAMS_PER_INSTANCE):
     nants = r.llen(f"{array}:antennas")
     redis_util.gateway_msg(r, array_group, 'NANTS', nants, True)
 
+    # Set DWELL to 0 on configure
+    redis_util.gateway_msg(r, array_group, 'DWELL', 0, True)
+
     # Make sure PKTSTART is 0 on configure
     redis_util.gateway_msg(r, array_group, 'PKTSTART', 0, True)
 
@@ -111,10 +114,11 @@ def unsubscribe(r, array, instances):
     util.annotate_grafana("UNSUBSCRIBE",
         f"{array}: Coordinator instructing DAQs to unsubscribe.")
 
-    # Set DESTIP to 0.0.0.0 individually for robustness.
+    # Set DESTIP to 0.0.0.0 and DWELL to 0 individually for robustness.
     for instance in instances:
         channel = f"{HPGDOMAIN}://{instance}/set"
-        redis_util.gateway_msg(r, channel, "DESTIP", "0.0.0.0", False)
+        redis_util.gateway_msg(r, channel, "DESTIP", "0.0.0.0", True)
+        redis_util.gateway_msg(r, channel, 'DWELL', 0, True)
     redis_util.alert(r, f"Instructed DAQs for {array} to unsubscribe.",
         "[test] new-coordinator")
     time.sleep(3) # give them a chance to respond
@@ -139,11 +143,6 @@ def unsubscribe(r, array, instances):
 
     # Sleep for 20 seconds to allow pipelines to restart:
     time.sleep(20)
-
-    # Reset DWELL for all hosts after pipeline restart:
-    redis_util.reset_dwell(r, instances, DEFAULT_DWELL)
-    log.info(f"DWELL has been reset for instances assigned to {array}")
-
 
 def samples_per_heap(r, array, spectra_per_heap):
     """Equivalent to HCLOCKS.
