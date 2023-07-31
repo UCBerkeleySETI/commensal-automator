@@ -35,51 +35,51 @@ def subscribe(r, array, instances, streams_per_instance=STREAMS_PER_INSTANCE):
     # Publish necessary gateway keys:
 
     # Name of current subarray (SUBARRAY)
-    redis_util.gateway_msg(r, array_group, 'SUBARRAY', array, False)
+    redis_util.gateway_msg(r, array_group, 'SUBARRAY', array, True)
 
     # Port (BINDPORT)
-    redis_util.gateway_msg(r, array_group, 'BINDPORT', port, False)
+    redis_util.gateway_msg(r, array_group, 'BINDPORT', port, True)
 
     # Total number of streams (FENSTRM)
-    redis_util.gateway_msg(r, array_group, 'FENSTRM', n_addrs, False)
+    redis_util.gateway_msg(r, array_group, 'FENSTRM', n_addrs, True)
 
     # Sync time (UNIX, seconds)
     t_sync = sync_time(r, array)
-    redis_util.gateway_msg(r, array_group, 'SYNCTIME', t_sync, False)
+    redis_util.gateway_msg(r, array_group, 'SYNCTIME', t_sync, True)
 
     # Centre frequency (FECENTER)
     fecenter = centre_freq(r, array)
-    redis_util.gateway_msg(r, array_group, 'FECENTER', fecenter, False)
+    redis_util.gateway_msg(r, array_group, 'FECENTER', fecenter, True)
 
     # Total number of frequency channels (FENCHAN)
     n_freq_chans = r.get(f"{array}:n_channels")
-    redis_util.gateway_msg(r, array_group, 'FENCHAN', n_freq_chans, False)
+    redis_util.gateway_msg(r, array_group, 'FENCHAN', n_freq_chans, True)
 
     # Coarse channel bandwidth (from F engines): CHANBW
     # Note: no sign information!
     chan_bw = coarse_chan_bw(r, array, n_freq_chans)
-    redis_util.gateway_msg(r, array_group, 'CHAN_BW', chan_bw, False)
+    redis_util.gateway_msg(r, array_group, 'CHAN_BW', chan_bw, True)
 
     # Number of channels per substream (HNCHAN)
     hnchan = r.get(cbf_sensor_name(r, array,
             'antenna_channelised_voltage_n_chans_per_substream'))
-    redis_util.gateway_msg(r, array_group, 'HNCHAN', hnchan, False)
+    redis_util.gateway_msg(r, array_group, 'HNCHAN', hnchan, True)
 
     # Number of spectra per heap (HNTIME)
     hntime = r.get(cbf_sensor_name(r, array,
             'tied_array_channelised_voltage_0x_spectra_per_heap'))
-    redis_util.gateway_msg(r, array_group, 'HNTIME', hntime, False)
+    redis_util.gateway_msg(r, array_group, 'HNTIME', hntime, True)
 
     # Number of ADC samples per heap (HCLOCKS)
     adc_per_heap = samples_per_heap(r, array, hntime)
-    redis_util.gateway_msg(r, array_group, 'HCLOCKS', adc_per_heap, False)
+    redis_util.gateway_msg(r, array_group, 'HCLOCKS', adc_per_heap, True)
 
     # Number of antennas (NANTS)
     nants = r.llen(f"{array}:antennas")
-    redis_util.gateway_msg(r, array_group, 'NANTS', nants, False)
+    redis_util.gateway_msg(r, array_group, 'NANTS', nants, True)
 
     # Make sure PKTSTART is 0 on configure
-    redis_util.gateway_msg(r, array_group, 'PKTSTART', 0, False)
+    redis_util.gateway_msg(r, array_group, 'PKTSTART', 0, True)
 
     # TODO: sort list of instances so each node typically gets the same piece of the band
     # SCHAN, NSTRM and DESTIP by instance:
