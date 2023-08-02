@@ -17,6 +17,12 @@ SLACK_CHANNEL = "meerkat-obs-log"
 SLACK_PROXY_CHANNEL = "slack-messages"
 PROPOSAL_ID = 'EXT-20220504-DM-01' 
 
+def sort_instances(instances):
+    """Sort the instances by number.
+    Accepts instances (list).
+    """
+    return sorted(instances, key = lambda x: (int(x[4:x.index("/")]), int(x[x.index("/")+1:])))
+
 def save_free(free, r):
     """Save the set of globally available, unassigned instances.
     """

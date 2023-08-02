@@ -84,9 +84,8 @@ def subscribe(r, array, instances, streams_per_instance=STREAMS_PER_INSTANCE):
     # Make sure PKTSTART is 0 on configure
     redis_util.gateway_msg(r, array_group, 'PKTSTART', 0, True)
 
-    # TODO: sort list of instances so each node typically gets the same piece of the band
     # SCHAN, NSTRM and DESTIP by instance:
-    inst_list = list(instances)
+    inst_list = redis_util.sort_instances(list(instances))
     for i in range(len(instances)):
         # Instance channel:
         channel = f"{HPGDOMAIN}://{inst_list[i]}/set"
