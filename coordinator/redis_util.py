@@ -9,6 +9,7 @@ import redis
 import sys
 import time
 import numpy as np
+import json
 
 from coordinator.logger import log
 
@@ -16,6 +17,16 @@ SLACK_CHANNEL = "meerkat-obs-log"
 SLACK_PROXY_CHANNEL = "slack-messages"
 PROPOSAL_ID = 'EXT-20220504-DM-01' 
 
+def save_free(free, r):
+    """Save the set of globally available, unassigned instances.
+    """
+    r.set("free_instances", json.dumps(list(free)))
+
+def read_free(r):
+    """Retrieve the set of globally available, unassigned instances.
+    """
+    free = json.loads(r.get("free_instances"))
+    return set(free)
 
 def save_state(array, machine, state, data, r):
     """Write or update the current state for the specified array into Redis.
@@ -25,7 +36,7 @@ def save_state(array, machine, state, data, r):
     log.info(f"{data}")
     array_hash = f"{array}:state"
     for key, value in data.items():
-        r.hset(array_hash, key, list(value))
+        r.hset(array_hash, key, json.dumps(list(value)))
 
 def read_state(array, r):
     """Read state and associated information if available.
@@ -457,7 +468,7 @@ def gateway_msg(r, channel, msg_key, msg_val, write):
     log.info(f"[active] Published {msg} to channel {channel}")
     # save hash of most recent messages
     if write:
-        red_server.hset(channel, msg_key, msg_val)
+        r.hset(channel, msg_key, msg_val)
         log.info(f"Wrote {msg} for channel {channel} to Redis")
 
 def join_gateway_group(r, instances, group_name, gateway_domain):
