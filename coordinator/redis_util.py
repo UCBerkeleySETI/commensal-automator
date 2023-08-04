@@ -18,8 +18,9 @@ SLACK_PROXY_CHANNEL = "slack-messages"
 PROPOSAL_ID = 'EXT-20220504-DM-01' 
 
 def sort_instances(instances):
-    """Sort the instances by number.
-    Accepts instances (list).
+    """Sort the instances by host and instance number.
+    Accepts instances (list). Format as follows:
+    ["blpn0/0", "blpn0/1", "blpn1/0", ... ]
     """
     return sorted(instances, key = lambda x: (int(x[4:x.index("/")]), int(x[x.index("/")+1:])))
 
