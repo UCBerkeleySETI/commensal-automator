@@ -67,7 +67,7 @@ def subscribe(r, array, instances, streams_per_instance=STREAMS_PER_INSTANCE):
 
     # Number of spectra per heap (HNTIME)
     hntime = r.get(cbf_sensor_name(r, array,
-            'tied_array_channelised_voltage_0x_spectra_per_heap'))
+            'antenna_channelised_voltage_spectra_per_heap'))
     redis_util.gateway_msg(r, array_group, 'HNTIME', hntime, True)
 
     # Number of ADC samples per heap (HCLOCKS)
