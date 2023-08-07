@@ -136,12 +136,15 @@ def process(n):
             results[datadir] = result
 
         # Done
-        log.info(f"Processing completed for {name} with code: {result}")
+        log.info(f"Processing completed for {name} with code: {results}")
 
         # Clean up
         to_clean = unprocessed.difference(preserved)
 
         for datadir in to_clean:
+            if datadir not in results:
+                log.error(f"Trying to clear {datadir}, but it has no returncodes.")
+                continue
             res = results[datadir]
             if res > 1:
                 log.error(f"Not deleting since seticore returned {res} for {datadir}")
