@@ -27,13 +27,17 @@ def sort_instances(instances):
 def save_free(free, r):
     """Save the set of globally available, unassigned instances.
     """
+    log.info(f"Saving free instances: {free}")
     r.set("free_instances", json.dumps(list(free)))
 
 def read_free(r):
     """Retrieve the set of globally available, unassigned instances.
     """
-    free = json.loads(r.get("free_instances"))
-    return set(free)
+    free = r.get("free_instances")
+    log.info(f"Loading free instances: {free}")
+    if free:
+        return set(json.loads(free))
+    return None
 
 def save_state(array, machine, state, data, r):
     """Write or update the current state for the specified array into Redis.
@@ -43,7 +47,10 @@ def save_state(array, machine, state, data, r):
     log.info(f"{data}")
     array_hash = f"{array}:state"
     for key, value in data.items():
-        r.hset(array_hash, key, json.dumps(list(value)))
+        if isinstance(value, set):
+            r.hset(array_hash, key, json.dumps(list(value)))
+        else:
+            r.hset(array_hash, key, value)
 
 def read_state(array, r):
     """Read state and associated information if available.
@@ -139,7 +146,12 @@ def reset_dwell(r, instances, dwell):
         log.info(f"Resetting DWELL for {chan_list[i]}, new dwell: {dwell}")
         r.publish(chan_list[i], "DWELL=0")
         r.publish(chan_list[i], "PKTSTART=0")
-        time.sleep(1.5) # Wait for processing node. NOTE: Is this long enough?
+
+    # Wait for processing nodes:
+    time.sleep(1.5)
+
+    # Reset DWELL
+    for i in range(len(chan_list)):
         r.publish(chan_list[i], f"DWELL={dwell}")
 
 def channel_list(hpgdomain, instances):
@@ -585,14 +597,20 @@ def pktidx_to_timestamp(r, pktidx, subarray):
     if pktidx < 0:
         raise ValueError(f"cannot convert pktidx {pktidx} to a timestamp")
 
+    channel_hash = f"bluse:{subarray}///set"
+
     pipe = r.pipeline()
-    for subkey in ["hclocks", "synctime", "fenchan", "chan_bw"]:
-        pipe.get(subarray + ":" + subkey)
+    for subkey in ["HCLOCKS", "SYNCTIME", "FENCHAN", "CHAN_BW"]:
+        pipe.hget(channel_hash, subkey)
     results = pipe.execute()
     hclocks, synctime, fenchan, chan_bw = map(float, results)
 
     # Seconds since SYNCTIME: PKTIDX*HCLOCKS/(2e6*FENCHAN*ABS(CHAN_BW))
     timestamp = synctime + pktidx * hclocks / (2e6 * fenchan * abs(chan_bw))
+
+    log.info(f"Conversion: {timestamp}")
+    log.info(f"Sync time: {synctime}")
+    log.info(f"HCLOCKS: {hclocks}, FENCHAN: {fenchan}, CHAN_BW: {chan_bw}")
 
     return timestamp
 
