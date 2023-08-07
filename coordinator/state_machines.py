@@ -1,10 +1,13 @@
 from coordinator.logger import log
+from coordinator import redis_util
 
 class FreeSubscribedMachine(object):
     """State machine to handle subscribing and unsubscribing from
     multicast groups.
     """
-    def __init__(self, initial_state, free, subscribed):
+    def __init__(self, initial_state, free, subscribed, r):
+
+        self.r = r
 
         self.state = initial_state
 
@@ -23,12 +26,17 @@ class FreeSubscribedMachine(object):
             else:
                 # stay in current state if entry failed
                 log.warning(f"Could not enter new state: {new_state.name}")
+        # Save the current state:
+        redis_util.save_free(self.data["free"], self.r)
+
 
 
 class RecProcMachine(object):
     """State machine to handle recording, processing and cleanup.
     """
-    def __init__(self, initial_state, all_instances, subscribed):
+    def __init__(self, initial_state, all_instances, subscribed, r):
+
+        self.r = r
 
         self.state = initial_state
 
