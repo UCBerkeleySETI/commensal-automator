@@ -9,7 +9,7 @@ processing on many processing nodes or instances via ZMQ. Each processing
 node or instance has a copy of the `bluse_analyzer` process, controlled by
 circus using ZMQ. Transfer of metadata is handled via Redis. 
 
-<img src="docs/coordinator.png" alt="coordinator" width=70%/>
+<img src="docs/coordinator.png" alt="coordinator" width=80%/>
 
 
 ## Usage:
