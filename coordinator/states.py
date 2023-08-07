@@ -131,6 +131,9 @@ class Record(State):
         if event == "TRACK_STOP":
             log.info(f"{self.array} stopped tracking before DWELL complete")
             redis_util.reset_dwell(self.r, data["recording"], DEFAULT_DWELL)
+            redis_util.alert(self.r,
+                f":black_square_for_stop: Recording stopped for `{self.array}`",
+                "coordinator")
             if redis_util.is_primary_time(self.r, self.array):
                 # move them back into the ready state
                 while data["recording"]:
@@ -139,6 +142,9 @@ class Record(State):
             else:
                 return Process(self.array, self.r)
         elif event == "REC_END":
+            redis_util.alert(self.r,
+                f":stopwatch: Recording ended for `{self.array}`",
+                "coordinator")
             return Process(self.array, self.r)
         else:
             return self
@@ -168,7 +174,13 @@ class Process(State):
         # must conform to the following format: <host>/<instance>
         for instance in data["processing"]:
             host, instance_number = instance.split("/")
-            util.zmq_circus_cmd(host, f"proc_{instance_number}", "start")
+            util.zmq_circus_cmd(host, f"bluse_analyzer_{instance_number}", "start")
+
+        # Alert processing
+        redis_util.alert(self.r,
+            f":gear: Processing for `{self.array}`",
+            "coordinator")
+
         return True
 
 
@@ -184,6 +196,9 @@ class Process(State):
                 # If all (or whatever preferred percentage) is completed,
                 # continue to the next state:
                 if not data["processing"]:
+                    redis_util.alert(self.r,
+                        f":white_check_mark: complete: `{self.array}`",
+                        "coordinator")
                     # Check and clear the returncodes:
                     if max(self.returncodes) < 2:
                         self.returncodes = []
@@ -207,6 +222,9 @@ class Error(State):
 
     def on_entry(self, data):
         log.info(f"{self.array} entering state: {self.name}")
+        redis_util.alert(self.r,
+            f":warning: ERROR: `{self.array}`",
+            "coordinator")
         return True
 
     def handle_event(self, event, data):
