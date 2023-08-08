@@ -44,7 +44,7 @@ class Free(State):
             if data["free"]:
                 return Subscribed(self.array, self.r)
             else:
-                message = f"No free instances, not configuring {self.array}"
+                message = f":no_entry_sign: `{self.array}` no free instances, not configuring."
                 redis_util.alert(self.r, message, "coordinator")
                 return self
         return self
@@ -70,7 +70,8 @@ class Subscribed(State):
         while len(data["free"]) > 0 and len(data["subscribed"]) < n_requested:
             data["subscribed"].add(data["free"].pop())
         if len(data["subscribed"]) < n_requested:
-            message = f"{len(data['subscribed'])}/{n_requested} available."
+            n_subs = len(data["subscribed"])
+            message = f":warning: `{self.array}` {n_subs}/{n_requested} available."
             redis_util.alert(self.r, message, "coordinator")
 
         # Initiate subscription process:
@@ -132,7 +133,7 @@ class Record(State):
             log.info(f"{self.array} stopped tracking before DWELL complete")
             redis_util.reset_dwell(self.r, data["recording"], DEFAULT_DWELL)
             redis_util.alert(self.r,
-                f":black_square_for_stop: Recording stopped for `{self.array}`",
+                f":black_square_for_stop: `{self.array}` recording stopped",
                 "coordinator")
             if redis_util.is_primary_time(self.r, self.array):
                 # move them back into the ready state
@@ -143,7 +144,7 @@ class Record(State):
                 return Process(self.array, self.r)
         elif event == "REC_END":
             redis_util.alert(self.r,
-                f":stopwatch: Recording ended for `{self.array}`",
+                f":black_square_for_stop: `{self.array}` recording ended",
                 "coordinator")
             return Process(self.array, self.r)
         else:
@@ -178,7 +179,7 @@ class Process(State):
 
         # Alert processing
         redis_util.alert(self.r,
-            f":gear: Processing for `{self.array}`",
+            f":gear: `{self.array}` processing",
             "coordinator")
 
         return True
@@ -196,11 +197,15 @@ class Process(State):
                 # If all (or whatever preferred percentage) is completed,
                 # continue to the next state:
                 if not data["processing"]:
-                    redis_util.alert(self.r,
-                        f":white_check_mark: complete: `{self.array}`",
-                        "coordinator")
+                    if max(self.returncodes) < 1:
+                        redis_util.alert(self.r,
+                            f":white_check_mark: `{self.array}` complete, code 0",
+                            "coordinator")
                     # Check and clear the returncodes:
-                    if max(self.returncodes) < 2:
+                    elif max(self.returncodes) < 2:
+                        redis_util.alert(self.r,
+                            f":heavy_check_mark: `{self.array}` complete, codes: `{returncodes}`",
+                            "coordinator")
                         self.returncodes = []
                         return Ready(self.array, self.r)
                     else:
@@ -223,7 +228,7 @@ class Error(State):
     def on_entry(self, data):
         log.info(f"{self.array} entering state: {self.name}")
         redis_util.alert(self.r,
-            f":warning: ERROR: `{self.array}`",
+            f":x: `{self.array}` ERROR",
             "coordinator")
         return True
 
