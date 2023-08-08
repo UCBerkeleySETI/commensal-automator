@@ -19,14 +19,13 @@ def subscribe(r, array, instances, streams_per_instance=STREAMS_PER_INSTANCE):
     # Configuration process started:
     util.annotate_grafana("CONFIGURE", 
             f"{array}: Coordinator configuring DAQs.")
-    redis_util.alert(r, "Subscribing to new multicast groups", "coordinator")
 
     # Reset keys:
     r.set(f"coordinator:cal_ts:{array}", 0)
 
     # Join Hashpipe-Redis gateway group for the current subarray:
     redis_util.join_gateway_group(r, instances, array, HPGDOMAIN)
-    array_group = f"{HPGDOMAIN}:{array}:///set"
+    array_group = f"{HPGDOMAIN}:{array}///set"
 
     # Apportion multicast groups:
     addr_list, port, n_addrs, n_last = alloc_multicast_groups(r, array, len(instances),
@@ -101,7 +100,7 @@ def subscribe(r, array, instances, streams_per_instance=STREAMS_PER_INSTANCE):
         # Destination IP addresses for instance i (DESTIP)
         redis_util.gateway_msg(r, channel, 'DESTIP', addr_list[i], False)
 
-    redis_util.alert(r, f"Subscribed: {array}", "coordinator")
+    redis_util.alert(r, f":arrow_forward: `{array}`", "coordinator")
 
 
 def unsubscribe(r, array, instances):
@@ -118,8 +117,6 @@ def unsubscribe(r, array, instances):
         channel = f"{HPGDOMAIN}://{instance}/set"
         redis_util.gateway_msg(r, channel, "DESTIP", "0.0.0.0", True)
         redis_util.gateway_msg(r, channel, 'DWELL', 0, True)
-    redis_util.alert(r, f"Instructed DAQs for {array} to unsubscribe.",
-        "[test] new-coordinator")
     time.sleep(3) # give them a chance to respond
 
     # Belt and braces restart DAQs
@@ -130,11 +127,11 @@ def unsubscribe(r, array, instances):
     # r_2 = util.zmq_multi_cmd(hostnames_only, "bluse_hashpipe_2", "restart")
     # result.append(r_2)
     if len(result) > 0:
-        redis_util.alert(r, f"Failed to restart bluse_hashpipe on: {result}",
-            "[test] new-coordinator")
+        redis_util.alert(r, f":x: `{array}` failed to restart DAQs: {result}",
+            "coordinator")
     else:
-        redis_util.alert(r, f"Restarted bluse_hashpipe on DAQs for {array}",
-            "[test] new-coordinator")
+        redis_util.alert(r, f":repeat: `{array}` restarted DAQs",
+            "coordinator")
 
     # Instruct gateways to leave current subarray group:
     redis_util.leave_gateway_group(r, array, HPGDOMAIN)
@@ -142,6 +139,8 @@ def unsubscribe(r, array, instances):
 
     # Sleep for 20 seconds to allow pipelines to restart:
     time.sleep(20)
+
+    redis_util.alert(r, f":eject: `{array}` unsubscribed", "coordinator")
 
 def samples_per_heap(r, array, spectra_per_heap):
     """Equivalent to HCLOCKS.
