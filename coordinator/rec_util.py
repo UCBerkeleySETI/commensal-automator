@@ -78,29 +78,33 @@ def record(r, array, instances):
     targets_req = f"{obsid}:{target_data['target']}:{ra_d}:{dec_d}:{fecenter}"
     r.publish(TARGETS_CHANNEL, targets_req)
 
-    # Those which are actually recording:
-    recording = get_recording(r, array)
-
     # Write datadir to the list of unprocessed directories for this subarray:
-    add_unprocessed(r, recording, datadir)
+    add_unprocessed(r, set(instances), datadir)
 
     # Start recording timeout timer, with 10 second safety margin:
     rec_timer = threading.Timer(300, lambda:timeout(r, array, "rec_result"))
     log.info("Starting recording timeout timer.")
     rec_timer.start()
 
+    redis_util.alert(r,
+        f":arrow_forward::black_circle_for_record: Recording `{obsid}` on `{array}`",
+        "coordinator")
     # If this is primary time, write datadir to the list of directories to
     # preserve:
     # TODO: check for primary time first
     #if is_primary_time():
     #    add_preserved(r, recording, datadir)
 
+    # Wait half a second to ensure recording has started:
+    time.sleep(0.5)
+    recording = get_recording(r, instances)
+
     return recording
 
 def add_unprocessed(r, recording, datadir):
     """Set the list of unprocessed directories.
     """
-    log.info(f"Adding {datadir} to {recording}")
+    log.info(f"Adding {datadir} to <instance>:unprocessed")
     for instance in recording:
         r.lpush(f"{instance}:unprocessed", datadir)
 
@@ -227,7 +231,7 @@ def get_cals(r, array):
         r.set(f"{array}:last-cal", current_cal_ts)
         return "success"
     else:
-        redis_utils.alert(r, "No calibration solution updates", "coordinator")
+        log.info("No calibration solution updates")
 
 
 def get_pktstart(r, instances, margin, array):
@@ -248,20 +252,24 @@ def get_pktstart(r, instances, margin, array):
     if len(pkt_indices) > 0:
 
         pkt_indices = np.asarray(pkt_indices, dtype = np.int64)
-        max_index = redis_util.pktidx_to_timestamp(r, np.max(pkt_indices), array)
-        med_index = redis_util.pktidx_to_timestamp(r, np.median(pkt_indices), array)
-        min_index = redis_util.pktidx_to_timestamp(r, np.min(pkt_indices), array)
+        max_ts = redis_util.pktidx_to_timestamp(r, np.max(pkt_indices), array)
+        med_ts = redis_util.pktidx_to_timestamp(r, np.median(pkt_indices), array)
+        min_ts = redis_util.pktidx_to_timestamp(r, np.min(pkt_indices), array)
 
         pktstart = np.max(pkt_indices) + margin
-        log.info(f"PKTIDX: Min {min_index}, Med {med_index}, Max {max_index}, PKTSTART {pktstart}")
 
         pktstart_timestamp = redis_util.pktidx_to_timestamp(r, pktstart, array)
         pktstart_dt = datetime.utcfromtimestamp(pktstart_timestamp)
         pktstart_str = pktstart_dt.strftime("%Y%m%dT%H%M%SZ")
 
+        log.info(f"PKTIDX: Min {min_ts}, Med {med_ts}, Max {max_ts}, PKTSTART {pktstart_timestamp}")
+
         # Check that calculated pktstart is plausible:
         if abs(pktstart_dt - datetime.utcnow()) > timedelta(minutes=2):
-            log.error(f"bad pktstart: {pktstart_str} for {array}")
+            log.warning(f"bad pktstart: {pktstart_str} for {array}")
+            redis_util.alert(r,
+                f":warning: `{array}` bad pktstart",
+                "coordinator")
             return
 
         return {"pktstart":pktstart, "pktstart_str":pktstart_str}
