@@ -628,7 +628,7 @@ def alert(r, message, name, slack_channel=SLACK_CHANNEL,
     """
     log.info(message)
     # Format: <Slack channel>:<Slack message text>
-    alert_msg = f"{slack_channel}:[{timestring()}] {name}: {message}"
+    alert_msg = f"{slack_channel}:[{timestring()} - {name}] {message}"
     r.publish(slack_proxy_channel, alert_msg)
 
 
