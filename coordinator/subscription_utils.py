@@ -124,6 +124,9 @@ def unsubscribe(r, array, instances):
         redis_util.gateway_msg(r, channel, 'DWELL', 0, True)
     time.sleep(3) # give them a chance to respond
 
+
+    redis_util.alert(r, f":eject: `{array}` unsubscribed", "coordinator")
+
     # Belt and braces restart DAQs
     hostnames_only = [instance.split('/')[0] for instance in instances]
     result = util.zmq_multi_cmd(hostnames_only, "bluse_hashpipe", "restart")
@@ -148,7 +151,6 @@ def unsubscribe(r, array, instances):
     # Sleep for 20 seconds to allow pipelines to restart:
     time.sleep(20)
 
-    redis_util.alert(r, f":eject: `{array}` unsubscribed", "coordinator")
 
 def samples_per_heap(r, array, spectra_per_heap):
     """Equivalent to HCLOCKS.
