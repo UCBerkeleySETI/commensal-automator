@@ -100,7 +100,12 @@ def subscribe(r, array, instances, streams_per_instance=STREAMS_PER_INSTANCE):
         # Destination IP addresses for instance i (DESTIP)
         redis_util.gateway_msg(r, channel, 'DESTIP', addr_list[i], False)
 
-    redis_util.alert(r, f":arrow_forward: `{array}`", "coordinator")
+    # Write list of instances for compatibility:
+    write_bfr5_instances(r, array, inst_list)
+
+    redis_util.alert(r,
+        f":arrow_forward: `{array}` instances subscribed",
+        "coordinator")
 
 
 def unsubscribe(r, array, instances):
@@ -136,6 +141,9 @@ def unsubscribe(r, array, instances):
     # Instruct gateways to leave current subarray group:
     redis_util.leave_gateway_group(r, array, HPGDOMAIN)
     log.info(f"Disbanded gateway group: {array}")
+
+    # Clear `bfr5_generator` allocated hosts list:
+    clear_bfr5_instances(r, array)
 
     # Sleep for 20 seconds to allow pipelines to restart:
     time.sleep(20)
@@ -261,3 +269,23 @@ def alloc_multicast_groups(r, array, n_instances,
     except ValueError:
         addr_list = [addrs + '+0']
     return addr_list, port, n_addrs, last_added
+
+def write_bfr5_instances(r, array, instances):
+    """Compatibility function to alert the `bfr5_generator` to the current
+    list of active hosts for which bfr5 files should be generated.
+
+    `instances` should be a list of strings.
+    """
+    key = f"coordinator:allocated_hosts:{array}"
+    # clear if old list still exists
+    if r.exists(key):
+        r.delete(key)
+    r.rpush(key, *instances)
+
+def clear_bfr5_instances(r, array):
+    """Compatibility function to clear the current list of active hosts for
+    the `bfr5_generator`.
+    """
+    key = f"coordinator:allocated_hosts:{array}"
+    if r.exists(key):
+        r.delete(key)
