@@ -174,8 +174,11 @@ class Process(State):
         # there could be more than one instance per host. Instance names
         # must conform to the following format: <host>/<instance>
         for instance in data["processing"]:
+            log.info(f"processing: {instance}")
             host, instance_number = instance.split("/")
-            util.zmq_circus_cmd(host, f"bluse_analyzer_{instance_number}", "start")
+            proc = util.zmq_circus_cmd(host, f"bluse_analyzer_{instance_number}", "start")
+            if not proc:
+                log.error(f"Could not start processing on {instance}")
 
         # Alert processing
         redis_util.alert(self.r,
@@ -201,10 +204,12 @@ class Process(State):
                         redis_util.alert(self.r,
                             f":white_check_mark: `{self.array}` complete, code 0",
                             "coordinator")
+                        self.returncodes = []
+                        return Ready(self.array, self.r)
                     # Check and clear the returncodes:
                     elif max(self.returncodes) < 2:
                         redis_util.alert(self.r,
-                            f":heavy_check_mark: `{self.array}` complete, codes: `{returncodes}`",
+                            f":heavy_check_mark: `{self.array}` complete, codes: `{self.returncodes}`",
                             "coordinator")
                         self.returncodes = []
                         return Ready(self.array, self.r)
