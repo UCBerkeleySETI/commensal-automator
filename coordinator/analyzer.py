@@ -107,8 +107,7 @@ def process(n):
 
     # Set of unprocessed directories:
     unprocessed = proc_util.get_items(r, name, "unprocessed")
-
-    log.info(f"{len(unprocessed)} unprocessed directorie(s)")
+    log.info(f"{len(unprocessed)} unprocessed directory(ies)")
 
     max_returncode = 0
 
