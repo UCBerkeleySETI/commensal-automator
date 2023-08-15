@@ -39,23 +39,38 @@ def read_free(r):
         return set(json.loads(free))
     return None
 
-def save_state(array, machine, state, data, r):
+def save_state(array, data, r):
     """Write or update the current state for the specified array into Redis.
      machine = state machine
+
+    Expected structure for `data`:
+
+    {
+        "recproc_state": <state>,
+        "freesub_state": <state>,
+        "subscribed": <list of instances>,
+        "ready": <list of instances>,
+        "recording": <list of instances>,
+        "processing": <list of instances>,
+        "timestamp": <timestamp of data>
+    }
     """
-    log.info(f"Updating {array}:{machine} in {state}, data:")
+    log.info(f"Updating {array} state, data:")
     log.info(f"{data}")
-    array_hash = f"{array}:state"
-    for key, value in data.items():
-        if isinstance(value, set):
-            r.hset(array_hash, key, json.dumps(list(value)))
-        else:
-            r.hset(array_hash, key, value)
+    array_key = f"{array}:state"
+    r.set(array_key, json.dumps(data))
 
 def read_state(array, r):
     """Read state and associated information if available.
     """
-    state_dict = r.hgetall(f"{array}:state")
+    state_data = r.get(f"{array}:state")
+    if state_data:
+        log.info(f"Loading previous state data for {array}")
+        log.info(state_data)
+        return json.loads(state_data)
+    else:
+        log.info(f"No saved state data for {array}")
+        return
 
 def raw_files(r):
     """Returns a dict mapping host name to a list of raw files on the host."""

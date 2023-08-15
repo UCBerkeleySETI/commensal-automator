@@ -5,16 +5,12 @@ class FreeSubscribedMachine(object):
     """State machine to handle subscribing and unsubscribing from
     multicast groups.
     """
-    def __init__(self, initial_state, free, subscribed, r):
+
+    def __init__(self, initial_state, data, r):
 
         self.r = r
-
         self.state = initial_state
-
-        self.data = {
-            "free":free,
-            "subscribed":subscribed
-        }
+        self.data = data
 
     def handle_event(self, event):
         new_state = self.state.handle_event(event, self.data)
@@ -26,29 +22,17 @@ class FreeSubscribedMachine(object):
             else:
                 # stay in current state if entry failed
                 log.warning(f"Could not enter new state: {new_state.name}")
-        # Save the current state:
+        # Save the current free instances:
         redis_util.save_free(self.data["free"], self.r)
-
-
 
 class RecProcMachine(object):
     """State machine to handle recording, processing and cleanup.
     """
-    def __init__(self, initial_state, all_instances, subscribed, r):
 
+    def __init__(self, initial_state, data, r):
         self.r = r
-
         self.state = initial_state
-
-        self.data = {
-            "subscribed":subscribed,
-            "ready":set(),
-            "recording":set(),
-            "processing":set(), 
-        }
-
-        # For now, we always start with all instances in "ready"
-        self.data["ready"] = all_instances.copy()
+        self.data = data
 
     def handle_event(self, event):
         new_state = self.state.handle_event(event, self.data)
@@ -60,3 +44,22 @@ class RecProcMachine(object):
             else:
                 # stay in current state if entry failed
                 log.warning(f"Could not enter new state: {new_state.name}")
+
+        # If any instances are subscribed, the freesub state machine is in the
+        # SUBSCRIBED state.
+        if self.data["subscribed"]:
+            freesub_state = "SUBSCRIBED"
+        else:
+            freesub_state = "FREE"
+
+        # Save state data
+        state_data = {
+            "freesub_state":freesub_state,
+            "recproc_state":self.state.name,
+            "subscribed":list(self.data["subscribed"]),
+            "ready":list(self.data["ready"]),
+            "recording":list(self.data["recording"]),
+            "processing":list(self.data["processing"])
+            }
+
+        redis_util.save_state(self.state.array, state_data, self.r)
