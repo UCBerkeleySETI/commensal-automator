@@ -1,4 +1,5 @@
 import threading
+import time
 import numpy as np
 from datetime import datetime, timedelta
 
@@ -87,7 +88,7 @@ def record(r, array, instances):
     rec_timer.start()
 
     redis_util.alert(r,
-        f":arrow_forward::black_circle_for_record: Recording `{obsid}` on `{array}`",
+        f":black_circle_for_record: Recording `{obsid}` on `{array}`",
         "coordinator")
     # If this is primary time, write datadir to the list of directories to
     # preserve:
@@ -99,7 +100,7 @@ def record(r, array, instances):
     time.sleep(0.5)
     recording = get_recording(r, instances)
 
-    return recording
+    return set(instances)
 
 def add_unprocessed(r, recording, datadir):
     """Set the list of unprocessed directories.
