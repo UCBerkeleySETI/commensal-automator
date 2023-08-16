@@ -54,18 +54,60 @@ and other ancillary tasks.
 
 <img src="docs/rec_proc.png" alt="rec_proc" width=80%/>
 
-## Dependencies
+### Instance allocation:
+
+The diagram below provides a simplified example of instance allocation, in
+which there are 7 instances and three subarrays. Three instances are
+unassigned, while two each are assigned to `array_1` and `array_2`. `array_3`
+does not have any instances allocated to it.
+
+<img src="docs/allocation_example.png" alt="allocation_example" width=90%/>
+
+The boxes and lines in different colours indicate the sets of instances that
+are shared between state machines. There is only one `free` set, which is
+shared by all `freesubscribed` machines. Each subarray's `freesubscribed` and
+`recproc` machines share a `subscribed` set. State changes are resolved in
+sequence, so each machine has its own turn to move instances between sets.
+
+### State saving and loading
+
+The states of each subarray's state machines (`recproc` and `freesubscribed`)
+are saved in Redis as a dictionary in JSON. This takes place every time a
+state change occurs. On startup, for each subarray, the coordinator checks to
+see if state data has been saved previously. If so, it initialises each state
+machine with the appropriate state and instance allocation, recreating the
+last known configuration when the coordinator was last active. This allows the
+coordinator to recover from interruptions, or for modifications to be made in
+the midst of an active subarray.
+
+State data is saved under several keys. The first is saved in Redis under the
+key `free_instances`. This is a JSON-formatted list of all unassigned
+instances, for example:
 
 ```
-Python >= 3.9.12
-pyzmq >= 25.0.0
-PyYAML >= 6.0
-katsdptelstate >= 0.11 (see https://github.com/ska-sa/katsdptelstate)
-redis >= 3.4.1
-requests == 2.28.1 
-numpy >= 1.18.1 
-circusd >= 0.12.1 
-```  
+["blpn0/0", "blpn1/0", "blpn2/0" ...]
+```
+
+The remaining state data is saved for each subarray under the key
+`<array name>:state`. The structure of the (JSON-formatted) dictionary is as
+follows:
+
+```
+state_data = {
+    "recproc_state": <state name>,
+    "freesub_state": <state name>,
+    "subscribed": <list of instances>,
+    "ready": <list of instances>,
+    "recording": <list of instances>,
+    "processing": <list of instances>,
+    "timestamp": <timestamp of data>
+}
+```
+
+If these keys are not available in Redis, the coordinator assumes all
+`recproc` machines are in the `READY` state, with all instances stored
+in `ready`, and that all `freesubscribed` machines are in the `FREE`
+state, with all instances stored in `free`.
 
 ## Installation and Deployment (BLUSE)
 
@@ -106,6 +148,19 @@ For use as a daemonised process with `circus`, follow these steps:
 -    Run `circusctl --endpoint <endpoint> reloadconfig`
 
 -    Run `circusctl --endpoint <endpoint> start coordinator`
+
+## Dependencies
+
+```
+Python >= 3.9.12
+pyzmq >= 25.0.0
+PyYAML >= 6.0
+katsdptelstate >= 0.11 (see https://github.com/ska-sa/katsdptelstate)
+redis >= 3.4.1
+requests == 2.28.1
+numpy >= 1.18.1
+circusd >= 0.12.1
+```
 
 ## Running the coordinator alongside the old automator/coordinator
 
