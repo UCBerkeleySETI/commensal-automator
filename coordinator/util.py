@@ -59,7 +59,6 @@ def zmq_multi_cmd(hosts, name, command):
     return failed
 
 
-
 def zmq_circus_cmd(host, name, command):
     """Construct and issue ZMQ messages to control Circus processes.
     """

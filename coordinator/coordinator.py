@@ -41,8 +41,8 @@ class Coordinator(object):
         if free:
             self.free = set(free)
 
+        # Look for saved state data when starting
         for array in self.arrays:
-            # Look for saved state data when starting
             state_data = redis_util.read_state(array, self.r)
             if state_data:
                 recproc_state = state_data["recproc_state"]
@@ -59,7 +59,6 @@ class Coordinator(object):
                     "free":self.free,
                     "subscribed":self.subscribed[array]
                  }
-
             # If no saved data:
             else:
                 recproc_state = "READY"
@@ -77,8 +76,8 @@ class Coordinator(object):
                 }
 
             # Create the initial states:
-            recproc_init = self.create_state(recproc_state, array, recproc_data, self.r)
-            freesub_init = self.create_state(freesub_state, array, freesub_data, self.r)
+            recproc_init = self.create_state(recproc_state, array, self.r)
+            freesub_init = self.create_state(freesub_state, array, self.r)
 
             # Create the new state machines:
             self.freesubscribed_machines[array] = FreeSubscribedMachine(freesub_init, freesub_data, self.r)
@@ -119,7 +118,7 @@ class Coordinator(object):
         else:
             return message
 
-    def create_state(self, name, array, data, r):
+    def create_state(self, name, array, r):
         """Return a new state object with the given parameters.
         """
         states = {
@@ -145,5 +144,8 @@ class Coordinator(object):
             machine.handle_event(message)
     
     def annotate(self, tag, text):
+        """Add an annotation to Grafana plots to be viewed alongside e.g.
+        the 40GbE heatmap.
+        """
         response = util.annotate_grafana(tag, text)
         log.info(f"Annotating Grafana, response: {response}")

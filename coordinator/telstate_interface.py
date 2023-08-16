@@ -13,7 +13,6 @@
 """
 import numpy as np
 import warnings
-import redis
 import logging
 import os
 import time

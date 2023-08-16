@@ -30,7 +30,7 @@ def get_n_proc(r):
 
 def timestamped_dir_from_filename(filename):
     """Extracts timestamped section from filenames like:
-    /buf0/<timestamp-part>/blah/blah/etc
+    `/buf0/<timestamp-part>/blah/blah/etc`
     """
     parts = filename.strip("/").split("/")
     if len(parts) < 2:
@@ -56,8 +56,10 @@ def make_outputdir(outputdir, log):
 def rm_datadir(datadir, instance_number, log):
     """Remove directory of RAW recordings after processing. DATADIR is
     expected in the format:
-    "/buf0/<pktstart timestamp>-<schedule block ID>/..."
-    Note that "<pktstart timestamp>-<schedule block ID>" is globally unique
+    
+    `/buf0/<pktstart timestamp>-<schedule block ID>/...`
+    
+    Note that `<pktstart timestamp>-<schedule block ID>` is globally unique
     for a directory of raw recordings for the current instance.
     """
     components = datadir.split("/")

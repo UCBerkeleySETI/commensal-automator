@@ -96,9 +96,10 @@ def record(r, array, instances):
     #if is_primary_time():
     #    add_preserved(r, recording, datadir)
 
+    # TODO: check recording here
     # Wait half a second to ensure recording has started:
-    time.sleep(0.5)
-    recording = get_recording(r, instances)
+    # time.sleep(0.5)
+    # recording = get_recording(r, instances)
 
     return set(instances)
 
@@ -187,7 +188,7 @@ def get_cals(r, array):
     endpoint_key = r.get(f"{array}:telstate_sensor")
     endpoint_val = r.get(endpoint_key)
     # Parse endpoint. Arrives as string in specific format:
-    # "('10.98.2.128', 31029)"
+    # e.g. "('10.98.2.128', 31029)"
     try:
         components = endpoint_val.strip("()").split(",")
         ip = components[0].strip("'")
@@ -239,7 +240,6 @@ def get_pktstart(r, instances, margin, array):
     """Calculate PKTSTART for specified DAQ instances.
     """
 
-    log.info(f"instances: {instances}")
     # Get current packet indices for each instance:
     pkt_indices = []
     for instance in instances:

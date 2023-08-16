@@ -7,7 +7,6 @@ class FreeSubscribedMachine(object):
     """
 
     def __init__(self, initial_state, data, r):
-
         self.r = r
         self.state = initial_state
         self.data = data
@@ -52,7 +51,7 @@ class RecProcMachine(object):
         else:
             freesub_state = "FREE"
 
-        # Save state data
+        # Assemble and save state data
         state_data = {
             "freesub_state":freesub_state,
             "recproc_state":self.state.name,

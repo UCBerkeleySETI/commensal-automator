@@ -123,8 +123,6 @@ def unsubscribe(r, array, instances):
         redis_util.gateway_msg(r, channel, "DESTIP", "0.0.0.0", True)
         redis_util.gateway_msg(r, channel, 'DWELL', 0, True)
     time.sleep(3) # give them a chance to respond
-
-
     redis_util.alert(r, f":eject: `{array}` unsubscribed", "coordinator")
 
     # Belt and braces restart DAQs

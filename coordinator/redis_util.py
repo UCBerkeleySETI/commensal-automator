@@ -705,19 +705,6 @@ def parse_msg(msg):
     return components
 
 
-# TODO: complete
-def classify_event(msg):
-    """Classify an incoming message as an event to which the state machines
-    must respond.
-    """
-    data = msg['data']
-    components = msg_data.split(':')
-    if len(components) > 4:
-        log.warning(f"Unrecognised message: {data}")
-        return
-    return components
-
-
 def show_status(r):
     broken = broken_daqs(r)
     if broken:
