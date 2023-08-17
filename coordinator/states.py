@@ -1,5 +1,5 @@
 from coordinator.logger import log
-from coordinator import redis_util, subscription_utils, util
+from coordinator import redis_util, subscription_utils, util, proc_util
 from coordinator import rec_util as rec
 
 DEFAULT_DWELL = 290 # in seconds
@@ -204,6 +204,7 @@ class Process(State):
                         redis_util.alert(self.r,
                             f":white_check_mark: `{self.array}` complete, code 0",
                             "coordinator")
+                        proc_util.increment_n_proc(self.r)
                         self.returncodes = []
                         return Ready(self.array, self.r)
                     # Check and clear the returncodes:
@@ -211,6 +212,7 @@ class Process(State):
                         redis_util.alert(self.r,
                             f":heavy_check_mark: `{self.array}` complete, codes: `{self.returncodes}`",
                             "coordinator")
+                        proc_util.increment_n_proc(self.r)
                         self.returncodes = []
                         return Ready(self.array, self.r)
                     else:

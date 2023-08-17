@@ -64,7 +64,6 @@ def run_seticore(bfrdir, inputdir, tsdir, partition, r, log):
             return 2
         # add --h5_dir arg to seticore command
         seticore_command.extend(["--h5_dir", h5dir])
-    proc_util.increment_n_proc(r)
 
     # run seticore
     log.info(f"running seticore: {seticore_command}")
