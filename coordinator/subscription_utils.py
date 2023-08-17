@@ -88,14 +88,17 @@ def subscribe(r, array, instances, streams_per_instance=STREAMS_PER_INSTANCE):
     for i in range(len(instances)):
         # Instance channel:
         channel = f"{HPGDOMAIN}://{inst_list[i]}/set"
-        # Number of streams for instance i (NSTRM)
+        # Number of streams for instance i (NSTRM). If this is the final
+        # instance on the list, it might not be completely filled.
         if i == len(instances)-1:
-            nstrm = n_last
+            nstrm = n_last + 1
         else:
             nstrm = streams_per_instance
         redis_util.gateway_msg(r, channel, 'NSTRM', nstrm, False)
-        # Absolute starting channel for instance i (SCHAN)
-        schan = i*nstrm*int(hnchan)
+        # Absolute starting channel for instance i (SCHAN). This is
+        # `streams_per_instance` even if the last instance is not completely
+        # filled.
+        schan = i*streams_per_instance*int(hnchan)
         redis_util.gateway_msg(r, channel, 'SCHAN', schan, False)
         # Destination IP addresses for instance i (DESTIP)
         redis_util.gateway_msg(r, channel, 'DESTIP', addr_list[i], False)
