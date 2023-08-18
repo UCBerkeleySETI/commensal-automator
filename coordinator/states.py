@@ -185,6 +185,9 @@ class Process(State):
             f":gear: `{self.array}` processing",
             "coordinator")
 
+        # Grafana tag:
+        util.annotate_grafana("PROCESS", f"{array}: processing")
+
         return True
 
 

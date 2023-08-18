@@ -71,7 +71,7 @@ def record(r, array, instances):
     redis_util.gateway_msg(r, array_group, 'PKTSTART', pktstart_data["pktstart"], False)
 
     # Grafana annotation that recording has started:
-    annotate('RECORD', f"{array}: Coordinator instructed DAQs to record")
+    annotate('RECORD', f"{array}, OBSID: {obsid}")
 
     # Alert the target selector to the new pointing:
     ra_d = util.ra_degrees(target_data["ra"])
