@@ -33,20 +33,44 @@ class Free(State):
         unsubscribe from their assigned multicast groups.
         """
         log.info(f"{self.array} entering state: {self.name}")
-        subscription_utils.unsubscribe(self.r, self.array, data["subscribed"])
-        while data["subscribed"]:
-            data["free"].add(data["subscribed"].pop())
+        if data["subscribed"]:
+            subscription_utils.unsubscribe(self.r, self.array, data["subscribed"])
+            while data["subscribed"]:
+                data["free"].add(data["subscribed"].pop())
         return True
 
     def handle_event(self, event, data):
         super().handle_event(event, data)
-        if event == "CONFIGURE":
+        if event == "CONFIGURING":
+            return Configuring(self.array, self.r)
+        return self
+
+class Configuring(State):
+    """Enter this state when awaiting the arrival of metadata.
+    """
+
+    def __init__(self, array, r):
+        super().__init__(array, r)
+        self.name = "CONFIGURING"
+
+    def on_entry(self, data):
+        """Wait for metadata to arrive before entering SUBSCRIBED state.
+        """
+        log.info(f"{self.array} entering state: {self.name}")
+        return True
+
+    def handle_event(self, event, data):
+        super().handle_event(event, data)
+        if event == "CONFIGURED":
             if data["free"]:
                 return Subscribed(self.array, self.r)
             else:
+                # If there are no available hosts, return to FREE
                 message = f":no_entry_sign: `{self.array}` no free instances, not configuring."
                 redis_util.alert(self.r, message, "coordinator")
-                return self
+                return Free(self.array, self.r)
+        elif event == "DECONFIGURE":
+            return Free(self.array, self.r)
         return self
 
 
@@ -174,7 +198,6 @@ class Process(State):
         # there could be more than one instance per host. Instance names
         # must conform to the following format: <host>/<instance>
         for instance in data["processing"]:
-            log.info(f"processing: {instance}")
             host, instance_number = instance.split("/")
             proc = util.zmq_circus_cmd(host, f"bluse_analyzer_{instance_number}", "start")
             if not proc:
@@ -186,7 +209,7 @@ class Process(State):
             "coordinator")
 
         # Grafana tag:
-        util.annotate_grafana("PROCESS", f"{array}: processing")
+        util.annotate_grafana("PROCESS", f"{self.array}: processing")
 
         return True
 

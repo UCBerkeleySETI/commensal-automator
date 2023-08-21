@@ -3,7 +3,7 @@ import redis
 from coordinator import util, redis_util
 from coordinator.logger import log
 
-from coordinator.states import Ready, Record, Process, Error, Free, Subscribed
+from coordinator.states import Ready, Record, Process, Error, Free, Subscribed, Configuring
 from coordinator.state_machines import RecProcMachine, FreeSubscribedMachine
 
 class Coordinator(object):
@@ -105,8 +105,10 @@ class Coordinator(object):
         """Convert an incoming message into an event transition.
         """
         log.info(message)
+        if message == "configure":
+            return "CONFIGURING"
         if message == "conf_complete":
-            return "CONFIGURE"
+            return "CONFIGURED"
         elif message == "deconfigure":
             return "DECONFIGURE"
         elif message == "tracking":
@@ -124,6 +126,7 @@ class Coordinator(object):
         states = {
             "FREE":Free,
             "SUBSCRIBED":Subscribed,
+            "CONFIGURING":Configuring,
             "READY":Ready,
             "RECORD":Record,
             "PROCESS":Process,
