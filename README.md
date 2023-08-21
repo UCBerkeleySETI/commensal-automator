@@ -48,7 +48,7 @@ and other ancillary tasks.
 
 ### `FreeSubscribed` states:
 
-<img src="docs/free_subscribe.png" alt="free_subscribe" width=40%/>
+<img src="docs/free_subscribe.png" alt="free_subscribe" width=60%/>
 
 ### `RecProc` states:
 
