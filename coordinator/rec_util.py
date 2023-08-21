@@ -22,7 +22,7 @@ def record(r, array, instances):
     """
 
     # Attempt to get current target information:
-    target_data = util.retry(3, 1, get_primary_target, r, array, 16, "|")
+    target_data = util.retry(5, 5, get_primary_target, r, array, 16, "|")
     if not target_data:
         log.error(f"Could not retrieve current target for {array}")
         return
@@ -62,6 +62,15 @@ def record(r, array, instances):
     # SRC_NAME:
     redis_util.gateway_msg(r, array_group, 'SRC_NAME', target_data["target"], False)
 
+    # RA and Dec at start of observation:
+    ra_d = util.ra_degrees(target_data["ra"])
+    redis_util.gateway_msg(r, array_group, 'RA', ra_d, False)
+    redis_util.gateway_msg(r, array_group, 'RA_STR', target_data["ra"], False)
+
+    dec_d = util.dec_degrees(target_data["dec"])
+    redis_util.gateway_msg(r, array_group, 'DEC', dec_d, False)
+    redis_util.gateway_msg(r, array_group, 'DEC_STR', target_data["dec"], False)
+
     # OBSID (unique identifier for a particular observation):
     obsid = f"MeerKAT:{array}:{pktstart_data['pktstart_str']}"
     redis_util.gateway_msg(r, array_group, 'OBSID', obsid, False)
@@ -74,8 +83,6 @@ def record(r, array, instances):
     annotate('RECORD', f"{array}, OBSID: {obsid}")
 
     # Alert the target selector to the new pointing:
-    ra_d = util.ra_degrees(target_data["ra"])
-    dec_d = util.dec_degrees(target_data["dec"])
     targets_req = f"{obsid}:{target_data['target']}:{ra_d}:{dec_d}:{fecenter}"
     r.publish(TARGETS_CHANNEL, targets_req)
 
@@ -88,7 +95,7 @@ def record(r, array, instances):
     rec_timer.start()
 
     redis_util.alert(r,
-        f":black_circle_for_record: Recording `{obsid}` on `{array}`",
+        f":black_circle_for_record: `{array}` recording: `{obsid}`",
         "coordinator")
     # If this is primary time, write datadir to the list of directories to
     # preserve:
@@ -146,8 +153,10 @@ def get_primary_target(r, array, length, delimiter = "|"):
     
     target_val = r.get(f"{array}:target")
     target_ts = float(r.get(f"{array}:last-target")) 
-    last_track_end = float(r.get(f"{array}:last-track-end")) 
-    if target_ts < last_track_end:
+    last_track_end = float(r.get(f"{array}:last-track-end"))
+    # Until we figure out new CAM target delivery: accept a target if it is
+    # newer than `last_track_end - 5`
+    if target_ts < last_track_end - 5:
         log.warning(f"No target data yet for current track for {array}.")
         return
     # Assuming target name or description will always come first
