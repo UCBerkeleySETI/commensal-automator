@@ -30,6 +30,19 @@ def save_free(free, r):
     log.info(f"Saving free instances: {free}")
     r.set("free_instances", json.dumps(list(free)))
 
+def save_freesub_state(array, state, r):
+    """Save the current freesub state name.
+    """
+    log.info(f"Saving freesub state: {state}")
+    r.set(f"{array}:freesub_state", state)
+
+def read_freesub_state(array, r):
+    """Read the most recent freesub state name.
+    """
+    state = r.get(f"{array}:freesub_state")
+    log.info(f"Reading freesub state: {state}")
+    return state
+
 def read_free(r):
     """Retrieve the set of globally available, unassigned instances.
     """
@@ -47,7 +60,6 @@ def save_state(array, data, r):
 
     {
         "recproc_state": <state>,
-        "freesub_state": <state>,
         "subscribed": <list of instances>,
         "ready": <list of instances>,
         "recording": <list of instances>,
@@ -157,8 +169,8 @@ def reset_dwell(r, instances, dwell):
     """
     chan_list = channel_list('bluse', instances)
     # Send messages to these specific hosts:
+    log.info(f"Resetting DWELL for {instances}, new dwell: {dwell}")
     for i in range(len(chan_list)):
-        log.info(f"Resetting DWELL for {chan_list[i]}, new dwell: {dwell}")
         r.publish(chan_list[i], "DWELL=0")
         r.publish(chan_list[i], "PKTSTART=0")
 
@@ -499,7 +511,7 @@ def gateway_msg(r, channel, msg_key, msg_val, write):
     """
     msg = f"{msg_key}={msg_val}"
     r.publish(channel, msg)
-    log.info(f"[active] Published {msg} to channel {channel}")
+    log.info(f"Published {msg} to channel {channel}")
     # save hash of most recent messages
     if write:
         r.hset(channel, msg_key, msg_val)
@@ -622,10 +634,6 @@ def pktidx_to_timestamp(r, pktidx, subarray):
 
     # Seconds since SYNCTIME: PKTIDX*HCLOCKS/(2e6*FENCHAN*ABS(CHAN_BW))
     timestamp = synctime + pktidx * hclocks / (2e6 * fenchan * abs(chan_bw))
-
-    log.info(f"Conversion: {timestamp}")
-    log.info(f"Sync time: {synctime}")
-    log.info(f"HCLOCKS: {hclocks}, FENCHAN: {fenchan}, CHAN_BW: {chan_bw}")
 
     return timestamp
 

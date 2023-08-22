@@ -34,54 +34,7 @@ class Coordinator(object):
             f":large_green_circle: starting up...",
             "coordinator")
 
-        # Check if a list of FREE instances is available in Redis. This set
-        # is shared by all subarray state machines and so must be initialised
-        # here.
-        free = redis_util.read_free(self.r)
-        if free:
-            self.free = set(free)
-
-        # Look for saved state data when starting
-        for array in self.arrays:
-            state_data = redis_util.read_state(array, self.r)
-            if state_data:
-                recproc_state = state_data["recproc_state"]
-                freesub_state = state_data["freesub_state"]
-                # Set of subscribed nodes is shared between both machines.
-                self.subscribed[array] = set(state_data["subscribed"])
-                recproc_data = {
-                     "subscribed":self.subscribed[array],
-                     "ready":set(state_data["ready"]),
-                     "recording":set(state_data["recording"]),
-                     "processing":set(state_data["processing"]),
-                     }
-                freesub_data = {
-                    "free":self.free,
-                    "subscribed":self.subscribed[array]
-                 }
-            # If no saved data:
-            else:
-                recproc_state = "READY"
-                freesub_state = "FREE"
-                self.subscribed[array] = set()
-                recproc_data = {
-                    "subscribed":self.subscribed[array],
-                    "ready":set(self.all_instances.copy()),
-                    "recording":set(),
-                    "processing":set(),
-                    }
-                freesub_data = {
-                    "free":self.free,
-                    "subscribed":self.subscribed[array] # same object
-                }
-
-            # Create the initial states:
-            recproc_init = self.create_state(recproc_state, array, self.r)
-            freesub_init = self.create_state(freesub_state, array, self.r)
-
-            # Create the new state machines:
-            self.freesubscribed_machines[array] = FreeSubscribedMachine(freesub_init, freesub_data, self.r)
-            self.recproc_machines[array] = RecProcMachine(recproc_init, recproc_data, self.r)
+        self.initialise_machines()
 
         # Listen for events and respond:
         ps = self.r.pubsub(ignore_subscribe_messages=True)
@@ -100,6 +53,71 @@ class Coordinator(object):
                     event = self.message_to_event(components[0])
                     self.freesubscribed_machines[array].handle_event(event)
                     self.recproc_machines[array].handle_event(event)
+
+
+    def initialise_machines(self):
+        """Initialise all states and state machines for the specified array.
+        Checks if any prior state information was stored in Redis, and uses
+        that to initialise the state machines and new states.
+        """
+
+        # Check if a list of FREE instances is available in Redis. This set
+        # is shared by all subarray state machines and so must be initialised
+        # here.
+        free = redis_util.read_free(self.r)
+        if free:
+            self.free = set(free)
+
+        # Look for saved state data for each array:
+        for array in self.arrays:
+            # recproc and freesub data; reproc state:
+            recproc_state_data = redis_util.read_state(array, self.r)
+            if recproc_state_data:
+                recproc_state = recproc_state_data["recproc_state"]
+                # Set of subscribed nodes is shared between both machines.
+                self.subscribed[array] = set(recproc_state_data["subscribed"])
+                recproc_data = {
+                        "subscribed":self.subscribed[array],
+                        "ready":set(recproc_state_data["ready"]),
+                        "recording":set(recproc_state_data["recording"]),
+                        "processing":set(recproc_state_data["processing"]),
+                        }
+                freesub_data = {
+                    "free":self.free,
+                    "subscribed":self.subscribed[array]
+                    }
+            # If no saved data:
+            else:
+                recproc_state = "READY"
+                self.subscribed[array] = set()
+                recproc_data = {
+                    "subscribed":self.subscribed[array],
+                    "ready":set(self.all_instances.copy()),
+                    "recording":set(),
+                    "processing":set(),
+                    }
+                freesub_data = {
+                    "free":self.free,
+                    "subscribed":self.subscribed[array] # same object
+                }
+
+            # freesub state:
+            freesub_state = redis_util.read_freesub_state(array, self.r)
+            # If freesub state is not saved in Redis
+            if not freesub_state:
+                if self.subscribed[array]:
+                    freesub_state = "SUBSCRIBED"
+                else:
+                    freesub_state = "FREE"
+
+            # Create the initial states:
+            recproc_init = self.create_state(recproc_state, array, self.r)
+            freesub_init = self.create_state(freesub_state, array, self.r)
+
+            # Create the new state machines:
+            self.freesubscribed_machines[array] = FreeSubscribedMachine(freesub_init, freesub_data, self.r)
+            self.recproc_machines[array] = RecProcMachine(recproc_init, recproc_data, self.r)
+
 
     def message_to_event(self, message):
         """Convert an incoming message into an event transition.

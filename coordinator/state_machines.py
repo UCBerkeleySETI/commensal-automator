@@ -23,6 +23,10 @@ class FreeSubscribedMachine(object):
                 log.warning(f"Could not enter new state: {new_state.name}")
         # Save the current free instances:
         redis_util.save_free(self.data["free"], self.r)
+        # Save the current state:
+        redis_util.save_freesub_state(self.state.array, 
+            self.state.name, 
+            self.r)
 
 class RecProcMachine(object):
     """State machine to handle recording, processing and cleanup.
@@ -44,16 +48,8 @@ class RecProcMachine(object):
                 # stay in current state if entry failed
                 log.warning(f"Could not enter new state: {new_state.name}")
 
-        # If any instances are subscribed, the freesub state machine is in the
-        # SUBSCRIBED state.
-        if self.data["subscribed"]:
-            freesub_state = "SUBSCRIBED"
-        else:
-            freesub_state = "FREE"
-
         # Assemble and save state data
         state_data = {
-            "freesub_state":freesub_state,
             "recproc_state":self.state.name,
             "subscribed":list(self.data["subscribed"]),
             "ready":list(self.data["ready"]),
