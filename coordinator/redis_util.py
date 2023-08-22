@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Helpers functions for looking up various redis data.
+# Helper functions for looking up various redis data.
 # The convention is that "r" is our redis client.
 
 from datetime import datetime, timezone
@@ -114,45 +114,6 @@ def sb_id(r, subarray):
         raise ValueError(f"bad sb_id_list value: {sb_id_list}")
     return answer
 
-
-def coordinator_subarrays(r):
-    """Returns a list of all subarrays that have hosts allocated to the coordinator."""
-    return sorted(key.split(":")[-1] for key in r.keys("coordinator:allocated_hosts:*"))
-
-
-def allocated_hosts(r, subarray):
-    """Returns the hosts allocated to a particular subarray."""
-    results = r.lrange("coordinator:allocated_hosts:" + subarray, 0, -1)
-    return sorted(s.split("/")[0] for s in results)
-
-def is_rec_enabled(r, subarray_name):
-    """Is recording enabled?
-    """
-    rec_enabled_key = f"rec_enabled:{subarray_name}"
-    rec_enabled = r.get(rec_enabled_key)
-    if rec_enabled is None:
-        log.warning('Could not determine recording permission. Defaulting to disabled.')
-        rec_enabled = 0
-    return int(rec_enabled)
-
-def enable_recording(r, subarray_name):
-    """Allow recording to proceed with new tracks for 
-    the specified array.
-    """
-    rec_setting = is_rec_enabled(r, subarray_name)
-    log.info(f"rec_setting {rec_setting}, setting to 1")
-    rec_setting_key = f"rec_enabled:{subarray_name}"
-    r.set(rec_setting_key, 1) 
-
-def disable_recording(r, subarray_name):
-    """Prevent recording from proceeding for new tracks for 
-    the specified array.
-    """
-    rec_setting = is_rec_enabled(r, subarray_name)
-    log.info(f"rec_setting {rec_setting}, setting to 0")
-    rec_setting_key = f"rec_enabled:{subarray_name}"
-    r.set(rec_setting_key, 0) 
-
 def get_bluse_dwell(r, subarray_name):
     """Get specified dwell for BLUSE primary time observing.
     Dwell in seconds.
@@ -180,13 +141,6 @@ def reset_dwell(r, instances, dwell):
     # Reset DWELL
     for i in range(len(chan_list)):
         r.publish(chan_list[i], f"DWELL={dwell}")
-
-def channel_list(hpgdomain, instances):
-    """Build a list of Hashpipe-Redis Gateway channels from a list 
-       of instance names (of format: host/instance)
-    """
-    channel_list = [hpgdomain + '://' + instance + '/set' for instance in instances]
-    return channel_list
 
 def is_primary_time(r, subarray_name):
     """Check if the current (or most recent) observation ID is for BLUSE
@@ -220,7 +174,6 @@ def set_last_rec_bluse(r, subarray_name, value):
     log.info(f"setting primary time status for {subarray_name}: {value}")
     r.set(key, value)
 
-
 def primary_sequence_end(r, subarray):
     """If the previously recorded track was a primary time track, and the
     current track is not a primary time track, return True.
@@ -248,13 +201,11 @@ def all_hosts(r):
     return sorted(key.split("//")[-1].split("/")[0]
                   for key in r.keys("bluse://*/0/status"))
 
-
 def multicast_subscribed(r):
     """Returns a list of the hosts that are subscribed to F-engine multicast groups.
     """
     return [host for (host, destip) in  get_status(r, "bluse", "DESTIP")
             if destip != "0.0.0.0"]
-
 
 def multiget_status(r, domain, keys):
     """Fetches status from hashpipe processes.
@@ -269,7 +220,6 @@ def multiget_status(r, domain, keys):
         pipe.hmget(redis_key, keys)
     results = pipe.execute()
     return list(zip(hosts, results))
-
 
 def multiget_by_instance(r, domain, instances, keys):
     """Fetches status from hashpipe processes.
@@ -291,7 +241,6 @@ def get_status(r, domain, key):
     """
     return [(host, results[0]) for (host, results) in multiget_status(r, domain, [key])]
 
-
 def broken_daqs(r):
     """Return a sorted list of which daqs look broken."""
     answer = []
@@ -302,20 +251,6 @@ def broken_daqs(r):
         if abs(delta.total_seconds()) > 60:
             answer.append(host)
     return answer
-
-
-def ready_to_record(r):
-    """Returns a sorted list of all hosts for which the coordinator is ready to record.
-    This means they will start recording on the next tracking event.
-    """
-    answer = set()
-    subarrays = coordinator_subarrays(r)
-    for subarray in subarrays:
-        # If recording enabled
-        if is_rec_enabled(r, subarray):
-            answer = answer.union(allocated_hosts(r, subarray))
-    return sorted(answer)
-
 
 def get_recording(r):
     """Returns a sorted list of all hosts that are currently recording.
@@ -346,29 +281,6 @@ def get_recording(r):
             continue
     raise IOError("get_recording failed even after retry")
 
-def get_recording_by_array(r, array):
-    """Check if recording has started for a subarray.
-    ToDo: should we consider recording to have started even if a few
-    hosts have failed to begin recording?
-    """
-    allocated = allocated_hosts(r, array)
-    recording = get_recording(r)
-    if len(allocated) == len(allocated.intersection(recording)):
-        return True
-    return False
-
-def coordinator_hosts(r):
-    """Returns a list of all hosts the coordinator is using.
-
-    These are the hosts that the coordinator may write more files to, even if it
-    receives no further instructions from us.
-    We don't want to start processing on a host while the coordinator is still using it.
-
-    TODO: carefully avoid all race conditions here
-    """
-    return sorted(set(ready_to_record(r) + get_recording(r)))
-
-
 def sb_id_from_filename(filename):
     """Works on either raw file names or directory names.
     Returns None if the filename doesn't fit the pattern.
@@ -380,123 +292,6 @@ def sb_id_from_filename(filename):
     if len(x) != 8 or not x.isnumeric() or not y.isnumeric():
         return None
     return f"{x}/{y}"
-
-
-def infer_subarray(r, hosts):
-    """Guess what subarray the data on these hosts is from.
-    If there is no exact match, return None.
-    """
-    hosts_set = set(hosts)
-    for subarray in coordinator_subarrays(r):
-        array_hosts = allocated_hosts(r, subarray)
-        if hosts_set == set(array_hosts):
-            return subarray
-    return None
-
-
-def suggest_recording(r, processing=None, verbose=False):
-    """Returns a list of all subarrays that we can start recording on.
-
-    processing is a set of hosts that are busy processing, so we can't
-    use them to record.
-    """
-    subbed = set(multicast_subscribed(r))
-
-    # Determine what hosts are already being used
-    busy = set()
-    if processing is not None:
-        busy = busy.union(processing)
-        if verbose:
-            print("hosts that are busy processing:", sorted(busy))
-    elif verbose:
-        print("assuming there is no processing happening right now")
-    hosts_with_files = set(raw_files(r).keys())
-    if verbose:
-        print("hosts that have raw files:", sorted(hosts_with_files))
-    busy = busy.union(hosts_with_files)
-    coord_using = coordinator_hosts(r)
-    if verbose:
-        print("hosts that the coordinator is already using:", sorted(coord_using))
-    busy = busy.union(coord_using)
-
-    # See what subarrays don't want any of these hosts
-    subarrays = coordinator_subarrays(r)
-    if not subarrays:
-        if verbose:
-            print("no subarrays are active, so we can't record")
-        return []
-    
-    answer = []
-    for subarray in subarrays:
-        hosts = set(allocated_hosts(r, subarray))
-        if not subbed.intersection(hosts):
-            if verbose:
-                print(f"we cannot record on {subarray} because no hosts are subscribed")
-            continue
-        inter = busy.intersection(hosts)
-        if inter:
-            if verbose:
-                print(f"we cannot record on {subarray} because {sorted(inter)} are in use")
-            continue
-        if verbose:
-            print(f"we can record on {subarray} because {sorted(hosts)} are unused")
-        answer.append(subarray)
-    return answer
-
-
-def hosts_by_dir(filemap):
-    """Create a map of input directory to a set of hosts, given a map of host to files
-    """
-    answer = {}
-    for host, filenames in filemap.items():
-        for filename in filenames:
-            dirname = os.path.dirname(filename)
-            if dirname not in answer:
-                answer[dirname] = set()
-            answer[dirname].add(host)
-    return answer
-
-
-def suggest_processing(r, processing=None, verbose=False):
-    """Returns a map of (input dir, set of hosts) tuples that we could process.
-
-    processing is a set of hosts that are already busy processing, so we can't
-    use them to start a new round of processing.
-    """
-    # Determine what hosts we can use
-    busy = set()
-    if processing is not None:
-        busy = busy.union(processing)
-        if verbose:
-            print("hosts that are already processing:", sorted(busy))
-    elif verbose:
-        print("assuming there is no processing already happening")
-    coord_using = coordinator_hosts(r)
-    if verbose:
-        print("hosts that the coordinator is using:", sorted(coord_using))
-    busy = busy.union(coord_using)
-
-    # See what files there are to process
-    filemap = raw_files(r)
-    if not filemap:
-        if verbose:
-            print("there are no raw files anywhere, so we can't process")
-        return {}
-    potential = hosts_by_dir(filemap)
-
-    # Filter for input directories where none of the hosts are busy
-    answer = {}
-    for dirname, hosts in potential.items():
-        inter = hosts.intersection(busy)
-        if inter:
-            if verbose:
-                print(f"{dirname} has busy hosts: {sorted(inter)}")
-        else:
-            if verbose:
-                print(f"{dirname} is ready on hosts: {sorted(hosts)}")
-            answer[dirname] = hosts
-
-    return answer
 
 def gateway_msg(r, channel, msg_key, msg_val, write):
     """Format and publish a hashpipe-Redis gateway message. Save messages
@@ -556,60 +351,6 @@ def set_group_key(r, group_name, gateway_domain, key, value):
     message = f"{key}={value}"
     r.publish(group_channel, message)
     log.info(f"Set {key} to {value} for {gateway_domain} instances in group {group_name}")
-
-def hpguppi_procstat(r):
-    """Returns a map from hpguppi states to a list of hosts in them.
-
-    Expected states: IDLE, START, END, None
-    """
-    answer = {}
-    for host, procstat in get_status(r, "blproc", "PROCSTAT"):
-        if procstat not in answer:
-            answer[procstat] = []
-        answer[procstat].append(host)
-    return answer
-
-
-def last_seticore_error(r):
-    """Returns a tuple of (host, log lines) for the most recent seticore run that
-    ended in an error.
-    Returns (None, []) if no errors are found.
-    """
-    answer_host = None
-    answer_run_line = None
-    answer_lines = []
-    for host in all_hosts(r):
-        filename = f"/home/obs/seticore_slurm/seticore_{host}.err"
-        try:
-            lines = open(filename).readlines()
-        except:
-            continue
-        reversed_lines = []
-        for line in reversed(lines[-100:]):
-            reversed_lines.append(line.strip("\n"))
-            if "running seticore" in line:
-                break
-        else:
-            # We have more than 100 lines of error output, seems weird
-            continue
-        possible_run_line = reversed_lines.pop()
-        if not reversed_lines:
-            # There's no error here
-            continue
-        if answer_run_line is None or possible_run_line > answer_run_line:
-            # This one looks like the most recent error so far
-            answer_host = host
-            answer_run_line = possible_run_line
-            answer_lines = list(reversed(reversed_lines))
-
-    # Truncate the error lines for nicer display
-    half_window = 5
-    if len(answer_lines) > 2 * half_window + 1:
-        snipped = len(answer_lines) - 2 * half_window
-        answer_lines = answer_lines[:half_window] + [
-            f"<{snipped} lines snipped>"] + answer_lines[-half_window:]
-    return answer_host, answer_lines
-
 
 def timestring():
     """A standard format to report the current time in"""
