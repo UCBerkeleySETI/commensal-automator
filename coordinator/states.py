@@ -143,10 +143,13 @@ class Record(State):
         ready = data["ready"]
         if ready == subscribed.intersection(ready):
             result = rec.record(self.r, self.array, list(ready))
-            # update data:
-            data["recording"] = result
-            data["ready"] = ready.difference(result)
-            return True
+            if result:
+                # update data:
+                data["recording"] = result
+                data["ready"] = ready.difference(result)
+                return True
+            log.warning("Could not start recording.")
+            return False
         else:
             log.error("Not all ready instances are subscribed.")
             return False
