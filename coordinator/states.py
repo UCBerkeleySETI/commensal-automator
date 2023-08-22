@@ -1,5 +1,5 @@
 from coordinator.logger import log
-from coordinator import redis_util, subscription_utils, util, proc_util
+from coordinator import redis_util, sub_util, util, proc_util
 from coordinator import rec_util as rec
 
 DEFAULT_DWELL = 290 # in seconds
@@ -34,7 +34,7 @@ class Free(State):
         """
         log.info(f"{self.array} entering state: {self.name}")
         if data["subscribed"]:
-            subscription_utils.unsubscribe(self.r, self.array, data["subscribed"])
+            sub_util.unsubscribe(self.r, self.array, data["subscribed"])
             while data["subscribed"]:
                 data["free"].add(data["subscribed"].pop())
         return True
@@ -90,7 +90,7 @@ class Subscribed(State):
 
         # Attempt to claim the required number of instances from those that
         # are free:
-        n_requested = subscription_utils.num_requested(self.r, self.array)
+        n_requested = sub_util.num_requested(self.r, self.array)
         while len(data["free"]) > 0 and len(data["subscribed"]) < n_requested:
             data["subscribed"].add(data["free"].pop())
         if len(data["subscribed"]) < n_requested:
@@ -99,7 +99,7 @@ class Subscribed(State):
             redis_util.alert(self.r, message, "coordinator")
 
         # Initiate subscription process:
-        subscription_utils.subscribe(self.r, self.array, data["subscribed"])
+        sub_util.subscribe(self.r, self.array, data["subscribed"])
         return True
 
     def handle_event(self, event, data):
