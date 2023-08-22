@@ -88,6 +88,9 @@ instances, for example:
 ["blpn0/0", "blpn1/0", "blpn2/0" ...]
 ```
 
+The state of each `freesub` machine is stored under the Redis key
+`<array>:freesub_state`.  
+
 The remaining state data is saved for each subarray under the key
 `<array name>:state`. The structure of the (JSON-formatted) dictionary is as
 follows:
@@ -95,7 +98,6 @@ follows:
 ```
 state_data = {
     "recproc_state": <state name>,
-    "freesub_state": <state name>,
     "subscribed": <list of instances>,
     "ready": <list of instances>,
     "recording": <list of instances>,
