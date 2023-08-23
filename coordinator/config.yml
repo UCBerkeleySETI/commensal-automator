@@ -1,11 +1,21 @@
 #Temporary configuration file for coordinator.py 
-#It contains:
-#1. The number of F-engine streams to be processed per hashpipe instance.
-#2. All the available hashpipe instances in the format: <host>/<instance>.
 
+channels:
+- alerts
+- proc_result
+- rec_result
 
-streams_per_instance: 
-- 4
+arrays:
+- array_1
+- array_2
+- array_3
+- array_4
+
+redis_host: 127.0.0.1
+
+redis_port: 6379
+
+streams_per_instance: 4
 
 hashpipe_instances:
 - blpn0/0

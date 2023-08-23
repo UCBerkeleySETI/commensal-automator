@@ -13,7 +13,6 @@
 """
 import numpy as np
 import warnings
-import redis
 import logging
 import os
 import time
@@ -24,7 +23,7 @@ import json
 
 import katsdptelstate
 
-from automator.logger import log, set_logger
+from coordinator.logger import log, set_logger
 
 class TelstateInterface(object):
     """This class is used to interface with Telstate to retrieve calibration
@@ -35,18 +34,15 @@ class TelstateInterface(object):
         """Initialise the interface and logging. 
         
            Args:
-               local_redis (str): Local Redis endpoint of the form <host>:<port>
+               local_redis (obj): Redis object
                telstate_redis (str): Redis endpoint for Telstate (host:port)
         """
         log = set_logger(level=logging.DEBUG)
-        local_redis_host = local_redis.split(':')[0]
-        local_redis_port = local_redis.split(':')[1]
-        self.red = redis.StrictRedis(host=local_redis_host, 
-            port=local_redis_port, decode_responses=True) 
+        self.red = local_redis 
         # Create TelescopeState object for current subarray:
         self.telstate = katsdptelstate.TelescopeState(telstate_redis)
  
-    def query_telstate(self, output_path, product_id):
+    def query_telstate(self, product_id, output_path=None):
         """Query the current Telstate Redis DB for the latest calibration solutions. 
            They are also written to an .npz file temporarily for diagnostic purposes.   
 
@@ -76,15 +72,16 @@ class TelstateInterface(object):
         r_time = datetime.utcnow()
         r_time = r_time.strftime("%Y%m%dT%H%M%SZ")
 
-        # Save .npz file for diagnostic purposes.
-        output_file = os.path.join(output_path, 'cal_solutions_{}'.format(timestamp))
-        log.info('Saving cal solutions to {}'.format(output_file))
-        try:
-            np.savez(output_file, cal_G=cal_G, cal_B=cal_B, cal_K=cal_K, 
-                cal_all=corrections, refant=refant)
-        except Exception as e:
-            log.error(e)
-            
+        if output_path:
+            # Save .npz file for diagnostic purposes.
+            output_file = os.path.join(output_path, 'cal_solutions_{}'.format(timestamp))
+            log.info('Saving cal solutions to {}'.format(output_file))
+            try:
+                np.savez(output_file, cal_G=cal_G, cal_B=cal_B, cal_K=cal_K, 
+                    cal_all=corrections, refant=refant)
+            except Exception as e:
+                log.error(e)
+
         # Antenna list:
         ant_key = '{}:antennas'.format(product_id)
         nants = self.red.llen(ant_key)
@@ -131,7 +128,7 @@ class TelstateInterface(object):
         # Fill multidimensional array:
         # Detect if data is complex:
         if(np.iscomplexobj(cals['m{}h'.format(str(ant_n[0]).zfill(3))])):
-            result_array = np.zeros((nchans, 2, nants), dtype=np.complex)
+            result_array = np.zeros((nchans, 2, nants), dtype=complex)
         else:
             result_array = np.zeros((nchans, 2, nants))
         for i in range(len(ant_n)):
