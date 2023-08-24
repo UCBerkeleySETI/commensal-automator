@@ -91,8 +91,10 @@ class Subscribed(State):
         # Attempt to claim the required number of instances from those that
         # are free:
         n_requested = sub_util.num_requested(self.r, self.array)
+        free_instances = redis_util.sort_instances(list(data["free"]))
         while len(data["free"]) > 0 and len(data["subscribed"]) < n_requested:
-            data["subscribed"].add(data["free"].pop())
+            data["free"].remove(free_instances[0])
+            data["subscribed"].add(free_instances.pop(0))
         if len(data["subscribed"]) < n_requested:
             n_subs = len(data["subscribed"])
             message = f":warning: `{self.array}` {n_subs}/{n_requested} available."
