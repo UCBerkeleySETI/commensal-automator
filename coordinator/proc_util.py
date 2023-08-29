@@ -2,6 +2,17 @@
 import re
 import os
 import shutil
+import numpy as np
+
+def output_summary(codes):
+    """Summarise output error codes.
+    """
+    summary = "codes "
+    if codes:
+        codes, counts = np.unique(codes, return_counts=True)
+        for code, count in zip(codes, counts):
+            summary = summary + f"`{code}: {count}` "
+    return summary
 
 def get_items(r, name, type):
     """Return the set of items of <type> from Redis.

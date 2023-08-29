@@ -231,9 +231,10 @@ class Process(State):
                 # If all (or whatever preferred percentage) is completed,
                 # continue to the next state:
                 if not data["processing"]:
+                    codes = proc_util.output_summary(self.returncodes)
                     if max(self.returncodes) < 1:
                         redis_util.alert(self.r,
-                            f":white_check_mark: `{self.array}` complete, code 0",
+                            f":white_check_mark: `{self.array}` complete: {codes}",
                             "coordinator")
                         proc_util.increment_n_proc(self.r)
                         self.returncodes = []
@@ -241,12 +242,15 @@ class Process(State):
                     # Check and clear the returncodes:
                     elif max(self.returncodes) < 2:
                         redis_util.alert(self.r,
-                            f":heavy_check_mark: `{self.array}` complete, codes: `{self.returncodes}`",
+                            f":heavy_check_mark: `{self.array}` complete: {codes}",
                             "coordinator")
                         proc_util.increment_n_proc(self.r)
                         self.returncodes = []
                         return Ready(self.array, self.r)
                     else:
+                        redis_util.alert(self.r,
+                            f":warning: `{self.array}`: {codes}",
+                            "coordinator")
                         return Error(self.array, self.r)
             else:
                 log.warning(f"Unrecognised instance: {instance}")
