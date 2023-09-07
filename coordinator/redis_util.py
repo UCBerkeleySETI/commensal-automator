@@ -146,8 +146,7 @@ def channel_list(hpgdomain, instances):
     """Build a list of Hashpipe-Redis Gateway channels from a list
        of instance names (of format: host/instance)
     """
-    channel_list = [hpgdomain + '://' + instance + '/set' for instance in instances]
-    return channel_list
+    return [f"{hpgdomain}://{instance}/set" for instance in instances]
 
 def is_primary_time(r, subarray_name):
     """Check if the current (or most recent) observation ID is for BLUSE
