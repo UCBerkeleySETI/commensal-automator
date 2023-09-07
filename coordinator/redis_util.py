@@ -142,6 +142,12 @@ def reset_dwell(r, instances, dwell):
     for i in range(len(chan_list)):
         r.publish(chan_list[i], f"DWELL={dwell}")
 
+def channel_list(hpgdomain, instances):
+    """Build a list of Hashpipe-Redis Gateway channels from a list
+       of instance names (of format: host/instance)
+    """
+    return [f"{hpgdomain}://{instance}/set" for instance in instances]
+
 def is_primary_time(r, subarray_name):
     """Check if the current (or most recent) observation ID is for BLUSE
     primary time.

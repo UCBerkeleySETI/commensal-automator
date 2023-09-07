@@ -91,8 +91,10 @@ class Subscribed(State):
         # Attempt to claim the required number of instances from those that
         # are free:
         n_requested = sub_util.num_requested(self.r, self.array)
+        free_instances = redis_util.sort_instances(list(data["free"]))
         while len(data["free"]) > 0 and len(data["subscribed"]) < n_requested:
-            data["subscribed"].add(data["free"].pop())
+            data["free"].remove(free_instances[0])
+            data["subscribed"].add(free_instances.pop(0))
         if len(data["subscribed"]) < n_requested:
             n_subs = len(data["subscribed"])
             message = f":warning: `{self.array}` {n_subs}/{n_requested} available."
@@ -141,7 +143,7 @@ class Record(State):
 
         subscribed = data["subscribed"]
         ready = data["ready"]
-        if ready == subscribed.intersection(ready):
+        if subscribed.issubset(ready):
             result = rec.record(self.r, self.array, list(ready))
             if result:
                 # update data:
@@ -229,9 +231,10 @@ class Process(State):
                 # If all (or whatever preferred percentage) is completed,
                 # continue to the next state:
                 if not data["processing"]:
+                    codes = proc_util.output_summary(self.returncodes)
                     if max(self.returncodes) < 1:
                         redis_util.alert(self.r,
-                            f":white_check_mark: `{self.array}` complete, code 0",
+                            f":white_check_mark: `{self.array}` complete: {codes}",
                             "coordinator")
                         proc_util.increment_n_proc(self.r)
                         self.returncodes = []
@@ -239,12 +242,15 @@ class Process(State):
                     # Check and clear the returncodes:
                     elif max(self.returncodes) < 2:
                         redis_util.alert(self.r,
-                            f":heavy_check_mark: `{self.array}` complete, codes: `{self.returncodes}`",
+                            f":heavy_check_mark: `{self.array}` complete: {codes}",
                             "coordinator")
                         proc_util.increment_n_proc(self.r)
                         self.returncodes = []
                         return Ready(self.array, self.r)
                     else:
+                        redis_util.alert(self.r,
+                            f":warning: `{self.array}`: {codes}",
+                            "coordinator")
                         return Error(self.array, self.r)
             else:
                 log.warning(f"Unrecognised instance: {instance}")
