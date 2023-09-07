@@ -143,7 +143,7 @@ class Record(State):
 
         subscribed = data["subscribed"]
         ready = data["ready"]
-        if subscribed == subscribed.intersection(ready):
+        if subscribed.issubset(ready):
             result = rec.record(self.r, self.array, list(ready))
             if result:
                 # update data:
