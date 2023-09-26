@@ -140,10 +140,9 @@ class Record(State):
     def on_entry(self, data):
 
         log.info(f"{self.array} entering state: {self.name}")
-
         subscribed = data["subscribed"]
         ready = data["ready"]
-        if subscribed.issubset(ready):
+        if subscribed.issubset(ready) and subscribed:
             result = rec.record(self.r, self.array, list(ready))
             if result:
                 # update data:
