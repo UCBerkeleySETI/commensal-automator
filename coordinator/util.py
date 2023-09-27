@@ -33,7 +33,6 @@ def config(cfg_file):
     except IOError:
         log.error('Could not open config file.')
 
-
 def zmq_multi_cmd(hosts, name, command):
     """Construct and issue ZMQ messages to control Circus processes.
     """
@@ -66,7 +65,7 @@ def zmq_circus_cmd(host, name, command):
         "command":command,
         "properties":{
             "name":name,
-            "waiting":False,
+            "waiting":True,
             "match":"simple"
             }
         }
@@ -76,6 +75,8 @@ def zmq_circus_cmd(host, name, command):
     s.send_json(message)
     r = s.recv_json()
     if r['status'] != 'ok':
+        status = r["status"]
+        log.info(f"{host} {name} result: {status}")
         return False
     s.disconnect(f"tcp://{host}:5555")
     return True
