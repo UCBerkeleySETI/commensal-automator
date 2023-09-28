@@ -82,8 +82,15 @@ def record(r, array, instances):
     targets_req = f"{obsid}:{target_data['target']}:{ra_d}:{dec_d}:{fecenter}"
     r.publish(TARGETS_CHANNEL, targets_req)
 
-    # Write datadir to the list of unprocessed directories for this subarray:
-    add_unprocessed(r, set(instances), pktstart_data["pktstart_str"], sb_id)
+    # Check if this recording is primary time:
+    if check_primary_time(r, array):
+        log.info("Primary time detected.")
+        redis_util.alert(r,
+        f":zap: `{array}` Primary time detected, human intervention required after recording",
+        "coordinator")
+    else:
+        # Write datadir to the list of unprocessed directories for this subarray:
+        add_unprocessed(r, set(instances), pktstart_data["pktstart_str"], sb_id)
 
     # Start recording timeout timer, with 10 second safety margin:
     rec_timer = threading.Timer(300, lambda:timeout(r, array, "rec_result"))
@@ -106,6 +113,17 @@ def record(r, array, instances):
 
     return set(instances)
 
+def check_primary_time(r, array):
+    """Check if the current recording is primary time.
+    """
+    array_num = array[-1] # last char is array number
+    key = f"{array}:subarray_{array_num}_script_proposal_id"
+    proposal_id = r.get(key)
+    if not proposal_id:
+        return
+    log.info(f"Retrieved currrent proposal ID: {proposal_id}")
+    if proposal_id.strip("'") == "DDT-20230920-DC-01":
+        return True
 
 def set_datadir(r, array, pktstart_str, instance_numbers, sb_id):
     """Set DATADIR correctly for each instance. For each host, instance 0

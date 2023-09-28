@@ -136,6 +136,7 @@ class Record(State):
     def __init__(self, array, r):
         super().__init__(array, r)
         self.name = "RECORD"
+        self.primary_time = False
 
     def on_entry(self, data):
 
@@ -148,6 +149,9 @@ class Record(State):
                 # update data:
                 data["recording"] = result
                 data["ready"] = ready.difference(result)
+                # check primary time:
+                if rec.check_primary_time(self.r, self.array):
+                    self.primary_time = True
                 return True
             log.warning("Could not start recording.")
             return False
@@ -163,17 +167,21 @@ class Record(State):
             redis_util.alert(self.r,
                 f":black_square_for_stop: `{self.array}` recording stopped",
                 "coordinator")
-            if redis_util.is_primary_time(self.r, self.array):
+            if self.primary_time:
                 # move them back into the ready state
                 while data["recording"]:
                     data["ready"].add(data["recording"].pop())
-                return Ready(self.array, self.r)
-            else:
-                return Process(self.array, self.r)
+                return Waiting(self.array, self.r)
+            return Process(self.array, self.r)
         elif event == "REC_END":
             redis_util.alert(self.r,
                 f":black_square_for_stop: `{self.array}` recording ended",
                 "coordinator")
+            if self.primary_time:
+                # move them back into the ready state
+                while data["recording"]:
+                    data["ready"].add(data["recording"].pop())
+                return Waiting(self.array, self.r)
             return Process(self.array, self.r)
         else:
             return self
@@ -253,6 +261,26 @@ class Process(State):
                         return Error(self.array, self.r)
             else:
                 log.warning(f"Unrecognised instance: {instance}")
+        return self
+
+
+class Waiting(State):
+    """Wait in this state for further human intervention.
+    """
+    def __init__(self, array, r):
+        super().__init__(array, r)
+        self.name = "WAITING"
+
+    def on_entry(self, data):
+        log.info(f"{self.array} entering state: {self.name}")
+        redis_util.alert(self.r,
+            f":bust_in_silhouette: `{self.array}` intervention required",
+            "coordinator")
+        return True
+
+    def handle_event(self, event, data):
+        super().handle_event(event, data)
+        log.info(f"In WAITING state, therefore ignoring: {event}")
         return self
 
 
