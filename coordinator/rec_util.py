@@ -36,11 +36,8 @@ def record(r, array, instances):
     # Supply Hashpipe-Redis gateway keys to the instances which will conduct
     # recording:
 
-    # Gateway group:
-    array_group = f"{HPGDOMAIN}:{array}///set"
-
     # Set DWELL in preparation for recording:
-    redis_util.gateway_msg(r, array_group, 'DWELL', DEFAULT_DWELL, True)
+    redis_util.set_group_key(r, array, "DWELL", DEFAULT_DWELL)
 
     # Calculate PKTSTART:
     pktstart_data = get_pktstart(r, instances, PKTIDX_MARGIN, array)
@@ -56,28 +53,27 @@ def record(r, array, instances):
 
     # DATADIR
     sb_id = redis_util.sb_id(r, array)
-    datadir = f"/buf0/{pktstart_data['pktstart_str']}-{sb_id}"
-    redis_util.gateway_msg(r, array_group, 'DATADIR', datadir, False)
+    set_datadir(r, array, pktstart_data["pktstart_str"], [0,1], sb_id)
 
     # SRC_NAME:
-    redis_util.gateway_msg(r, array_group, 'SRC_NAME', target_data["target"], False)
+    redis_util.set_group_key(r, array, "SRC_NAME", target_data["target"])
 
     # RA and Dec at start of observation:
     ra_d = util.ra_degrees(target_data["ra"])
-    redis_util.gateway_msg(r, array_group, 'RA', ra_d, False)
-    redis_util.gateway_msg(r, array_group, 'RA_STR', target_data["ra"], False)
+    redis_util.set_group_key(r, array, "RA", ra_d)
+    redis_util.set_group_key(r, array, "RA_STR", target_data["ra"])
 
     dec_d = util.dec_degrees(target_data["dec"])
-    redis_util.gateway_msg(r, array_group, 'DEC', dec_d, False)
-    redis_util.gateway_msg(r, array_group, 'DEC_STR', target_data["dec"], False)
+    redis_util.set_group_key(r, array, "DEC", dec_d)
+    redis_util.set_group_key(r, array, "DEC_STR", target_data["dec"])
 
     # OBSID (unique identifier for a particular observation):
     obsid = f"MeerKAT:{array}:{pktstart_data['pktstart_str']}"
-    redis_util.gateway_msg(r, array_group, 'OBSID', obsid, False)
+    redis_util.set_group_key(r, array, "OBSID", obsid)
 
     # Set PKTSTART separately after all the above messages have
     # all been delivered:
-    redis_util.gateway_msg(r, array_group, 'PKTSTART', pktstart_data["pktstart"], False)
+    redis_util.set_group_key(r, array, "PKTSTART", str(pktstart_data["pktstart"]))
 
     # Grafana annotation that recording has started:
     annotate('RECORD', f"{array}, OBSID: {obsid}")
@@ -86,8 +82,15 @@ def record(r, array, instances):
     targets_req = f"{obsid}:{target_data['target']}:{ra_d}:{dec_d}:{fecenter}"
     r.publish(TARGETS_CHANNEL, targets_req)
 
-    # Write datadir to the list of unprocessed directories for this subarray:
-    add_unprocessed(r, set(instances), datadir)
+    # Check if this recording is primary time:
+    if check_primary_time(r, array):
+        log.info("Primary time detected.")
+        redis_util.alert(r,
+        f":zap: `{array}` Primary time detected, human intervention required after recording",
+        "coordinator")
+    else:
+        # Write datadir to the list of unprocessed directories for this subarray:
+        add_unprocessed(r, set(instances), pktstart_data["pktstart_str"], sb_id)
 
     # Start recording timeout timer, with 10 second safety margin:
     rec_timer = threading.Timer(300, lambda:timeout(r, array, "rec_result"))
@@ -110,11 +113,37 @@ def record(r, array, instances):
 
     return set(instances)
 
-def add_unprocessed(r, recording, datadir):
+def check_primary_time(r, array):
+    """Check if the current recording is primary time.
+    """
+    array_num = array[-1] # last char is array number
+    key = f"{array}:subarray_{array_num}_script_proposal_id"
+    proposal_id = r.get(key)
+    if not proposal_id:
+        return
+    log.info(f"Retrieved currrent proposal ID: {proposal_id}")
+    # This is the current active proposal ID to look for. If it
+    # is detected, we want to enter the "waiting" state.
+    if proposal_id.strip("'") == "DDT-20230920-DC-01":
+        return True
+
+def set_datadir(r, array, pktstart_str, instance_numbers, sb_id):
+    """Set DATADIR correctly for each instance. For each host, instance 0
+    must always use `/buf0` and instance 1 must always use `/buf1`.
+    """
+    for instance_n in instance_numbers:
+        group = f"{HPGDOMAIN}:{array}-{instance_n}///set"
+        datadir = f"/buf{instance_n}/{pktstart_str}-{sb_id}"
+        redis_util.gateway_msg(r, group, 'DATADIR', datadir, False)
+
+
+def add_unprocessed(r, recording, pktstart_str, sb_id):
     """Set the list of unprocessed directories.
     """
-    log.info(f"Adding {datadir} to <instance>:unprocessed")
+    log.info(f"Adding datadir to <instance>:unprocessed")
     for instance in recording:
+        host, n = instance.split("/")
+        datadir = f"/buf{n}/{pktstart_str}-{sb_id}"
         r.lpush(f"{instance}:unprocessed", datadir)
 
 
@@ -154,6 +183,7 @@ def get_primary_target(r, array, length, delimiter = "|"):
     target_val = r.get(f"{array}:target")
     target_ts = float(r.get(f"{array}:last-target")) 
     last_track_end = float(r.get(f"{array}:last-track-end"))
+    log.info(f"Target: {target_val}, ts: {target_ts}, last: {last_track_end}")
     # Until we figure out new CAM target delivery: accept a target if it is
     # newer than `last_track_end - 5`
     if target_ts < last_track_end - 5:

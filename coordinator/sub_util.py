@@ -24,8 +24,7 @@ def subscribe(r, array, instances, streams_per_instance=STREAMS_PER_INSTANCE):
     r.set(f"coordinator:cal_ts:{array}", 0)
 
     # Join Hashpipe-Redis gateway group for the current subarray:
-    redis_util.join_gateway_group(r, instances, array, HPGDOMAIN)
-    array_group = f"{HPGDOMAIN}:{array}///set"
+    redis_util.create_array_groups(r, instances, array)
 
     # Apportion multicast groups:
     addr_list, port, n_addrs, n_last = alloc_multicast_groups(r, array, len(instances),
@@ -34,54 +33,54 @@ def subscribe(r, array, instances, streams_per_instance=STREAMS_PER_INSTANCE):
     # Publish necessary gateway keys:
 
     # Name of current subarray (SUBARRAY)
-    redis_util.gateway_msg(r, array_group, 'SUBARRAY', array, True)
+    redis_util.set_group_key(r, array, "SUBARRAY", array)
 
     # Port (BINDPORT)
-    redis_util.gateway_msg(r, array_group, 'BINDPORT', port, True)
+    redis_util.set_group_key(r, array, "BINDPORT", port)
 
     # Total number of streams (FENSTRM)
-    redis_util.gateway_msg(r, array_group, 'FENSTRM', n_addrs, True)
+    redis_util.set_group_key(r, array, "FENSTRM", n_addrs)
 
     # Sync time (UNIX, seconds)
     t_sync = sync_time(r, array)
-    redis_util.gateway_msg(r, array_group, 'SYNCTIME', t_sync, True)
+    redis_util.set_group_key(r, array, "SYNCTIME", t_sync)
 
     # Centre frequency (FECENTER)
     fecenter = centre_freq(r, array)
-    redis_util.gateway_msg(r, array_group, 'FECENTER', fecenter, True)
+    redis_util.set_group_key(r, array, "FECENTER", fecenter)
 
     # Total number of frequency channels (FENCHAN)
     n_freq_chans = r.get(f"{array}:n_channels")
-    redis_util.gateway_msg(r, array_group, 'FENCHAN', n_freq_chans, True)
+    redis_util.set_group_key(r, array, "FENCHAN", n_freq_chans)
 
     # Coarse channel bandwidth (from F engines): CHANBW
     # Note: no sign information!
     chan_bw = coarse_chan_bw(r, array, n_freq_chans)
-    redis_util.gateway_msg(r, array_group, 'CHAN_BW', chan_bw, True)
+    redis_util.set_group_key(r, array, "CHAN_BW", chan_bw)
 
     # Number of channels per substream (HNCHAN)
     hnchan = r.get(cbf_sensor_name(r, array,
             'antenna_channelised_voltage_n_chans_per_substream'))
-    redis_util.gateway_msg(r, array_group, 'HNCHAN', hnchan, True)
+    redis_util.set_group_key(r, array, "HNCHAN", hnchan)
 
     # Number of spectra per heap (HNTIME)
     hntime = r.get(cbf_sensor_name(r, array,
             'antenna_channelised_voltage_spectra_per_heap'))
-    redis_util.gateway_msg(r, array_group, 'HNTIME', hntime, True)
+    redis_util.set_group_key(r, array, "HNTIME", hntime)
 
     # Number of ADC samples per heap (HCLOCKS)
     adc_per_heap = samples_per_heap(r, array, hntime)
-    redis_util.gateway_msg(r, array_group, 'HCLOCKS', adc_per_heap, True)
+    redis_util.set_group_key(r, array, "HCLOCKS", adc_per_heap)
 
     # Number of antennas (NANTS)
     nants = r.llen(f"{array}:antennas")
-    redis_util.gateway_msg(r, array_group, 'NANTS', nants, True)
+    redis_util.set_group_key(r, array, "NANTS", nants)
 
     # Set DWELL to 0 on configure
-    redis_util.gateway_msg(r, array_group, 'DWELL', 0, True)
+    redis_util.set_group_key(r, array, "DWELL", 0)
 
     # Make sure PKTSTART is 0 on configure
-    redis_util.gateway_msg(r, array_group, 'PKTSTART', 0, True)
+    redis_util.set_group_key(r, array, "PKTSTART", 0)
 
     # SCHAN, NSTRM and DESTIP by instance:
     inst_list = redis_util.sort_instances(list(instances))
@@ -129,12 +128,14 @@ def unsubscribe(r, array, instances):
     redis_util.alert(r, f":eject: `{array}` unsubscribed", "coordinator")
 
     # Belt and braces restart DAQs
-    hostnames_only = [instance.split('/')[0] for instance in instances]
-    result = util.zmq_multi_cmd(hostnames_only, "bluse_hashpipe", "restart")
-    # When there are two instances per host, run again for the second
-    # bluse_hashpipe instance, for example:
-    # r_2 = util.zmq_multi_cmd(hostnames_only, "bluse_hashpipe_2", "restart")
-    # result.append(r_2)
+    result = []
+    for instance in instances:
+        host, n = instance.split("/")
+        hashpipe_instance = f"bluse_hashpipe_{n}"
+        log.info(f"Restarting {instance}")
+        if not util.zmq_circus_cmd(host, hashpipe_instance, "restart"):
+            result.append(instance)
+
     if len(result) > 0:
         redis_util.alert(r, f":x: `{array}` failed to restart DAQs: {result}",
             "coordinator")
@@ -143,7 +144,7 @@ def unsubscribe(r, array, instances):
             "coordinator")
 
     # Instruct gateways to leave current subarray group:
-    redis_util.leave_gateway_group(r, array, HPGDOMAIN)
+    redis_util.destroy_array_groups(r, array)
     log.info(f"Disbanded gateway group: {array}")
 
     # Clear `bfr5_generator` allocated hosts list:

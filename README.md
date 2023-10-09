@@ -52,7 +52,7 @@ and other ancillary tasks.
 
 ### `RecProc` states:
 
-<img src="docs/rec_proc.png" alt="rec_proc" width=80%/>
+<img src="docs/rec_proc.png" alt="rec_proc" width=70%/>
 
 ### Instance allocation:
 

@@ -318,6 +318,31 @@ def gateway_msg(r, channel, msg_key, msg_val, write):
         r.hset(channel, msg_key, msg_val)
         log.info(f"Wrote {msg} for channel {channel} to Redis")
 
+def create_array_groups(r, instances, array, domain="bluse"):
+    """Create appropriate groups for a specific array to address subgroups of
+    instances (for the case where more than one instance exist on the same
+    host).
+    """
+    for instance in instances:
+        host, instance_number = instance.split("/")
+        group_name = f"{array}-{instance_number}"
+        gateway_channel = f"{domain}://{instance}/gateway"
+        message = f"join={group_name}"
+        r.publish(gateway_channel, message)
+        log.info(f"Instance {instance} joining {group_name}")
+
+def destroy_array_groups(r, array, domain="bluse", inst_nums=[0,1]):
+    """Instruct all participants in gateway groups associated with `array` to
+    leave.
+    """
+    for n in inst_nums:
+        group_name = f"{array}-{n}"
+        message = f"leave={group_name}"
+        group_gateway_channel = f"{domain}:{group_name}///gateway"
+        r.publish(group_gateway_channel, message)
+        log.info(f"Instances instructed to leave the gateway group: {group_name}")
+
+
 def join_gateway_group(r, instances, group_name, gateway_domain):
     """Instruct hashpipe instances to join a hashpipe-redis gateway group.
     
@@ -332,7 +357,7 @@ def join_gateway_group(r, instances, group_name, gateway_domain):
         r.publish(node_gateway_channel, msg)
     log.info(f"Instances {instances} instructed to join gateway group: {group_name}")
 
-    
+
 def leave_gateway_group(r, group_name, gateway_domain):
     """Instruct hashpipe instances to leave a hashpipe-redis gateway group.
     """
@@ -340,23 +365,22 @@ def leave_gateway_group(r, group_name, gateway_domain):
     publish_gateway_message(r, group_name, gateway_domain, message)
     log.info(f"Instances instructed to leave the gateway group: {group_name}")
 
-    
+
 def publish_gateway_message(r, group_name, gateway_domain, message):
     """Publish a message to a hashpipe-redis group gateway <group_name>.
     """
     group_gateway_channel = f"{gateway_domain}:{group_name}///gateway"
     r.publish(group_gateway_channel, message)
 
-    
-def set_group_key(r, group_name, gateway_domain, key, value):
-    """Set a hashpipe-redis gateway key for a specified hashpipe-redis gateway
-    group.
+
+def set_group_key(r, array, key, val, gw_domain="bluse", inst_nums=[0,1]):
+    """Publish a message to all instances belonging to an array's associated
+    groups (one per instance).
     """
-    group_channel = f"{gateway_domain}:{group_name}///set"
-    # Message to set key:
-    message = f"{key}={value}"
-    r.publish(group_channel, message)
-    log.info(f"Set {key} to {value} for {gateway_domain} instances in group {group_name}")
+    for n in inst_nums:
+        group = f"{gw_domain}:{array}-{n}///set"
+        gateway_msg(r, group, key, val, True)
+
 
 def timestring():
     """A standard format to report the current time in"""
@@ -371,7 +395,8 @@ def pktidx_to_timestamp(r, pktidx, subarray):
     if pktidx < 0:
         raise ValueError(f"cannot convert pktidx {pktidx} to a timestamp")
 
-    channel_hash = f"bluse:{subarray}///set"
+    # Look in the 0th channel hash for these values
+    channel_hash = f"bluse:{subarray}-0///set"
 
     pipe = r.pipeline()
     for subkey in ["HCLOCKS", "SYNCTIME", "FENCHAN", "CHAN_BW"]:

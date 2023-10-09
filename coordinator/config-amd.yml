@@ -1,0 +1,85 @@
+#Temporary configuration file for coordinator.py, using new AMD processing
+# nodes (2 instances per node).
+
+channels:
+- alerts
+- proc_result
+- rec_result
+
+arrays:
+- array_1
+- array_2
+- array_3
+- array_4
+
+redis_host: 127.0.0.1
+
+redis_port: 6379
+
+streams_per_instance: 4
+
+hashpipe_instances:
+- blpn64/0
+- blpn64/1
+- blpn66/0
+- blpn66/1
+- blpn68/0
+- blpn68/1
+- blpn70/0
+- blpn70/1
+- blpn72/0
+- blpn72/1
+- blpn74/0
+- blpn74/1
+- blpn76/0
+- blpn76/1
+- blpn78/0
+- blpn78/1
+- blpn80/0
+- blpn80/1
+- blpn82/0
+- blpn82/1
+- blpn84/0
+- blpn84/1
+- blpn86/0
+- blpn86/1
+- blpn88/0
+- blpn88/1
+- blpn90/0
+- blpn90/1
+- blpn92/0
+- blpn92/1
+- blpn94/0
+- blpn94/1
+- blpn96/0
+- blpn96/1
+- blpn98/0
+- blpn98/1
+- blpn100/0
+- blpn100/1
+- blpn102/0
+- blpn102/1
+- blpn104/0
+- blpn104/1
+- blpn106/0
+- blpn106/1
+- blpn108/0
+- blpn108/1
+- blpn110/0
+- blpn110/1
+- blpn112/0
+- blpn112/1
+- blpn114/0
+- blpn114/1
+- blpn116/0
+- blpn116/1
+- blpn118/0
+- blpn118/1
+- blpn120/0
+- blpn120/1
+- blpn122/0
+- blpn122/1
+- blpn124/0
+- blpn124/1
+- blpn126/0
+- blpn126/1

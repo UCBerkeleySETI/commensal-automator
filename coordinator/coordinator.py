@@ -3,7 +3,7 @@ import redis
 from coordinator import util, redis_util
 from coordinator.logger import log
 
-from coordinator.states import Ready, Record, Process, Error, Free, Subscribed, Configuring
+from coordinator.states import Ready, Record, Process, Error, Free, Subscribed, Configuring, Waiting
 from coordinator.state_machines import RecProcMachine, FreeSubscribedMachine
 
 class Coordinator(object):
@@ -148,6 +148,7 @@ class Coordinator(object):
             "READY":Ready,
             "RECORD":Record,
             "PROCESS":Process,
+            "WAITING":Waiting,
             "ERROR":Error,
             }
         state = states.get(name)

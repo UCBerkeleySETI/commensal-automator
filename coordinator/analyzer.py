@@ -17,10 +17,9 @@ RESULT_CHANNEL = "proc_result"
 LOG_FORMAT = "[%(asctime)s - %(levelname)s - %(filename)s:%(lineno)s] %(message)s"
 LOGGER_NAME = "BLUSE.interface"
 BFRDIR = "/home/obs/bfr5"
-PARTITION = "scratch"
 REDIS_HOST = "blh0.bl.pvt"
 
-def run_seticore(bfrdir, inputdir, tsdir, partition, r, log):
+def run_seticore(bfrdir, inputdir, tsdir, volume, r, log):
     """Processes the incoming data using seticore.
 
     Args:
@@ -28,7 +27,7 @@ def run_seticore(bfrdir, inputdir, tsdir, partition, r, log):
         associated with the data in the NVMe modules. 
         inputdir (str): Directory containing raw file input
         tsdir (str): directory component starting with a timestamp
-        partition (str): partition component of output directory.
+        volume (str): volume component of output directory.
         r (obj): redis server.
 
     Returns:
@@ -38,7 +37,7 @@ def run_seticore(bfrdir, inputdir, tsdir, partition, r, log):
     # "Unknown/GUPPI" subdirectories containing the actual raw files. 
     inputdir = f"{inputdir}/Unknown/GUPPI"
     # Create search product output directory.
-    outputdir = f"/{partition}/data/{tsdir}/seticore_search"
+    outputdir = f"/{volume}/data/{tsdir}/seticore_search"
     log.info(f"Creating search output directory: {outputdir}")
     if not proc_util.make_outputdir(outputdir, log):
         return 2
@@ -58,7 +57,7 @@ def run_seticore(bfrdir, inputdir, tsdir, partition, r, log):
     n = proc_util.get_n_proc(r)
     if n%10 == 0:
         # create directory for h5 files
-        h5dir = f"/{partition}/data/{tsdir}/seticore_beamformer"
+        h5dir = f"/{volume}/data/{tsdir}/seticore_beamformer"
         log.info(f"Creating beamformer output directory: {h5dir}")
         if not proc_util.make_outputdir(h5dir, log):
             return 2
@@ -108,6 +107,13 @@ def process(n):
     unprocessed = proc_util.get_items(r, name, "unprocessed")
     log.info(f"{len(unprocessed)} unprocessed directory(ies)")
 
+    # Volume
+    volume = "scratch"
+    if n == 1:
+        volume = "scratch2"
+    elif n != 0:
+        log.warning(f"Instance no. {n}, defaulting to /scratch")
+
     max_returncode = 0
 
     if unprocessed:
@@ -128,13 +134,15 @@ def process(n):
                 BFRDIR,
                 datadir,
                 tsdir,
-                PARTITION,
+                volume,
                 r,
                 log)
             results[datadir] = result
 
         # Done
         log.info(f"Processing completed for {name} with code: {results}")
+
+
 
         # Clean up
         to_clean = unprocessed.difference(preserved)
