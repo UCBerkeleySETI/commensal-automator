@@ -122,6 +122,8 @@ def check_primary_time(r, array):
     if not proposal_id:
         return
     log.info(f"Retrieved currrent proposal ID: {proposal_id}")
+    # This is the current active proposal ID to look for. If it
+    # is detected, we want to enter the "waiting" state.
     if proposal_id.strip("'") == "DDT-20230920-DC-01":
         return True
 
