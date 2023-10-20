@@ -138,11 +138,11 @@ def process(n):
                 r,
                 log)
             results[datadir] = result
+            # overall max_returncode for this analyser execution:
+            max_returncode = max(max_returncode, result)
 
         # Done
         log.info(f"Processing completed for {name} with code: {results}")
-
-
 
         # Clean up
         to_clean = unprocessed.difference(preserved)
@@ -157,13 +157,12 @@ def process(n):
                 continue
             if not os.path.exists(datadir):
                 log.warning("Directory doesn't exist")
+                max_returncode = max(max_returncode, 2)
                 continue
             log.info(f"Deleting: {datadir}")
             if not proc_util.rm_datadir(datadir, n, log):
                 log.error(f"Failed to clear {datadir}")
-                res = 2
-            if res > max_returncode:
-                max_returncode = res
+                max_returncode = max(max_returncode, 2)
 
     # Publish result back to central coordinator via Redis:
     r.publish(RESULT_CHANNEL, f"RETURN:{name}:{max_returncode}")
