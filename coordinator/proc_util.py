@@ -74,7 +74,7 @@ def rm_datadir(datadir, instance_number, log):
     for a directory of raw recordings for the current instance.
     """
     components = datadir.split("/")
-    if components[1] != "buf0":
+    if components[1] != "buf0" and components[1] != "buf1":
         log.error(f"Not a valid datadir: {datadir}")
         return False
     datadir_id = components[2]
