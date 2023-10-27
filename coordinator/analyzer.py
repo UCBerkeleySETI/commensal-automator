@@ -126,6 +126,11 @@ def process(n):
         for datadir in unprocessed:
             if not os.path.exists(datadir):
                 log.warning(f"{datadir} does not exist, skipping.")
+                max_returncode = max(max_returncode, 1)
+                continue
+            if not os.listdir(datadir):
+                log.warning(f"{datadir} empty, skipping.")
+                max_returncode = max(max_returncode, 1)
                 continue
             # Timestamped directory name:
             tsdir = proc_util.timestamped_dir_from_filename(datadir)
@@ -150,6 +155,7 @@ def process(n):
         for datadir in to_clean:
             if datadir not in results:
                 log.error(f"Trying to clear {datadir}, but it has no returncodes.")
+                max_returncode = max(max_returncode, 1)
                 continue
             res = results[datadir]
             if res > 1:
@@ -157,7 +163,7 @@ def process(n):
                 continue
             if not os.path.exists(datadir):
                 log.warning("Directory doesn't exist")
-                max_returncode = max(max_returncode, 2)
+                max_returncode = max(max_returncode, 1)
                 continue
             log.info(f"Deleting: {datadir}")
             if not proc_util.rm_datadir(datadir, n, log):
