@@ -128,19 +128,21 @@ def unsubscribe(r, array, instances):
     redis_util.alert(r, f":eject: `{array}` unsubscribed", "coordinator")
 
     # Belt and braces restart DAQs
-    result = []
-    for instance in instances:
-        host, n = instance.split("/")
-        hashpipe_instance = f"bluse_hashpipe_{n}"
-        log.info(f"Restarting {instance}")
-        if not util.zmq_circus_cmd(host, hashpipe_instance, "restart"):
-            result.append(instance)
-
+    result = restart_process(instances, "bluse_hashpipe")
     if len(result) > 0:
         redis_util.alert(r, f":x: `{array}` failed to restart DAQs: {result}",
             "coordinator")
     else:
         redis_util.alert(r, f":repeat: `{array}` restarted DAQs",
+            "coordinator")
+
+    # Restart gateways
+    result = restart_process(instances, "bluse_redisgw")
+    if len(result) > 0:
+        redis_util.alert(r, f":x: `{array}` failed to restart gateways: {result}",
+            "coordinator")
+    else:
+        redis_util.alert(r, f":repeat: `{array}` restarted gateways",
             "coordinator")
 
     # Instruct gateways to leave current subarray group:
@@ -153,6 +155,18 @@ def unsubscribe(r, array, instances):
     # Sleep for 20 seconds to allow pipelines to restart:
     time.sleep(20)
 
+def restart_process(instances, process):
+    """Restart <process> for specified instances.
+    Constructs process name based on instance number (appended).
+    """
+    result = []
+    for instance in instances:
+        host, n = instance.split("/")
+        process_name = f"{process}_{n}"
+        log.info(f"Restarting {process_name}")
+        if not util.zmq_circus_cmd(host, process_name, "restart"):
+            result.append(instance)
+    return result
 
 def samples_per_heap(r, array, spectra_per_heap):
     """Equivalent to HCLOCKS.
