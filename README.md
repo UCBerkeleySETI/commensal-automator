@@ -111,6 +111,15 @@ If these keys are not available in Redis, the coordinator assumes all
 in `ready`, and that all `freesubscribed` machines are in the `FREE`
 state, with all instances stored in `free`.
 
+## Monitoring via Slack
+
+The current status of the entire system can conveniently be monitored via
+ Slack, so long as the Slack proxy process is running and a Slack app has
+ been created. See below for an example of the status updates in a dedicated
+ Slack channel:
+
+<img src="docs/slack_reporting.png" alt="slack_reporting" width=90%/>
+
 ## Installation and Deployment (BLUSE)
 
 Instructions for installation and deployment on the BLUSE headnode:
