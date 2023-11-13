@@ -144,7 +144,7 @@ class Record(State):
         subscribed = data["subscribed"]
         ready = data["ready"]
         if subscribed.issubset(ready) and subscribed:
-            result = rec.record(self.r, self.array, list(ready))
+            result = rec.record(self.r, self.array, list(subscribed))
             if result:
                 # update data:
                 data["recording"] = result
