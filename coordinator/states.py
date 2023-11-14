@@ -220,6 +220,13 @@ class Process(State):
             f":gear: `{self.array}` processing",
             "coordinator")
 
+        n = proc_util.get_n_proc(self.r)
+        if n%10 == 0:
+            # Alert will write filterbank files:
+            redis_util.alert(self.r,
+                f":potable_water: `{self.array}` will save beamformer output",
+                "coordinator")
+
         # Grafana tag:
         util.annotate_grafana("PROCESS", f"{self.array}: processing")
 
