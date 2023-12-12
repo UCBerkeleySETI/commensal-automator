@@ -12,6 +12,7 @@ import os
 import socket
 
 from coordinator import proc_util
+from coordinator import redis_util
 
 RESULT_CHANNEL = "proc_result"
 LOG_FORMAT = "[%(asctime)s - %(levelname)s - %(filename)s:%(lineno)s] %(message)s"
@@ -172,6 +173,11 @@ def process(n):
 
     # Publish result back to central coordinator via Redis:
     r.publish(RESULT_CHANNEL, f"RETURN:{name}:{max_returncode}")
+
+    if max_returncode > 1:
+        redis_util.alert(self.r,
+            f":warning: `{name}` code: `{max_returncode}",
+                "analyzer")
 
 
 if __name__ == "__main__":
