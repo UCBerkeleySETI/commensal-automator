@@ -41,7 +41,7 @@ def run_seticore(bfrdir, inputdir, tsdir, volume, r, log):
     outputdir = f"/{volume}/data/{tsdir}/seticore_search"
     log.info(f"Creating search output directory: {outputdir}")
     if not proc_util.make_outputdir(outputdir, log):
-        return 2
+        return 1
 
     # Build command:
     seticore_command = ["/home/lacker/bin/seticore",
@@ -61,7 +61,7 @@ def run_seticore(bfrdir, inputdir, tsdir, volume, r, log):
         h5dir = f"/{volume}/data/{tsdir}/seticore_beamformer"
         log.info(f"Creating beamformer output directory: {h5dir}")
         if not proc_util.make_outputdir(h5dir, log):
-            return 2
+            return 1
         # add --h5_dir arg to seticore command
         seticore_command.extend(["--h5_dir", h5dir])
 
@@ -175,8 +175,7 @@ def process(n):
     r.publish(RESULT_CHANNEL, f"RETURN:{name}:{max_returncode}")
 
     if max_returncode > 1:
-        redis_util.alert(self.r,
-            f":warning: `{name}` code: `{max_returncode}",
+        redis_util.alert(r, f":warning: `{name}` code: `{max_returncode}`",
                 "analyzer")
 
 
