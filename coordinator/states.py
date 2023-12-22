@@ -226,6 +226,10 @@ class Process(State):
             redis_util.alert(self.r,
                 f":potable_water: `{self.array}` will save beamformer output",
                 "coordinator")
+            # Alert will attempt experimental ML detection:
+            redis_util.alert(self.r,
+                f":test_tube: `{self.array}` running ML experiment",
+                "coordinator")
 
         # Grafana tag:
         util.annotate_grafana("PROCESS", f"{self.array}: processing")

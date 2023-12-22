@@ -87,6 +87,29 @@ def cli(args = sys.argv[0]):
     args = parser.parse_args()
     process(n = args.instance)
 
+def ml_detection(tsdir, outputvolume, log):
+    """Run detection code.
+    """
+    ts = tsdir.split("/")[2].split("-")[0] # ToDo: get rid of
+    array = "array_1" # ToDo: autodetect
+    bfr5file = f"/home/obs/bfr5/MeerKAT-{array}-{ts}.bfr5/"
+
+    # inputdir
+    inputdir = f"/{outputvolume}/data/{tsdir}/seticore_beamformer"
+    # outputdir
+    outputdir = f"/{outputvolume}/data/{tsdir}/ml_search"
+    log.info(f"Creating ml output directory: {outputdir}")
+    if not proc_util.make_outputdir(outputdir, log):
+        return 1
+
+    cmd = ["detection",
+        "-b", inputdir,
+        "-r", -bfr5file,
+        "-o", outputdir,
+        "-s", 10,
+        "-m", 1]
+
+    log.info(subprocess.run(cmd).returncode)
 
 def process(n):
     """Set up and run processing.
@@ -144,6 +167,14 @@ def process(n):
                 r,
                 log)
             results[datadir] = result
+
+            # run ML detection script:
+            try:
+                ml_detection(tsdir, outputvolume, log)
+            except Exception as e:
+                log.info("ML detection error:")
+                log.error(e)
+
             # overall max_returncode for this analyser execution:
             max_returncode = max(max_returncode, result)
 
