@@ -10,6 +10,7 @@ import sys
 import argparse
 import os
 import socket
+import sys
 
 from coordinator import proc_util
 from coordinator import redis_util
@@ -90,9 +91,10 @@ def cli(args = sys.argv[0]):
 def ml_detection(tsdir, outputvolume, log):
     """Run detection code.
     """
-    ts = tsdir.split("/")[2].split("-")[0] # ToDo: get rid of
+    # ts = tsdir.split("/")[2].split("-")[0] # ToDo: get rid of
+    ts = tsdir.split("-")[0] # ToDo: get rid of
     array = "array_1" # ToDo: autodetect
-    bfr5file = f"/home/obs/bfr5/MeerKAT-{array}-{ts}.bfr5/"
+    bfr5file = f"/home/obs/bfr5/MeerKAT-{array}-{ts}.bfr5"
 
     # inputdir
     inputdir = f"/{outputvolume}/data/{tsdir}/seticore_beamformer"
@@ -104,12 +106,14 @@ def ml_detection(tsdir, outputvolume, log):
 
     cmd = ["detection",
         "-b", inputdir,
-        "-r", -bfr5file,
+        "-r", bfr5file,
         "-o", outputdir,
-        "-s", 10,
-        "-m", 1]
+        "-s", "10",
+        "-m", "1"]
 
-    log.info(subprocess.run(cmd).returncode)
+    log.info(cmd)
+
+    return subprocess.run(cmd).returncode
 
 def process(n):
     """Set up and run processing.
@@ -139,6 +143,7 @@ def process(n):
         log.warning(f"Instance no. {n}, defaulting to /scratch")
 
     max_returncode = 0
+    max_ml_returncode = -1
 
     if unprocessed:
         # Set of directories that should be kept after processing (these are
@@ -146,6 +151,7 @@ def process(n):
         preserved = proc_util.get_items(r, name, "preserved")
 
         results = dict()
+        results_ml = dict()
 
         for datadir in unprocessed:
             if not os.path.exists(datadir):
@@ -169,17 +175,21 @@ def process(n):
             results[datadir] = result
 
             # run ML detection script:
-            try:
-                ml_detection(tsdir, outputvolume, log)
-            except Exception as e:
-                log.info("ML detection error:")
-                log.error(e)
+            if proc_util.get_n_proc(r)%10 == 0:
+                try:
+                    ml_code = ml_detection(tsdir, volume, log)
+                except Exception as e:
+                    log.info("ML detection error:")
+                    log.error(e)
+                    ml_code = 1
+                results_ml[datadir] = ml_code
+                max_ml_returncode = max(max_ml_returncode, ml_code)
 
             # overall max_returncode for this analyser execution:
             max_returncode = max(max_returncode, result)
 
         # Done
-        log.info(f"Processing completed for {name} with code: {results}")
+        log.info(f"Processing completed for {name} with codes: {results} and {results_ml}")
 
         # Clean up
         to_clean = unprocessed.difference(preserved)
@@ -203,7 +213,7 @@ def process(n):
                 max_returncode = max(max_returncode, 2)
 
     # Publish result back to central coordinator via Redis:
-    r.publish(RESULT_CHANNEL, f"RETURN:{name}:{max_returncode}")
+    r.publish(RESULT_CHANNEL, f"RETURN:{name}:{max_returncode}:{max_ml_returncode}")
 
     if max_returncode > 1:
         redis_util.alert(r, f":warning: `{name}` code: `{max_returncode}`",
