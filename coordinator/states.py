@@ -194,7 +194,8 @@ class Process(State):
     def __init__(self, array, r):
         super().__init__(array, r)
         self.name = "PROCESS"
-        self.returncodes = []
+        self.returncodes1 = []
+        self.returncodes2 = []
 
     def on_entry(self, data):
         """Initiate processing on the appropriate processing nodes.
@@ -241,33 +242,52 @@ class Process(State):
         super().handle_event(event, data)
         # If a node completes processing:
         if "RETURN" in event:
-            _, instance, returncode = event.split(":")
+            _, instance, returncode1, returncode2 = event.split(":")
+            log.info(f"{_} {instance} {returncode1} {returncode2}")
             if instance in data["processing"]:
                 data["processing"].remove(instance)
                 data["ready"].add(instance)
-                self.returncodes.append(int(returncode))
+                self.returncodes1.append(int(returncode1))
+                self.returncodes2.append(int(returncode2))
                 # If all (or whatever preferred percentage) is completed,
                 # continue to the next state:
                 if not data["processing"]:
-                    codes = proc_util.output_summary(self.returncodes)
-                    if max(self.returncodes) < 1:
+                    codes1 = proc_util.output_summary(self.returncodes1)
+                    codes2 = proc_util.output_summary(self.returncodes2)
+
+                    log.info(self.returncodes1)
+
+                    if max(self.returncodes2) < 0:
+                        stage2_msg = "No second stage"
+                    elif max(self.returncodes2) < 1:
+                        stage2_msg = f":white_check_mark: `{self.array}` stage 2 complete: {codes2}"
+                    elif max(self.returncodes2) < 2:
+                        stage2_msg = f":heavy_check_mark: `{self.array}` stage 2 complete: {codes2}"
+                    else:
+                        stage2_msg = f":warning: `{self.array}` stage 2 complete: {codes2}"
+
+                    if max(self.returncodes1) < 1:
                         redis_util.alert(self.r,
-                            f":white_check_mark: `{self.array}` complete: {codes}",
+                            f":white_check_mark: `{self.array}` stage 1 complete: {codes1}",
                             "coordinator")
+                        redis_util.alert(self.r, stage2_msg, "coordinator")
                         proc_util.increment_n_proc(self.r)
-                        self.returncodes = []
+                        self.returncodes1 = []
+                        self.returncodes2 = []
                         return Ready(self.array, self.r)
                     # Check and clear the returncodes:
-                    elif max(self.returncodes) < 2:
+                    elif max(self.returncodes1) < 2:
                         redis_util.alert(self.r,
-                            f":heavy_check_mark: `{self.array}` complete: {codes}",
+                            f":heavy_check_mark: `{self.array}` stage 1 complete: {codes1}",
                             "coordinator")
+                        redis_util.alert(self.r, stage2_msg, "coordinator")
                         proc_util.increment_n_proc(self.r)
-                        self.returncodes = []
+                        self.returncodes1 = []
+                        self.returncodes2 = []
                         return Ready(self.array, self.r)
                     else:
                         redis_util.alert(self.r,
-                            f":warning: `{self.array}`: {codes}",
+                            f":warning: `{self.array}`: {codes1}",
                             "coordinator")
                         return Error(self.array, self.r)
             else:
