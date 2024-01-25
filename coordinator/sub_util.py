@@ -258,6 +258,7 @@ def alloc_multicast_groups(r, array, n_instances,
     # Address format: spead://<ip>+<count>:<port>
     addrs = stream_addresses.split('/')[-1]
     addrs, port = addrs.split(':')
+    last_added = 0
     try:
         addr0, n_addrs = addrs.split('+')
         n_addrs = int(n_addrs) + 1 # Total number of addresses
