@@ -113,6 +113,12 @@ def record(r, array, instances):
 
     return set(instances)
 
+def obs_band(r, array):
+    """Get the current observing band.
+    """
+    sensor = f"subarray_{array[-1]}_band"
+    return r.get(sensor)
+
 def check_primary_time(r, array):
     """Check if the current recording is primary time.
     """
