@@ -16,6 +16,7 @@ from coordinator import proc_util
 from coordinator import redis_util
 
 RESULT_CHANNEL = "proc_result"
+PRIORITY_CHANNEL = "target-selector:processing"
 LOG_FORMAT = "[%(asctime)s - %(levelname)s - %(filename)s:%(lineno)s] %(message)s"
 LOGGER_NAME = "BLUSE.interface"
 BFRDIR = "/home/obs/bfr5"
@@ -173,6 +174,11 @@ def process(n):
                 r,
                 log)
             results[datadir] = result
+
+            # Each datadir corresponds with a unique obsid. Instruct target
+            # selector to update the priorty table for each completed datadir.
+            if result == 0:
+                proc_util.completed(r, datadir, 1, 64, PRIORITY_CHANNEL)
 
             # run ML detection script:
             if proc_util.get_n_proc(r)%10 == 0:
