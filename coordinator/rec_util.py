@@ -96,9 +96,7 @@ def record(r, array, instances):
         add_unprocessed(r, set(instances), pktstart_str, sb_id):
 
     # Write metadata for current obsid:
-    nants = r.llen(f"{array}:antennas")
-    band = obs_band(r, array)
-    write_metadata(r, instance, band, pktstart_ts, nants, obsid, DEFAULT_DWELL)
+    write_metadata(r, instance, pktstart_ts, obsid, DEFAULT_DWELL, datadir, array)
 
     # Start recording timeout timer, with 10 second safety margin:
     rec_timer = threading.Timer(300, lambda:timeout(r, array, "rec_result"))
@@ -121,16 +119,20 @@ def record(r, array, instances):
 
     return set(instances)
 
-def write_metadata(r, instance, band, pktstart_ts, nants, obsid, dwell, datadir):
+def write_metadata(r, instance, pktstart_ts, dwell, datadir, array):
     """Write current rec info so that other processes (e.g. analyzer) can
     make requests for new targets.
     """
+    nants = r.llen(f"{array}:antennas")
+    band = obs_band(r, array)
     current_rec_data = {
         "band":band,
         "start_ts":pktstart_ts,
         "nants":nants,
         "obsid":obsid
     }
+    # Link subarray (current datadir associated with <array>):
+    r.set(f"{array}:datadir", datadir)
     # write metadata
     r.set(f"metadata:{datadir}", json.dumps(current_rec_data))
     # Write predicted stop time:

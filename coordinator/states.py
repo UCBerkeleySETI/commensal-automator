@@ -1,3 +1,5 @@
+import time
+
 from coordinator.logger import log
 from coordinator import redis_util, sub_util, util, proc_util
 from coordinator import rec_util as rec
@@ -163,6 +165,11 @@ class Record(State):
         super().handle_event(event, data)
         if event == "TRACK_STOP":
             log.info(f"{self.array} stopped tracking before DWELL complete")
+            # Reset stop time. Note, this is not calculated directly from
+            # PKTIDX, so use this value accordingly.
+            datadir = r.get(f"{array}:datadir")
+            r.set(f"rec_end:{datadir}", time.time())
+            # End recording early:
             redis_util.reset_dwell(self.r, data["recording"], DEFAULT_DWELL)
             redis_util.alert(self.r,
                 f":black_square_for_stop: `{self.array}` recording stopped",
