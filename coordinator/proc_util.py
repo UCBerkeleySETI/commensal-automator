@@ -7,19 +7,19 @@ import json
 
 from coordinator.logger import log
 
-def completed(r, obsid, n, nbeams, channel):
+def completed(r, datadir, n, nbeams, channel):
     """Format and send a message to the target selector instructing it to
     update the observing priority table.
     """
     try:
-        meta = r.get(f"metadata:{obsid}")
+        meta = r.get(f"metadata:{datadir}")
         meta = json.loads(meta)
     except json.decoder.JSONDecodeError:
-        log.error(f"Invalid JSON when reading metadata for {obsid}")
+        log.error(f"Invalid JSON when reading metadata for {datadir}")
         return
-    stop_ts = r.get(f"rec_end":{obsid})
+    stop_ts = r.get(f"rec_end":{datadir})
     if not stop_ts:
-        log.error(f"No recording end timestamp for {obsid}")
+        log.error(f"No recording end timestamp for {datadir}")
         return
     t = stop_ts - meta["start_ts"] # in seconds
     update_data = {
@@ -31,9 +31,16 @@ def completed(r, obsid, n, nbeams, channel):
         "nbeams":nbeams
     }
     msg = f"UPDATE:{json.dumps(update_data)}"
-    log.info(f"Publishing update message for {obsid}")
+    log.info(f"Publishing update message for {datadir}")
     r.publish(channel, msg)
 
+def datadir_to_obsid(datadir, telescope, array):
+    """Convert DATADIR to the corresponding unique obsid.
+    """
+    #TODO: remove the need for obsid <--> datadir conversions.
+    components = re.split("/|-", datadir)
+    pktstart_str = components[-2] # last components are pktstart_str, sb_id
+    return f"{telescope}:{array}:{pktstart_str}"
 
 def output_summary(codes):
     """Summarise output error codes.
