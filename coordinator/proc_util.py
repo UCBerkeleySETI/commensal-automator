@@ -3,6 +3,37 @@ import re
 import os
 import shutil
 import numpy as np
+import json
+
+from coordinator.logger import log
+
+def completed(r, obsid, n, nbeams, channel):
+    """Format and send a message to the target selector instructing it to
+    update the observing priority table.
+    """
+    try:
+        meta = r.get(f"metadata:{obsid}")
+        meta = json.loads(meta)
+    except json.decoder.JSONDecodeError:
+        log.error(f"Invalid JSON when reading metadata for {obsid}")
+        return
+    stop_ts = r.get(f"rec_end":{obsid})
+    if not stop_ts:
+        log.error(f"No recording end timestamp for {obsid}")
+        return
+    t = stop_ts - meta["start_ts"] # in seconds
+    update_data = {
+        "n":n,
+        "band":meta["band"],
+        "t":t,
+        "nants":meta["nants"],
+        "obsid":obsid,
+        "nbeams":nbeams
+    }
+    msg = f"UPDATE:{json.dumps(update_data)}"
+    log.info(f"Publishing update message for {obsid}")
+    r.publish(channel, msg)
+
 
 def output_summary(codes):
     """Summarise output error codes.
