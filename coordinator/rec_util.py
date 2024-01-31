@@ -161,10 +161,26 @@ def request_targets(r, array, pktstart_ts, target, ra_deg, dec_deg):
 def obs_band(r, array):
     """Get the current observing band.
     """
-    # TODO: autodetect band based on center freq for S-band
     sensor = f"subarray_{array[-1]}_band"
-    return r.get(sensor)
-
+    band = r.get(sensor)
+    # Note all s-band subbands simply return "s" here. Therefore, we use
+    # the center frequency to determine which subband is actually active.
+    if band == "s":
+        center = center_freq(r, array)
+        bands = {
+            3062.5:"s4",
+            2843.75:"s3",
+            2625:"s2",
+            2406.25:"s1",
+            2187.5:"s0"
+        }
+        try:
+            band = bands[center]
+        except KeyError:
+            # Log error if could not retrieve subband, but return "s"
+            # faithfully as reported by the CAM sensor.
+            log.error(f"Could not retrieve s-band subband for {band}")
+    return band
 
 def centre_freq(r, array):
     """Centre frequency (FECENTER).
