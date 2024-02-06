@@ -10,6 +10,8 @@ import sys
 import h5py
 import csv
 import re
+import os
+import glob
 
 def cli(args = sys.argv[0]):
     usage = "{} [options]".format(args)
@@ -22,18 +24,33 @@ def cli(args = sys.argv[0]):
                         default = '.',
                         help = 'Directory to search.')
 
+    parser.add_argument("-o",
+                        type = str,
+                        default = 'output.csv',
+                        help = 'Output directory name')
+
     if len(sys.argv[1:]) == 0:
         parser.print_help()
         parser.exit()
     args = parser.parse_args()
-    aggregate(directory = args.d)
+    aggregate(directory = args.d, output = args.o)
 
 
-def aggregate(directory):
+def aggregate(directory, output):
     """Aggregate recordings by looking at bfr5 files.
     Note, in future, we will use the dedicated BLDW database.
     """
-    pass
+    aggregated = []
+    file_list = list_bfr5_files(directory)
+    for f in file_list:
+        aggregated.append(read_bfr5(f))
+    write_csv(aggregated, output)
+
+
+def list_bfr5_files(directory):
+    """"List all bfr5 files in the specified directory for opening.
+    """
+    return glob.glob(os.path.join(directory, "*bfr5"))
 
 
 def read_bfr5(filename):
@@ -72,5 +89,4 @@ def write_csv(src_list, file_name):
         writer.writerows(src_list)
 
 if __name__ == "__main__":
-    srcs = read_bfr5("MeerKAT-array_1-20230907T112709Z.bfr5")
-    write_csv(srcs, "test.csv")
+    cli()
