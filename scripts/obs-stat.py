@@ -8,6 +8,8 @@ Analyse completed observations:
 import argparse
 import sys
 import h5py
+import csv
+import re
 
 def cli(args = sys.argv[0]):
     usage = "{} [options]".format(args)
@@ -51,6 +53,10 @@ def read_bfr5(filename):
     # get tstart from obsid
     tstart = obsid.split(":")[-1] #last element is timestamp
 
+    # Check if timestamp:
+    if not re.match("\d{8}T\d{6}Z", tstart):
+        return
+
     # format rows
     src_list = []
     for src in srcs:
@@ -58,5 +64,13 @@ def read_bfr5(filename):
 
     return src_list
 
+def write_csv(src_list, file_name):
+    """Write csv file of all extracted sources.
+    """
+    with open(file_name, "w") as f:
+        writer = csv.writer(f)
+        writer.writerows(src_list)
+
 if __name__ == "__main__":
-    read_bfr5("MeerKAT-array_1-20230907T112709Z.bfr5")
+    srcs = read_bfr5("MeerKAT-array_1-20230907T112709Z.bfr5")
+    write_csv(srcs, "test.csv")
