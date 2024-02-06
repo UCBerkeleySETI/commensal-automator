@@ -44,11 +44,19 @@ def read_bfr5(filename):
     """
     with h5py.File(filename, 'r') as f:
         obsid = f["obsinfo"]["obsid"][()].decode("utf-8")
-        src = f["beaminfo"]["src_names"][...].astype(str)
+        srcs = f["beaminfo"]["src_names"][...].astype(str)
         fstart = f["obsinfo"]["freq_array"][...][0]*1e3 # in MHz
-        nants = f["diminfo"]["nants"][...]
+        nants = f["diminfo"]["nants"][()]
 
-    return obsid, fstart, nants, src
+    # get tstart from obsid
+    tstart = obsid.split(":")[-1] #last element is timestamp
+
+    # format rows
+    src_list = []
+    for src in srcs:
+        src_list.append([src, tstart, fstart, nants])
+
+    return src_list
 
 if __name__ == "__main__":
     read_bfr5("MeerKAT-array_1-20230907T112709Z.bfr5")
