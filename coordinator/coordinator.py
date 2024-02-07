@@ -15,14 +15,12 @@ class Coordinator(object):
 
     def __init__(self, config_file):
 
-        config = util.config(config_file)
+        self.r = redis.StrictRedis(decode_responses=True)
+        config = util.config(self.r, config_file)
         self.channels = config["channels"]
         self.free = set(config["hashpipe_instances"]) # default instance list
         self.all_instances = set(config["hashpipe_instances"].copy()) # is copy() needed here?
         self.arrays = config["arrays"]
-        self.r = redis.StrictRedis(host=config["redis_host"],
-                                   port=config["redis_port"],
-                                   decode_responses=True)
         self.recproc_machines = dict()
         self.freesubscribed_machines = dict()
         self.subscribed = dict()

@@ -10,6 +10,7 @@ import time
 import yaml
 
 from coordinator.logger import log
+from coordinator import redis_util
 
 GRAFANA_ANNOTATIONS_URL = "http://blh0:3000/api/annotations"
 try:
@@ -18,7 +19,7 @@ except KeyError:
     log.warning("Grafana token not set.")
     GRAFANA_AUTH = None
 
-def config(cfg_file):
+def config(r, cfg_file):
     """Configure the coordinator according to .yml config file.
     Returns list of instances and the number of streams to be processed per
     instance.
@@ -30,8 +31,13 @@ def config(cfg_file):
                 return cfg
             except yaml.YAMLError as e:
                 log.error(e)
+                redis_util.alert(r,
+                    f":warning: yml parsing error: {cfg_file}",
+                    "coordinator")
     except IOError:
         log.error('Could not open config file.')
+        redis_util.alert(r, f":warning: could not read {cfg_file}",
+            "coordinator")
 
 def zmq_multi_cmd(hosts, name, command):
     """Construct and issue ZMQ messages to control Circus processes.
