@@ -17,7 +17,7 @@ def completed(r, datadir, n, nbeams, channel):
     except json.decoder.JSONDecodeError:
         log.error(f"Invalid JSON when reading metadata for {datadir}")
         return
-    stop_ts = r.get(f"rec_end":{datadir})
+    stop_ts = r.get(f"rec_end:{datadir}")
     if not stop_ts:
         log.error(f"No recording end timestamp for {datadir}")
         return

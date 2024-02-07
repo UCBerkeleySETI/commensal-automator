@@ -72,7 +72,7 @@ def record(r, array, instances):
     redis_util.set_group_key(r, array, "DEC_STR", target_data["dec"])
 
     # OBSID (unique identifier for a particular observation):
-    obsid = f"MeerKAT:{array}:{pktstart_str]}"
+    obsid = f"MeerKAT:{array}:{pktstart_str}"
     redis_util.set_group_key(r, array, "OBSID", obsid)
 
     # Set PKTSTART separately after all the above messages have
@@ -93,7 +93,7 @@ def record(r, array, instances):
         "coordinator")
     else:
         # Write datadir to the list of unprocessed directories for this subarray:
-        add_unprocessed(r, set(instances), pktstart_str, sb_id):
+        add_unprocessed(r, set(instances), pktstart_str, sb_id)
 
     # Write metadata for current obsid:
     write_metadata(r, instance, pktstart_ts, obsid, DEFAULT_DWELL, datadir, array)
