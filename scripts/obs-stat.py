@@ -43,7 +43,7 @@ def aggregate(directory, output):
     aggregated = []
     file_list = list_bfr5_files(directory)
     for f in file_list:
-        aggregated.append(read_bfr5(f))
+        aggregated.extend(read_bfr5(f))
     write_csv(aggregated, output)
 
 
@@ -64,6 +64,8 @@ def read_bfr5(filename):
     with h5py.File(filename, 'r') as f:
         obsid = f["obsinfo"]["obsid"][()].decode("utf-8")
         srcs = f["beaminfo"]["src_names"][...].astype(str)
+        decs = f["beaminfo"]["decs"][...]
+        ras = f["beaminfo"]["ras"][...]
         fstart = f["obsinfo"]["freq_array"][...][0]*1e3 # in MHz
         nants = f["diminfo"]["nants"][()]
 
@@ -76,15 +78,15 @@ def read_bfr5(filename):
 
     # format rows
     src_list = []
-    for src in srcs:
-        src_list.append([src, tstart, fstart, nants])
+    for src, ra, dec in zip(srcs, ras, decs):
+        src_list.append([src, ra, dec, tstart, fstart, nants])
 
     return src_list
 
 def write_csv(src_list, file_name):
     """Write csv file of all extracted sources.
     """
-    with open(file_name, "w") as f:
+    with open(file_name, "w", newline = "") as f:
         writer = csv.writer(f)
         writer.writerows(src_list)
 
