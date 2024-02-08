@@ -41,10 +41,14 @@ def aggregate(directory, output):
     Note, in future, we will use the dedicated BLDW database.
     """
     aggregated = []
+    primary_aggregated = []
     file_list = list_bfr5_files(directory)
     for f in file_list:
-        aggregated.extend(read_bfr5(f))
+        srcs, primary = read_bfr5(f)
+        aggregated.extend(srcs)
+        primary_aggregated.append(primary)
     write_csv(aggregated, output)
+    write_csv(primary_aggregated, f"primary_{output}")
 
 
 def list_bfr5_files(directory):
@@ -76,12 +80,15 @@ def read_bfr5(filename):
     if not re.match("\d{8}T\d{6}Z", tstart):
         return
 
+    # primary source:
+    primary = [srcs[0], ras[0], decs[0], tstart, fstart, nants]
+
     # format rows
     src_list = []
     for src, ra, dec in zip(srcs, ras, decs):
         src_list.append([src, ra, dec, tstart, fstart, nants])
 
-    return src_list
+    return src_list, primary
 
 def write_csv(src_list, file_name):
     """Write csv file of all extracted sources.
