@@ -203,9 +203,11 @@ def bandwidth(r, array):
     """
     try:
         cbf_prefix = r.get(f"{array}:cbf_prefix")
-        sensor = f"cbf_{array[-1]}_{cbf_prefix}_bandwidth"
+        sensor = f"{array}:cbf_{array[-1]}_{cbf_prefix}_bandwidth"
         bandwidth = r.get(sensor)
-        return float(bandwidth)/1e6
+        if bandwidth:
+            return float(bandwidth)/1e6
+        log.error(f"Bandwidth unknown for {array}")
     except Exception as e:
         log.error(e)
 
