@@ -14,9 +14,11 @@ import os
 import glob
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.ticker import FuncFormatter
 import healpy as hp
+from datetime import datetime, timedelta
 
-NSIDE = 1024
+NSIDE = 64
 NPIX = hp.nside2npix(NSIDE)
 
 def cli(args = sys.argv[0]):
@@ -122,7 +124,6 @@ def read_csv(file_name):
     """Read in a .csv file by row.
     """
     srcs = []
-
     with open(file_name, "r") as f:
         reader = csv.reader(f)
         for row in reader:
@@ -133,22 +134,42 @@ def read_csv(file_name):
 def plot_coverage(input):
     """Sky coverage plot of locations of observations.
     """
-    primary_srcs = read_csv(input)
-    aitoff_plot(primary_srcs)
-    healpix_plot(primary_srcs)
+    srcs = read_csv(input)
+    timeline(srcs)
+    mollweide_plot(srcs)
+    healpix_plot(srcs)
+
 
 def healpix_plot(primary_srcs):
     """healpix plot.
     """
     sky_map = np.zeros(NPIX)
     for src in primary_srcs:
-        theta = 0.5*np.pi + float(src[2])
+        theta = 0.5*np.pi - float(src[2])
         phi = float(src[1])
-        index = hp.ang2pix(NSIDE, theta, phi)
+        try:
+            index = hp.ang2pix(NSIDE, theta, phi)
+        except ValueError as e:
+            print(f"ValueError, theta = {theta}, phi = {phi}")
         sky_map[index] += 1
     sky_map = sky_map/np.max(sky_map)
-    hp.mollview(sky_map, coord=['C'], title='HEALPix Map', unit='Some Unit', norm='hist', cmap='viridis')
-    hp.graticule()
+    hp.mollview(sky_map, coord=['C'], title='HEALPix Map', unit='numbers', cmap='gray', cbar=False)
+    plt.show()
+    plt.savefig('map-healpix.png', facecolor='black')
+
+def mollweide_plot(primary_srcs):
+    plt.figure(figsize=(10, 5), facecolor="black")
+    ax = plt.subplot(111, projection="mollweide")
+    ax.set_facecolor("black")
+    ax.tick_params(colors="white")
+    ax.set_xlabel("RA [deg]", color="white")
+    ax.set_ylabel("Dec [deg]", color="white")
+    ax.set_xticklabels(["30", "60", "90", "120", "150", "180", "210", "240", "270", "300", "330"])
+    plt.title("Stars processed", color="white")
+    plt.grid(True, color="gray")
+    for src in primary_srcs:
+        plt.plot(float(src[1]) - np.pi, float(src[2]), '+', mfc="none", c="cyan", markersize=7)
+    plt.savefig('map-mollweide.png', facecolor='black', dpi=600)
     plt.show()
 
 def aitoff_plot(primary_srcs):
@@ -157,8 +178,53 @@ def aitoff_plot(primary_srcs):
     plt.title("Sky Map")
     plt.grid(True)
     for src in primary_srcs:
-        plt.plot(float(src[1]) - 180, float(src[2]), 'o', c="b", markersize=5, alpha=0.5)
+        plt.plot(float(src[1]) - 180, float(src[2]), 'o', c="b", markersize=5)
     plt.show()
+
+def dedup(srcs):
+    ids = []
+    for src in srcs:
+        ids.append(src[0])
+    ids_set = set(ids)
+    return ids_set
+
+def timeline(srcs):
+
+    datetimes = []
+
+    for src in srcs:
+        datetimes.append(datetime.strptime(src[3], "%Y%m%dT%H%M%SZ"))
+
+    datetimes.sort()
+    cumulative = range(1, len(datetimes) + 1)
+
+    # Format ticks
+    def format_y(value, tick_number):
+        return f'{int(value / 1000)}k'
+
+    plt.figure(figsize=(10, 6), facecolor='black')
+    plt.plot(datetimes, cumulative, marker="o", color='cyan')
+    plt.gca().set_facecolor('black')
+    plt.gca().tick_params(colors='white', which='both', labelsize='large')
+    plt.xlabel('Observing Month', color='white', fontsize=20)
+    plt.ylabel('# Stars (Cumulative)', color='white', fontsize=20)
+    #plt.title('Observing Progress', color='white', fontsize=20)
+    plt.grid(color='gray')
+
+    plt.tick_params(axis='both', which='major', labelsize=18)
+    plt.tick_params(axis='both', which='minor', labelsize=18)
+
+    plt.gca().spines['bottom'].set_color('white')
+    plt.gca().spines['top'].set_color('white')
+    plt.gca().spines['right'].set_color('white')
+    plt.gca().spines['left'].set_color('white')
+
+    plt.gca().yaxis.set_major_formatter(FuncFormatter(format_y))
+
+    plt.savefig('observing-progress.png', facecolor='black', dpi=600)
+
+    plt.show()
+
 
 if __name__ == "__main__":
     cli()
