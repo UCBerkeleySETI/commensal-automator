@@ -21,13 +21,13 @@ def completed(r, datadir, n, nbeams, channel):
     if not stop_ts:
         log.error(f"No recording end timestamp for {datadir}")
         return
-    t = stop_ts - meta["start_ts"] # in seconds
+    t = float(stop_ts) - meta["start_ts"] # in seconds
     update_data = {
         "n":n,
         "band":meta["band"],
         "t":t,
         "nants":meta["nants"],
-        "obsid":obsid,
+        "obsid":meta["obsid"],
         "nbeams":nbeams
     }
     msg = f"UPDATE:{json.dumps(update_data)}"
