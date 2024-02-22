@@ -35,9 +35,12 @@ class Reset:
         """Reset to `ready`, `unsubscribed` for all subarrays.
         """
         self.r.delete("free_instances")
+        keys = 0
         for subarray in self.subarrays:
-            self.r.delete(f"{subarray}:state")
-            self.r.delete(f"{subarray}:freesub_state")
+            keys += self.r.delete(f"{subarray}:state")
+            keys += self.r.delete(f"{subarray}:freesub_state")
+        print(f"{keys} keys cleared")
+
 
 if __name__ == "__main__":
     cli()
