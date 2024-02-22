@@ -68,7 +68,6 @@ def run_seticore(bfrdir, inputdir, tsdir, volume, r, log):
         seticore_command.extend(["--h5_dir", h5dir])
 
     # run seticore
-    log.info(f"running seticore: {seticore_command}")
     return subprocess.run(seticore_command).returncode
 
 def cli(args = sys.argv[0]):
