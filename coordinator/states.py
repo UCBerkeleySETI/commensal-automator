@@ -59,6 +59,9 @@ class Configuring(State):
         """Wait for metadata to arrive before entering SUBSCRIBED state.
         """
         log.info(f"{self.array} entering state: {self.name}")
+        redis_util.alert(self.r,
+            f":magic_wand: `{self.array}` configuring",
+            "coordinator")
         return True
 
     def handle_event(self, event, data):
