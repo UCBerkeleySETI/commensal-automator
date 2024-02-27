@@ -18,9 +18,13 @@ def cli(args = sys.argv[0]):
                         default = False,
                         help = 'Reset all to `ready`, `unsubscribed`')
     parser.add_argument("--rec",
+                        action = "store_true",
+                        default = False,
+                        help = 'Reset recproc to `ready` from `rec`')
+    parser.add_argument("--arr",
                         type = str,
                         default = "array_1",
-                        help = 'Reset all in subarray to `ready` from `rec`')
+                        help = 'Specify subarray name')
 
     if len(sys.argv[1:]) == 0:
         parser.print_help()
@@ -29,26 +33,24 @@ def cli(args = sys.argv[0]):
 
     if args.all:
         Res = Reset()
-        Res.reset_all()
+        Res.reset_all(args.arr)
 
     if args.rec:
         Res = Reset()
-        Res.reset_rec(args.rec)
+        Res.reset_rec(args.arr)
 
 class Reset:
 
     def __init__(self):
         self.r = redis.StrictRedis(decode_responses=True)
-        self.subarrays = ["array_1", "array_2", "array_3", "array_4"]
 
-    def reset_all(self):
-        """Reset to `ready`, `unsubscribed` for all subarrays.
+    def reset_all(self, subarray):
+        """Reset to `ready`, `unsubscribed` for specified subarray.
         """
-        self.r.delete("free_instances")
         keys = 0
-        for subarray in self.subarrays:
-            keys += self.r.delete(f"{subarray}:state")
-            keys += self.r.delete(f"{subarray}:freesub_state")
+        keys += self.r.delete("free_instances")
+        keys += self.r.delete(f"{subarray}:state")
+        keys += self.r.delete(f"{subarray}:freesub_state")
         print(f"{keys} keys cleared")
 
     def reset_rec(self, subarray):
