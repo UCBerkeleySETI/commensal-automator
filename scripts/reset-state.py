@@ -5,6 +5,8 @@ import argparse
 import sys
 import redis
 
+from coordinator import redis_util
+
 def cli(args = sys.argv[0]):
     usage = "{} [options]".format(args)
     description = "Analyse prior observations by crawling recordings."
@@ -15,6 +17,10 @@ def cli(args = sys.argv[0]):
                         action = "store_true",
                         default = False,
                         help = 'Reset all to `ready`, `unsubscribed`')
+    parser.add_argument("--rec",
+                        type = str,
+                        default = "array_1",
+                        help = 'Reset all in subarray to `ready` from `rec`')
 
     if len(sys.argv[1:]) == 0:
         parser.print_help()
@@ -24,6 +30,10 @@ def cli(args = sys.argv[0]):
     if args.all:
         Res = Reset()
         Res.reset_all()
+
+    if args.rec:
+        Res = Reset()
+        Res.reset_rec(args.rec)
 
 class Reset:
 
@@ -41,6 +51,16 @@ class Reset:
             keys += self.r.delete(f"{subarray}:freesub_state")
         print(f"{keys} keys cleared")
 
+    def reset_rec(self, subarray):
+        """Recording reset, resets subarray state to `READY` and moves all
+        recording instances back to the `ready` set from `recording`.
+        """
+        state = redis_util.read_state(subarray, self.r)
+        if state:
+            while state["recording"]:
+                state["ready"].add(state["recording"].pop())
+            state["recproc_state"] = "READY"
+            redis_util.save_state(subarray, state, self.r)
 
 if __name__ == "__main__":
     cli()
