@@ -299,7 +299,7 @@ def sb_id_from_filename(filename):
         return None
     return f"{x}/{y}"
 
-def gateway_msg(r, channel, msg_key, msg_val, write):
+def gateway_msg(r, channel, msg_key, msg_val, write=True):
     """Format and publish a hashpipe-Redis gateway message. Save messages
     in a Redis hash for later use by reconfig tool.
 
@@ -311,12 +311,13 @@ def gateway_msg(r, channel, msg_key, msg_val, write):
         write (bool): If true, also write message to Redis database.
     """
     msg = f"{msg_key}={msg_val}"
-    r.publish(channel, msg)
+    listeners = r.publish(channel, msg)
     log.info(f"Published {msg} to channel {channel}")
     # save hash of most recent messages
     if write:
         r.hset(channel, msg_key, msg_val)
         log.info(f"Wrote {msg} for channel {channel} to Redis")
+    return listeners
 
 def create_array_groups(r, instances, array, domain="bluse"):
     """Create appropriate groups for a specific array to address subgroups of
@@ -373,14 +374,20 @@ def publish_gateway_message(r, group_name, gateway_domain, message):
     r.publish(group_gateway_channel, message)
 
 
-def set_group_key(r, array, key, val, gw_domain="bluse", inst_nums=[0,1]):
+def set_group_key(r, array, key, val, l=1, gw_domain="bluse", inst_nums=[0,1]):
     """Publish a message to all instances belonging to an array's associated
     groups (one per instance).
     """
+    listeners = 0
     for n in inst_nums:
         group = f"{gw_domain}:{array}-{n}///set"
-        gateway_msg(r, group, key, val, True)
-
+        listeners += gateway_msg(r, group, key, val, True)
+    # check if listeners below expected number:
+    if listeners < l:
+        missing = l - listeners
+        alert(r, f":warning: `{array}` {missing} listeners missing for {key}",
+                "coordinator")
+    return listeners
 
 def timestring():
     """A standard format to report the current time in"""
