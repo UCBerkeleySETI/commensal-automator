@@ -7,7 +7,7 @@ import json
 
 from coordinator.logger import log
 
-def completed(r, datadir, n, nbeams, channel):
+def completed(r, datadir, n_segments, nbeams, channel):
     """Format and send a message to the target selector instructing it to
     update the observing priority table.
     """
@@ -23,7 +23,7 @@ def completed(r, datadir, n, nbeams, channel):
         return
     t = float(stop_ts) - meta["start_ts"] # in seconds
     update_data = {
-        "n":n,
+        "nsegs":n_segments,
         "band":meta["band"],
         "t":t,
         "nants":meta["nants"],
