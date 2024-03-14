@@ -108,8 +108,8 @@ def ml_detection(tsdir, outputvolume, log):
         "-b", inputdir,
         "-r", bfr5file,
         "-o", outputdir,
-        "-s", "10",
-        "-m", "1"]
+        "-s", "1000",
+        "-m", "0.7"]
 
     log.info(cmd)
 
