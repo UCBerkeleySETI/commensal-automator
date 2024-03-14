@@ -329,7 +329,11 @@ def create_array_groups(r, instances, array, domain="bluse"):
         group_name = f"{array}-{instance_number}"
         gateway_channel = f"{domain}://{instance}/gateway"
         message = f"join={group_name}"
-        r.publish(gateway_channel, message)
+        listener = r.publish(gateway_channel, message)
+        if listener == 0:
+            alert(r,
+            f":warning: `{array}`: {instance} did not join {group_name}",
+            "coordinator")
         log.info(f"Instance {instance} joining {group_name}")
 
 def destroy_array_groups(r, array, domain="bluse", inst_nums=[0,1]):
@@ -387,6 +391,7 @@ def set_group_key(r, array, key, val, l=1, gw_domain="bluse", inst_nums=[0,1]):
         missing = l - listeners
         alert(r, f":warning: `{array}` {missing} listeners missing for {key}",
                 "coordinator")
+    log.info(f"listeners for {key}: {listeners}")
     return listeners
 
 def timestring():
