@@ -58,7 +58,7 @@ def record(r, array, instances):
 
     # DATADIR
     sb_id = redis_util.sb_id(r, array)
-    set_datadir(r, array, pktstart_str, [0,1], sb_id)
+    set_datadir(r, array, pktstart_str, [0,1], sb_id, len(instances))
 
     # SRC_NAME:
     redis_util.set_group_key(r, array, "SRC_NAME", target_data["target"])
@@ -237,14 +237,22 @@ def check_primary_time(r, array):
     if proposal_id.strip("'") == "DDT-20230920-DC-01":
         return True
 
-def set_datadir(r, array, pktstart_str, instance_numbers, sb_id):
+def set_datadir(r, array, pktstart_str, instance_numbers, sb_id, l):
     """Set DATADIR correctly for each instance. For each host, instance 0
     must always use `/buf0` and instance 1 must always use `/buf1`.
     """
-    for instance_n in instance_numbers:
+    listeners = 0 # count for listeners
+    for instance_n in instance_numbers: # usually a max of 2 instance nums
         group = f"{HPGDOMAIN}:{array}-{instance_n}///set"
         datadir = f"/buf{instance_n}/{pktstart_str}-{sb_id}"
-        redis_util.gateway_msg(r, group, 'DATADIR', datadir, False)
+        listeners += redis_util.gateway_msg(r, group, 'DATADIR', datadir, 0)
+    if listeners < l:
+        missing = l - listeners
+        redis_util.alert(r,
+            f":warning: `{array}` DATADIR unset for {missing} instance(s)",
+            "coordinator")
+    log.info(f"Listners for datadir: {listeners}")
+    return listeners
 
 
 def add_unprocessed(r, recording, pktstart_str, sb_id):
