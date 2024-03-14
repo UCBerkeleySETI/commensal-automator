@@ -175,16 +175,18 @@ def obs_band(r, array):
     """
     sensor = f"{array}:subarray_{array[-1]}_band"
     band = r.get(sensor)
+    log.info(band)
     # Note all s-band subbands simply return "s" here. Therefore, we use
     # the center frequency to determine which subband is actually active.
     if band == "s":
         center = centre_freq(r, array)
+        log.info(center)
         bands = {
-            3062.5:"s4",
-            2843.75:"s3",
-            2625:"s2",
-            2406.25:"s1",
-            2187.5:"s0"
+            "3062.5":"s4",
+            "2843.75":"s3",
+            "2625":"s2",
+            "2406.25":"s1",
+            "2187.5":"s0"
         }
         try:
             band = bands[center]
