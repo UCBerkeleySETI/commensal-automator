@@ -10,8 +10,8 @@ from coordinator.telstate_interface import TelstateInterface
 
 HPGDOMAIN = 'bluse'
 PKTIDX_MARGIN = 2048 # in packets
-#TARGETS_CHANNEL = 'target-selector:pointings'
-TARGETS_CHANNEL = 'target-selector:new-pointing'
+TARGETS_CHANNEL = 'target-selector:pointings'
+#TARGETS_CHANNEL = 'target-selector:new-pointing'
 DEFAULT_DWELL = 290
 
 def record(r, array, instances):
@@ -84,10 +84,10 @@ def record(r, array, instances):
     annotate('RECORD', f"{array}, OBSID: {obsid}")
 
     # Alert the target selector to the new pointing:
-    #request_targets(r, array, pktstart_str, target_data["target"], ra_d, dec_d)
+    request_targets(r, array, pktstart_str, target_data["target"], ra_d, dec_d)
 
-    targets_req = f"{obsid}:{target_data['target']}:{ra_d}:{dec_d}:{fecenter}"
-    r.publish(TARGETS_CHANNEL, targets_req)
+    #targets_req = f"{obsid}:{target_data['target']}:{ra_d}:{dec_d}:{fecenter}"
+    #r.publish(TARGETS_CHANNEL, targets_req)
 
     # Check if this recording is primary time:
     if check_primary_time(r, array):
