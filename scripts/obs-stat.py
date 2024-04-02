@@ -47,17 +47,38 @@ def cli(args = sys.argv[0]):
                         default = False,
                         help = "Plot the sky map.")
 
+
+    parser.add_argument("-f",
+                        type = str,
+                        default = None,
+                        help = "Find the specified source.")
+
     if len(sys.argv[1:]) == 0:
         parser.print_help()
         parser.exit()
     args = parser.parse_args()
 
-    if args.d:
-        aggregate(directory = args.d, output = args.o)
-
     if args.p:
         plot_coverage(args.i)
 
+    elif args.f:
+        if not args.d:
+            print("Please specify directory.")
+        else:
+            find(args.f, args.d)
+
+    elif args.d:
+        aggregate(directory = args.d, output = args.o)
+
+
+def find(source, directory):
+    """Find the particular source in existing bfr5 files.
+    """
+    file_list = list_bfr5_files(directory)
+    for f in file_list:
+        srcs, primary = read_bfr5(f)
+        if any(source in src for src in srcs):
+            print(f"{source} appears in {f}")
 
 def aggregate(directory, output):
     """Aggregate recordings by looking at bfr5 files.
