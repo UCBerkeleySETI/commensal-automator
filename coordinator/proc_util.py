@@ -7,6 +7,30 @@ import json
 
 from coordinator.logger import log
 
+def check_length(r, datadir, min_duration):
+    """Check the length of a recording against threshold.
+    """
+    key = f"metadata{datadir}"
+    meta = r.get(key)
+    try:
+        meta = json.loads(key)
+    except json.decoder.JSONDecodeError:
+        log.error("Invalid JSON")
+        return
+    try:
+        t = meta["start_ts"]
+        return t
+    except KeyError:
+        log.error("Missing key: start_ts")
+        return
+    tend = float(r.get(f"rec_end:{datadir}"))
+    if not tend:
+        log.error(f"No tend associated with {datadir}")
+        return
+    if t - tend >= min_duration:
+        return True
+
+
 def completed(r, datadir, n_segments, nbeams, channel):
     """Format and send a message to the target selector instructing it to
     update the observing priority table.

@@ -11,6 +11,7 @@ import argparse
 import os
 import socket
 import sys
+import time
 
 from coordinator import proc_util
 from coordinator import redis_util
@@ -154,6 +155,7 @@ def process(n):
         results_ml = dict()
 
         for datadir in unprocessed:
+
             if not os.path.exists(datadir):
                 log.warning(f"{datadir} does not exist, skipping.")
                 max_returncode = max(max_returncode, 1)
@@ -162,6 +164,13 @@ def process(n):
                 log.warning(f"{datadir} empty, skipping.")
                 max_returncode = max(max_returncode, 1)
                 continue
+
+            # If recording is shorter than 2.5 minutes, ignore
+            if not proc_util.check_length(r, datadir, 150):
+                redis_util.alert(r, f":warning: `{name}` too short, ignoring",
+                    "analyzer")
+                continue
+
             # Timestamped directory name:
             tsdir = proc_util.timestamped_dir_from_filename(datadir)
             # Run seticore
