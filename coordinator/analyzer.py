@@ -166,9 +166,8 @@ def process(n):
                 continue
 
             # If recording is shorter than 2.5 minutes, ignore
-            if not proc_util.check_length(r, datadir, 150):
-                redis_util.alert(r, f":warning: `{name}` too short, ignoring",
-                    "analyzer")
+            proc_util.check_length(r, datadir, 150)
+                results[datadir] = 0
                 continue
 
             # Timestamped directory name:

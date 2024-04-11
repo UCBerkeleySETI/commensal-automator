@@ -172,6 +172,10 @@ class Record(State):
             # PKTIDX, so use this value accordingly.
             datadir = self.r.get(f"{self.array}:datadir")
             self.r.set(f"rec_end:{datadir}", time.time())
+            # Alert if too short
+            if not proc_util.check_length(self.r, datadir, 150):
+                redis_util.alert(r, f":warning: `{datadir}` too short, ignoring",
+                    "coordinator")
             # End recording early:
             redis_util.reset_dwell(self.r, data["recording"], DEFAULT_DWELL)
             redis_util.alert(self.r,
