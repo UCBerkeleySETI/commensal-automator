@@ -142,6 +142,7 @@ class Record(State):
         super().__init__(array, r)
         self.name = "RECORD"
         self.primary_time = False
+        self.timer = None
 
     def on_entry(self, data):
 
@@ -149,11 +150,13 @@ class Record(State):
         subscribed = data["subscribed"]
         ready = data["ready"]
         if subscribed.issubset(ready) and subscribed:
-            result = rec.record(self.r, self.array, list(subscribed))
+            result, timer = rec.record(self.r, self.array, list(subscribed))
             if result:
                 # update data:
                 data["recording"] = result
                 data["ready"] = ready.difference(result)
+                # add timer:
+                self.timer = timer
                 # check primary time:
                 if rec.check_primary_time(self.r, self.array):
                     self.primary_time = True
@@ -174,8 +177,14 @@ class Record(State):
             self.r.set(f"rec_end:{datadir}", time.time())
             # Alert if too short
             if not proc_util.check_length(self.r, datadir, 150):
-                redis_util.alert(r, f":warning: `{datadir}` too short, ignoring",
+                redis_util.alert(self.r, f":warning: `{datadir}` too short, ignoring",
                     "coordinator")
+            # Cancel timer:
+            if not self.timer:
+                redis_util.alert(self.r, f":warning: `{self.array}` no timer for `{datadir}`",
+                    "coordinator")
+            else:
+                self.timer.cancel()
             # End recording early:
             redis_util.reset_dwell(self.r, data["recording"], DEFAULT_DWELL)
             redis_util.alert(self.r,
