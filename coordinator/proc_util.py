@@ -10,16 +10,15 @@ from coordinator.logger import log
 def check_length(r, datadir, min_duration):
     """Check the length of a recording against threshold.
     """
-    key = f"metadata{datadir}"
+    key = f"metadata:{datadir}"
     meta = r.get(key)
     try:
-        meta = json.loads(key)
+        meta = json.loads(meta)
     except json.decoder.JSONDecodeError:
         log.error("Invalid JSON")
         return
     try:
         t = meta["start_ts"]
-        return t
     except KeyError:
         log.error("Missing key: start_ts")
         return

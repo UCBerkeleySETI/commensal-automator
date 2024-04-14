@@ -166,7 +166,7 @@ def process(n):
                 continue
 
             # If recording is shorter than 2.5 minutes, ignore
-            proc_util.check_length(r, datadir, 150)
+            if not proc_util.check_length(r, datadir, 150):
                 results[datadir] = 0
                 continue
 
