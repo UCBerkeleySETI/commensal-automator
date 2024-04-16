@@ -177,7 +177,7 @@ class Record(State):
             self.r.set(f"rec_end:{datadir}", time.time())
             # Alert if too short
             if not proc_util.check_length(self.r, datadir, 150):
-                redis_util.alert(self.r, f":warning: `{datadir}` too short, ignoring",
+                redis_util.alert(self.r, f":timer_clock: `{datadir}` too short, ignoring",
                     "coordinator")
             # Cancel timer:
             if not self.timer:
