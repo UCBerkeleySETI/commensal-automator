@@ -124,7 +124,7 @@ def record(r, array, instances):
     # time.sleep(0.5)
     # recording = get_recording(r, instances)
 
-    return set(instances), rec_timer
+    return {"instances":set(instances), "timer":rec_timer}
 
 def write_metadata(r, instance, pktstart_ts, obsid, dwell, datadir, array):
     """Write current rec info so that other processes (e.g. analyzer) can
