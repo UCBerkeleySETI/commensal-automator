@@ -23,6 +23,8 @@ def record(r, array, instances):
     Telstate are current.
     """
 
+    n_inst = len(instances)
+
     # Attempt to get current target information:
     target_data = util.retry(5, 5, get_primary_target, r, array, 16, "|")
     if not target_data:
@@ -39,7 +41,7 @@ def record(r, array, instances):
     # recording:
 
     # Set DWELL in preparation for recording:
-    redis_util.set_group_key(r, array, "DWELL", DEFAULT_DWELL)
+    redis_util.set_group_key(r, array, "DWELL", DEFAULT_DWELL, l=n_inst)
 
     # Calculate PKTSTART:
     pktstart_data = get_pktstart(r, instances, PKTIDX_MARGIN, array)
@@ -58,27 +60,27 @@ def record(r, array, instances):
 
     # DATADIR
     sb_id = redis_util.sb_id(r, array)
-    set_datadir(r, array, pktstart_str, [0,1], sb_id, len(instances))
+    set_datadir(r, array, pktstart_str, [0,1], sb_id, n_inst)
 
     # SRC_NAME:
-    redis_util.set_group_key(r, array, "SRC_NAME", target_data["target"])
+    redis_util.set_group_key(r, array, "SRC_NAME", target_data["target"], l=n_inst)
 
     # RA and Dec at start of observation:
     ra_d = util.ra_degrees(target_data["ra"])
-    redis_util.set_group_key(r, array, "RA", ra_d)
-    redis_util.set_group_key(r, array, "RA_STR", target_data["ra"])
+    redis_util.set_group_key(r, array, "RA", ra_d, l=n_inst)
+    redis_util.set_group_key(r, array, "RA_STR", target_data["ra"], l=n_inst)
 
     dec_d = util.dec_degrees(target_data["dec"])
-    redis_util.set_group_key(r, array, "DEC", dec_d)
-    redis_util.set_group_key(r, array, "DEC_STR", target_data["dec"])
+    redis_util.set_group_key(r, array, "DEC", dec_d, l=n_inst)
+    redis_util.set_group_key(r, array, "DEC_STR", target_data["dec"], l=n_inst)
 
     # OBSID (unique identifier for a particular observation):
     obsid = f"MeerKAT:{array}:{pktstart_str}"
-    redis_util.set_group_key(r, array, "OBSID", obsid)
+    redis_util.set_group_key(r, array, "OBSID", obsid, l=n_inst)
 
     # Set PKTSTART separately after all the above messages have
     # all been delivered:
-    redis_util.set_group_key(r, array, "PKTSTART", str(pktstart), l=len(instances))
+    redis_util.set_group_key(r, array, "PKTSTART", str(pktstart), l=n_inst)
 
     # Grafana annotation that recording has started:
     annotate('RECORD', f"{array}, OBSID: {obsid}")
