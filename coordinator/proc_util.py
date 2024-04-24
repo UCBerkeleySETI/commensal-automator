@@ -26,7 +26,7 @@ def check_length(r, datadir, min_duration):
     if not tend:
         log.error(f"No tend associated with {datadir}")
         return
-    if t - tend >= min_duration:
+    if tend - t >= min_duration:
         return True
 
 
