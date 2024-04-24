@@ -108,7 +108,11 @@ def record(r, array, instances):
         write_metadata(r, instance, pktstart_ts, obsid, DEFAULT_DWELL, datadir, array)
 
     # Start recording timeout timer, with 10 second safety margin:
-    rec_timer = threading.Timer(300, lambda:timeout(r, array, "rec_result"))
+    pktstart_delay = pktstart_ts - time.time()
+    redis_util.alert(r,
+        f":hourglass: `{array}` pktstart delay: {pktstart_delay}",
+        "coordinator")
+    rec_timer = threading.Timer(300 + pktstart_delay, lambda:timeout(r, array, "rec_result"))
     log.info("Starting recording timeout timer.")
     rec_timer.start()
 
