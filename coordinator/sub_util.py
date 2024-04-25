@@ -36,6 +36,8 @@ def subscribe(r, array, instances, streams_per_instance=STREAMS_PER_INSTANCE):
     for _ in range(retries):
         result = set_array_metadata(r, array, port, n_addrs, len(instances))
         if not result:
+            redis_util.alert(r, f":fast_forward: `{array}` retry",
+                "coordinator")
             time.sleep(delay)
             # recreate and rejoin gateway groups:
             redis_util.create_array_groups(r, instances, array)
@@ -74,6 +76,8 @@ def subscribe(r, array, instances, streams_per_instance=STREAMS_PER_INSTANCE):
         for _ in range(retries):
             result = set_instance_metadata(r, channel, nstrm, schan, addr)
             if not result:
+                redis_util.alert(r, f":fast_forward: `{array}` retry",
+                    "coordinator")
                 time.sleep(delay)
                 # recreate and rejoin gateway group for specific instance:
                 redis_util.create_array_groups(r, [inst_list[i]], array)
