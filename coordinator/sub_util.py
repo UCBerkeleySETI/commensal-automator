@@ -13,11 +13,11 @@ STREAMS_PER_INSTANCE = 4
 
 def subscribe(r, array, instances, streams_per_instance=STREAMS_PER_INSTANCE):
     """Allocate instances to the appropriate multicast groups
-    when a new subarray has been configured. 
+    when a new subarray has been configured.
     """
 
     # Configuration process started:
-    util.annotate_grafana("CONFIGURE", 
+    util.annotate_grafana("CONFIGURE",
             f"{array}: Coordinator configuring DAQs.")
 
     # Reset keys:
@@ -27,16 +27,66 @@ def subscribe(r, array, instances, streams_per_instance=STREAMS_PER_INSTANCE):
     redis_util.create_array_groups(r, instances, array)
 
     # Apportion multicast groups:
-    addr_list, port, n_addrs, n_last = alloc_multicast_groups(r, array, len(instances),
-        streams_per_instance)
+    addr_list, port, n_addrs, n_last = alloc_multicast_groups(r, array,
+        len(instances), streams_per_instance)
 
-    # Publish necessary gateway keys:
+    # Publish necessary gateway keys and retry:
+    delay = 2
+    retries = 3
+    for _ in range(retries):
+        result = set_array_metadata(r, array, port, n_addrs, len(instances))
+        if not result:
+            time.sleep(delay)
+            # recreate and rejoin gateway groups:
+            redis_util.create_array_groups(r, instances, array)
+            continue
+        break
 
-    # Name of current subarray (SUBARRAY)
-    redis_util.set_group_key(r, array, "SUBARRAY", array)
+    if not result:
+        redis_util.alert(r,
+            f":warning: `{array}` missing listeners after 3 retries",
+            "coordinator")
 
-    # Port (BINDPORT)
-    redis_util.set_group_key(r, array, "BINDPORT", port)
+    # SCHAN, NSTRM and DESTIP by instance, sequentially:
+    inst_list = redis_util.sort_instances(list(instances))
+    for i in range(len(instances)):
+        # Instance channel:
+        channel = f"{HPGDOMAIN}://{inst_list[i]}/set"
+        # Number of streams for instance i (NSTRM). If this is the final
+        # instance on the list, it might not be completely filled.
+        if i == len(instances)-1:
+            nstrm = n_last + 1
+        else:
+            nstrm = streams_per_instance
+
+        hnchan = r.get(cbf_sensor_name(r, array,
+            'antenna_channelised_voltage_n_chans_per_substream'))
+
+        addr = addr_list[i]
+        # Absolute starting channel for instance i (SCHAN). This is
+        # `streams_per_instance` even if the last instance is not completely
+        # filled.
+        schan = i*streams_per_instance*int(hnchan)
+
+        # Publish necessary gateway keys and retry:
+        delay = 1
+        retries = 3
+        for _ in range(retries):
+            result = set_instance_metadata(r, channel, nstrm, schan, addr)
+            if not result:
+                time.sleep(delay)
+                # recreate and rejoin gateway group for specific instance:
+                redis_util.create_array_groups(r, [inst_list[i]], array)
+                continue
+            break
+
+    if not result:
+        redis_util.alert(r,
+            f":warning: `{array}` missing listeners after 3 retries",
+            "coordinator")
+
+    # Write list of instances for compatibility:
+    write_bfr5_instances(r, array, inst_list)
 
     # Total number of streams (FENSTRM)
     redis_util.set_group_key(r, array, "FENSTRM", n_addrs)
