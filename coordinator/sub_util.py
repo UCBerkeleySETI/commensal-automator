@@ -88,77 +88,86 @@ def subscribe(r, array, instances, streams_per_instance=STREAMS_PER_INSTANCE):
     # Write list of instances for compatibility:
     write_bfr5_instances(r, array, inst_list)
 
-    # Total number of streams (FENSTRM)
-    redis_util.set_group_key(r, array, "FENSTRM", n_addrs)
-
-    # Sync time (UNIX, seconds)
-    t_sync = sync_time(r, array)
-    redis_util.set_group_key(r, array, "SYNCTIME", t_sync)
-
-    # Centre frequency (FECENTER)
-    fecenter = centre_freq(r, array)
-    redis_util.set_group_key(r, array, "FECENTER", fecenter)
-
-    # Total number of frequency channels (FENCHAN)
-    n_freq_chans = r.get(f"{array}:n_channels")
-    redis_util.set_group_key(r, array, "FENCHAN", n_freq_chans)
-
-    # Coarse channel bandwidth (from F engines): CHANBW
-    # Note: no sign information!
-    chan_bw = coarse_chan_bw(r, array, n_freq_chans)
-    redis_util.set_group_key(r, array, "CHAN_BW", chan_bw)
-
-    # Number of channels per substream (HNCHAN)
-    hnchan = r.get(cbf_sensor_name(r, array,
-            'antenna_channelised_voltage_n_chans_per_substream'))
-    redis_util.set_group_key(r, array, "HNCHAN", hnchan)
-
-    # Number of spectra per heap (HNTIME)
-    hntime = r.get(cbf_sensor_name(r, array,
-            'antenna_channelised_voltage_spectra_per_heap'))
-    redis_util.set_group_key(r, array, "HNTIME", hntime)
-
-    # Number of ADC samples per heap (HCLOCKS)
-    adc_per_heap = samples_per_heap(r, array, hntime)
-    redis_util.set_group_key(r, array, "HCLOCKS", adc_per_heap)
-
-    # Number of antennas (NANTS)
-    nants = r.llen(f"{array}:antennas")
-    redis_util.set_group_key(r, array, "NANTS", nants)
-
-    # Set DWELL to 0 on configure
-    redis_util.set_group_key(r, array, "DWELL", 0)
-
-    # Make sure PKTSTART is 0 on configure
-    redis_util.set_group_key(r, array, "PKTSTART", 0)
-
-    # SCHAN, NSTRM and DESTIP by instance:
-    inst_list = redis_util.sort_instances(list(instances))
-    for i in range(len(instances)):
-        # Instance channel:
-        channel = f"{HPGDOMAIN}://{inst_list[i]}/set"
-        # Number of streams for instance i (NSTRM). If this is the final
-        # instance on the list, it might not be completely filled.
-        if i == len(instances)-1:
-            nstrm = n_last + 1
-        else:
-            nstrm = streams_per_instance
-        redis_util.gateway_msg(r, channel, 'NSTRM', nstrm, False)
-        # Absolute starting channel for instance i (SCHAN). This is
-        # `streams_per_instance` even if the last instance is not completely
-        # filled.
-        schan = i*streams_per_instance*int(hnchan)
-        redis_util.gateway_msg(r, channel, 'SCHAN', schan, False)
-        # Destination IP addresses for instance i (DESTIP)
-        redis_util.gateway_msg(r, channel, 'DESTIP', addr_list[i], False)
-
-    # Write list of instances for compatibility:
-    write_bfr5_instances(r, array, inst_list)
-
     redis_util.alert(r,
         f":arrow_forward: `{array}` instances subscribed",
         "coordinator")
 
+def set_instance_metadata(r, channel, nstrm, schan, addr):
+    """Set specific instance metadata.
+    """
+    listeners = 0
+    listeners += redis_util.gateway_msg(r, channel, 'NSTRM', nstrm, 0)
+    listeners += redis_util.gateway_msg(r, channel, 'SCHAN', schan, 0)
+    # Destination IP addresses for instance i (DESTIP)
+    listeners += redis_util.gateway_msg(r, channel, 'DESTIP', addr, 0)
+    if listeners < 3:
+        return
+    return True
+
+def set_array_metadata(r, array, port, n_addrs, n_inst):
+    """Set initial metadata for an array, required prior to subscribing to
+    multicast groups.
+
+    Requires that the gateways of the instances assigned to the array are also
+    subscribed to the appropriate gateway groups.
+    """
+
+    # Check that we got all listeners for all
+    total = 0
+
+    # 1. Name of current subarray (SUBARRAY)
+    total += redis_util.set_group_key(r, array, "SUBARRAY", array, l=n_inst)
+
+    # 2. Port (BINDPORT)
+    total += redis_util.set_group_key(r, array, "BINDPORT", port, l=n_inst)
+
+    # 3. Total number of streams (FENSTRM)
+    total += redis_util.set_group_key(r, array, "FENSTRM", n_addrs, l=n_inst)
+
+    # 4. Sync time (UNIX, seconds)
+    t_sync = sync_time(r, array)
+    total += redis_util.set_group_key(r, array, "SYNCTIME", t_sync, l=n_inst)
+
+    # 5. Centre frequency (FECENTER)
+    fecenter = centre_freq(r, array)
+    total += redis_util.set_group_key(r, array, "FECENTER", fecenter, l=n_inst)
+
+    # 6. Total number of frequency channels (FENCHAN)
+    n_freq_chans = r.get(f"{array}:n_channels")
+    total += redis_util.set_group_key(r, array, "FENCHAN", n_freq_chans, l=n_inst)
+
+    # 7. Coarse channel bandwidth (from F engines): CHANBW
+    # Note: no sign information!
+    chan_bw = coarse_chan_bw(r, array, n_freq_chans)
+    total += redis_util.set_group_key(r, array, "CHAN_BW", chan_bw, l=n_inst)
+
+    # 8. Number of channels per substream (HNCHAN)
+    hnchan = r.get(cbf_sensor_name(r, array,
+            'antenna_channelised_voltage_n_chans_per_substream'))
+    total += redis_util.set_group_key(r, array, "HNCHAN", hnchan, l=n_inst)
+
+    # 9. Number of spectra per heap (HNTIME)
+    hntime = r.get(cbf_sensor_name(r, array,
+            'antenna_channelised_voltage_spectra_per_heap'))
+    total += redis_util.set_group_key(r, array, "HNTIME", hntime, l=n_inst)
+
+    # 10. Number of ADC samples per heap (HCLOCKS)
+    adc_per_heap = samples_per_heap(r, array, hntime)
+    total += redis_util.set_group_key(r, array, "HCLOCKS", adc_per_heap, l=n_inst)
+
+    # 11. Number of antennas (NANTS)
+    nants = r.llen(f"{array}:antennas")
+    total += redis_util.set_group_key(r, array, "NANTS", nants, l=n_inst)
+
+    # 12. Set DWELL to 0 on configure
+    total += redis_util.set_group_key(r, array, "DWELL", 0, l=n_inst)
+
+    # 13. Make sure PKTSTART is 0 on configure
+    total += redis_util.set_group_key(r, array, "PKTSTART", 0, l=n_inst)
+
+    if total < 13*n_inst:
+        return
+    return True
 
 def unsubscribe(r, array, instances):
     """Ensure that all the specified instances unsubscribe from the
