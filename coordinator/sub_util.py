@@ -48,6 +48,10 @@ def subscribe(r, array, instances, streams_per_instance=STREAMS_PER_INSTANCE):
         redis_util.alert(r,
             f":warning: `{array}` missing listeners after 3 retries",
             "coordinator")
+    else:
+        redis_util.alert(r,
+            f":ballot_box_with_check: `{array}` retry success",
+            "coordinator")
 
     # SCHAN, NSTRM and DESTIP by instance, sequentially:
     inst_list = redis_util.sort_instances(list(instances))
