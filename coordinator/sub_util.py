@@ -230,7 +230,6 @@ def restart_process(instances, process):
     for instance in instances:
         host, n = instance.split("/")
         process_name = f"{process}_{n}"
-        log.info(f"Restarting {process_name}")
         if not util.zmq_circus_cmd(host, process_name, "restart"):
             result.append(instance)
     return result
