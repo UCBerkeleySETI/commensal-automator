@@ -14,6 +14,30 @@ TARGETS_CHANNEL = 'target-selector:pointings'
 #TARGETS_CHANNEL = 'target-selector:new-pointing'
 DEFAULT_DWELL = 290
 
+def set_key(r, array, key, value, instances):
+    """Republish gateway keys and retry; attempt without republishing initial
+    metadata (assume it remains in status buffer and is repopulated as
+    designed).
+    """
+    # Publish necessary gateway keys and retry:
+    n_inst = len(instances)
+    delay = 0.5
+    retries = 3
+    for i in range(retries):
+        listeners = redis_util.set_group_key(r, array, key, value, l=n_inst)
+        if listeners < n_inst:
+            redis_util.alert(r, f":fast_forward: `{array}` retry",
+                "coordinator")
+            time.sleep(delay)
+            # recreate and rejoin gateway groups:
+            redis_util.create_array_groups(r, instances, array)
+            continue
+        elif i > 0:
+            redis_util.alert(r,
+                f":ballot_box_with_check: `{array}` retry success",
+                "coordinator")
+        return
+
 def record(r, array, instances):
     """Start and check recording for a non-primary time track.
 
@@ -41,7 +65,7 @@ def record(r, array, instances):
     # recording:
 
     # Set DWELL in preparation for recording:
-    redis_util.set_group_key(r, array, "DWELL", DEFAULT_DWELL, l=n_inst)
+    set_key(r, array, "DWELL", DEFAULT_DWELL, instances)
 
     # Calculate PKTSTART:
     pktstart_data = get_pktstart(r, instances, PKTIDX_MARGIN, array)
@@ -63,24 +87,24 @@ def record(r, array, instances):
     set_datadir(r, array, pktstart_str, [0,1], sb_id, n_inst)
 
     # SRC_NAME:
-    redis_util.set_group_key(r, array, "SRC_NAME", target_data["target"], l=n_inst)
+    set_key(r, array, "SRC_NAME", target_data["target"], instances)
 
     # RA and Dec at start of observation:
     ra_d = util.ra_degrees(target_data["ra"])
-    redis_util.set_group_key(r, array, "RA", ra_d, l=n_inst)
-    redis_util.set_group_key(r, array, "RA_STR", target_data["ra"], l=n_inst)
+    set_key(r, array, "RA", ra_d, instances)
+    set_key(r, array, "RA_STR", target_data["ra"], instances)
 
     dec_d = util.dec_degrees(target_data["dec"])
-    redis_util.set_group_key(r, array, "DEC", dec_d, l=n_inst)
-    redis_util.set_group_key(r, array, "DEC_STR", target_data["dec"], l=n_inst)
+    set_key(r, array, "DEC", dec_d, instances)
+    set_key(r, array, "DEC_STR", target_data["dec"], instances)
 
     # OBSID (unique identifier for a particular observation):
     obsid = f"MeerKAT:{array}:{pktstart_str}"
-    redis_util.set_group_key(r, array, "OBSID", obsid, l=n_inst)
+    set_key(r, array, "OBSID", obsid, instances)
 
     # Set PKTSTART separately after all the above messages have
     # all been delivered:
-    redis_util.set_group_key(r, array, "PKTSTART", str(pktstart), l=n_inst)
+    set_key(r, array, "PKTSTART", str(pktstart), instances)
 
     # Grafana annotation that recording has started:
     annotate('RECORD', f"{array}, OBSID: {obsid}")
