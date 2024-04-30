@@ -50,7 +50,7 @@ def subscribe(r, array, instances, streams_per_instance=STREAMS_PER_INSTANCE):
             "coordinator")
     else:
         redis_util.alert(r,
-            f":ballot_box_with_check: `{array}` retry success",
+            f":ballot_box_with_check: `{array}` retry success on subscribe",
             "coordinator")
 
     # SCHAN, NSTRM and DESTIP by instance, sequentially:
@@ -88,10 +88,14 @@ def subscribe(r, array, instances, streams_per_instance=STREAMS_PER_INSTANCE):
                 continue
             break
 
-    if not result:
-        redis_util.alert(r,
-            f":warning: `{array}` missing listeners after 3 retries",
-            "coordinator")
+        if not result:
+            redis_util.alert(r,
+                f":warning: `{array}` missing listeners after 3 retries",
+                "coordinator")
+        else:
+            redis_util.alert(r,
+                f":ballot_box_with_check: `{array}` retry success `{channel}`",
+                "coordinator")
 
     # Write list of instances for compatibility:
     write_bfr5_instances(r, array, inst_list)
