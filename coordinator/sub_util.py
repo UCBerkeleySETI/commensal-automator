@@ -75,12 +75,12 @@ def subscribe(r, array, instances, streams_per_instance=STREAMS_PER_INSTANCE):
         schan = i*streams_per_instance*int(hnchan)
 
         # Publish necessary gateway keys and retry:
-        delay = 1
+        delay = 0.5
         retries = 3
-        for _ in range(retries):
+        for i in range(retries):
             result = set_instance_metadata(r, channel, nstrm, schan, addr)
             if not result:
-                redis_util.alert(r, f":fast_forward: `{array}` retry",
+                redis_util.alert(r, f":fast_forward: `{array}` retry `{channel}`",
                     "coordinator")
                 time.sleep(delay)
                 # recreate and rejoin gateway group for specific instance:
@@ -90,9 +90,9 @@ def subscribe(r, array, instances, streams_per_instance=STREAMS_PER_INSTANCE):
 
         if not result:
             redis_util.alert(r,
-                f":warning: `{array}` missing listeners after 3 retries",
+                f":warning: `{array}` missing listeners after {retries} retries",
                 "coordinator")
-        else:
+        elif i > 0:
             redis_util.alert(r,
                 f":ballot_box_with_check: `{array}` retry success `{channel}`",
                 "coordinator")
