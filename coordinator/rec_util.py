@@ -26,7 +26,7 @@ def set_key(r, array, key, value, instances):
     for i in range(retries):
         listeners = redis_util.set_group_key(r, array, key, value, l=n_inst)
         if listeners < n_inst:
-            redis_util.alert(r, f":fast_forward: `{array}` retry",
+            redis_util.alert(r, f":fast_forward: `{array}` retry `{key}`",
                 "coordinator")
             time.sleep(delay)
             # recreate and rejoin gateway groups:
@@ -34,7 +34,7 @@ def set_key(r, array, key, value, instances):
             continue
         elif i > 0:
             redis_util.alert(r,
-                f":ballot_box_with_check: `{array}` retry success",
+                f":ballot_box_with_check: `{array}` retry `{key}` success",
                 "coordinator")
         return
 
