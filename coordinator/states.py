@@ -281,7 +281,7 @@ class Process(State):
                     log.info(self.returncodes1)
 
                     if max(self.returncodes2) < 0:
-                        stage2_msg = "No second stage"
+                        stage2_msg = None
                     elif max(self.returncodes2) < 1:
                         stage2_msg = f":white_check_mark: `{self.array}` stage 2 complete: {codes2}"
                     elif max(self.returncodes2) < 2:
@@ -293,7 +293,8 @@ class Process(State):
                         redis_util.alert(self.r,
                             f":white_check_mark: `{self.array}` stage 1 complete: {codes1}",
                             "coordinator")
-                        redis_util.alert(self.r, stage2_msg, "coordinator")
+                        if stage2_msg:
+                            redis_util.alert(self.r, stage2_msg, "coordinator")
                         proc_util.increment_n_proc(self.r)
                         self.returncodes1 = []
                         self.returncodes2 = []
@@ -303,7 +304,8 @@ class Process(State):
                         redis_util.alert(self.r,
                             f":heavy_check_mark: `{self.array}` stage 1 complete: {codes1}",
                             "coordinator")
-                        redis_util.alert(self.r, stage2_msg, "coordinator")
+                        if stage2_msg:
+                            redis_util.alert(self.r, stage2_msg, "coordinator")
                         proc_util.increment_n_proc(self.r)
                         self.returncodes1 = []
                         self.returncodes2 = []
