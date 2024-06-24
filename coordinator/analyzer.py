@@ -168,6 +168,7 @@ def process(n):
             # If recording is shorter than 2.5 minutes, ignore
             if not proc_util.check_length(r, datadir, 150):
                 results[datadir] = 0
+                log.info("Too short, skipping")
                 continue
 
             # Timestamped directory name:
@@ -221,9 +222,18 @@ def process(n):
                 max_returncode = max(max_returncode, 1)
                 continue
             log.info(f"Deleting: {datadir}")
-            if not proc_util.rm_datadir(datadir, n, log):
-                log.error(f"Failed to clear {datadir}")
-                max_returncode = max(max_returncode, 2)
+            for i in range(0,3):
+                if not proc_util.rm_datadir(datadir, n, log):
+                    log.error(f"Failed to clear {datadir}")
+                    max_returncode = max(max_returncode, 2)
+                # check if actually deleted
+                if os.path.isdir(datadir):
+                    log.error("Unsuccessful deletion, attempting again")
+                    redis_util.alert(r, f":warning: deletion failure, retry",
+                    "analyzer")
+                else:
+                    break
+
 
     # Publish result back to central coordinator via Redis:
     r.publish(RESULT_CHANNEL, f"RETURN:{name}:{max_returncode}:{max_ml_returncode}")
