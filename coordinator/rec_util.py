@@ -273,18 +273,29 @@ def set_datadir(r, array, pktstart_str, instance_numbers, sb_id, l):
     """Set DATADIR correctly for each instance. For each host, instance 0
     must always use `/buf0` and instance 1 must always use `/buf1`.
     """
-    listeners = 0 # count for listeners
-    for instance_n in instance_numbers: # usually a max of 2 instance nums
-        group = f"{HPGDOMAIN}:{array}-{instance_n}///set"
-        datadir = f"/buf{instance_n}/{pktstart_str}-{sb_id}"
-        listeners += redis_util.gateway_msg(r, group, 'DATADIR', datadir, 0)
-    if listeners < l:
-        missing = l - listeners
-        redis_util.alert(r,
-            f":warning: `{array}` DATADIR unset for {missing} instance(s)",
-            "coordinator")
-    log.info(f"Listners for datadir: {listeners}")
-    return listeners
+    delay = 0.3 # seconds
+    retries = 6
+    for i in range(retries):
+        listeners = 0 # count for listeners
+        for instance_n in instance_numbers: # usually a max of 2 instance nums
+            group = f"{HPGDOMAIN}:{array}-{instance_n}///set"
+            datadir = f"/buf{instance_n}/{pktstart_str}-{sb_id}"
+            listeners += redis_util.gateway_msg(r, group, 'DATADIR', datadir, 0)
+        log.info(f"Listners for datadir: {listeners}")
+        if listeners < l:
+            missing = l - listeners
+            redis_util.alert(r,
+                f":warning: `{array}` DATADIR unset for {missing} instance(s)",
+                "coordinator")
+            redis_util.alert(r, f":fast_forward: `{array}` retry `DATADIR`",
+                "coordinator")
+            time.sleep(delay)
+            continue
+        elif i > 0:
+            redis_util.alert(r,
+                f":ballot_box_with_check: `{array}` retry `{key}` success",
+                "coordinator")
+        return listeners
 
 
 def add_unprocessed(r, recording, pktstart_str, sb_id):
