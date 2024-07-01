@@ -21,7 +21,7 @@ PRIORITY_CHANNEL = "target-selector:processing"
 LOG_FORMAT = "[%(asctime)s - %(levelname)s - %(filename)s:%(lineno)s] %(message)s"
 LOGGER_NAME = "BLUSE.interface"
 BFRDIR = "/home/obs/bfr5"
-REDIS_HOST = "blh0.bl.pvt"
+REDIS_HOST = "10.98.81.254"
 
 def run_seticore(bfrdir, inputdir, tsdir, volume, r, log):
     """Processes the incoming data using seticore.
