@@ -136,6 +136,16 @@ def process(n):
     unprocessed = proc_util.get_items(r, name, "unprocessed")
     log.info(f"{len(unprocessed)} unprocessed directory(ies)")
 
+    # Check against current recording's DATADIR
+    to_clean = set()
+    last_datadir = r.get(f"{name}:last-datadir")
+    if last_datadir not in unprocessed:
+        log.warning(f"DATADIR mismatch, last datadir was {last_datadir}")
+        redis_util.alert(r, f":warning: `DATADIR` mismatch",
+        f"analyzer:{name}")
+        # add to list for deletion
+        to_clean.add(last_datadir)
+
     # Volume
     volume = "scratch"
     if n == 1:
@@ -206,7 +216,7 @@ def process(n):
         log.info(f"Processing completed for {name} with codes: {results} and {results_ml}")
 
         # Clean up
-        to_clean = unprocessed.difference(preserved)
+        to_clean.union(unprocessed.difference(preserved))
 
         for datadir in to_clean:
             if datadir not in results:
@@ -230,7 +240,7 @@ def process(n):
                 if os.path.isdir(datadir):
                     log.error("Unsuccessful deletion, attempting again")
                     redis_util.alert(r, f":warning: deletion failure, retry",
-                    "analyzer")
+                    f"analyzer:{name}")
                 else:
                     break
 

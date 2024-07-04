@@ -130,6 +130,9 @@ def record(r, array, instances):
         instance_n = instance.split("/")[1] # get instance number. TODO: integrate this a bit better with set_datadir()
         datadir = f"/buf{instance_n}/{pktstart_str}-{sb_id}"
         write_metadata(r, instance, pktstart_ts, obsid, DEFAULT_DWELL, datadir, array)
+        # Actual status buffer datadir for each instance
+        datadir = r.hget(f"bluse://{instance}/status", "DATADIR")
+        r.set(f"{instance}:last-datadir", datadir)
 
     # Start recording timeout timer, with 10 second safety margin:
     pktstart_delay = pktstart_ts - time.time()
