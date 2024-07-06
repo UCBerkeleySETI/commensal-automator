@@ -1,7 +1,7 @@
 import time
 
 from coordinator.logger import log
-from coordinator import redis_util, sub_util, util, proc_util
+from coordinator import redis_util, sub_util, util, proc_util, rec_util
 from coordinator import rec_util as rec
 
 DEFAULT_DWELL = 290 # in seconds
@@ -174,6 +174,7 @@ class Record(State):
             # Reset stop time. Note, this is not calculated directly from
             # PKTIDX, so use this value accordingly.
             datadir = self.r.get(f"{self.array}:datadir")
+            rec_util.datadir_from_buffer(self.r, list(data["recording"]))
             self.r.set(f"rec_end:{datadir}", time.time())
             # Alert if too short
             if not proc_util.check_length(self.r, datadir, 150):
@@ -200,6 +201,7 @@ class Record(State):
             redis_util.alert(self.r,
                 f":black_square_for_stop: `{self.array}` recording ended",
                 "coordinator")
+            rec_util.datadir_from_buffer(self.r, list(data["recording"]))
             if self.primary_time:
                 # move them back into the ready state
                 while data["recording"]:
