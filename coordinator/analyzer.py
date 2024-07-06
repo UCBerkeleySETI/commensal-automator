@@ -119,6 +119,7 @@ def ml_detection(tsdir, outputvolume, log):
 def process(n):
     """Set up and run processing.
     """
+
     # Set up logging:
     log = logging.getLogger(LOGGER_NAME)
     logging.basicConfig(format=LOG_FORMAT)
@@ -140,7 +141,7 @@ def process(n):
     to_clean = set()
     last_datadir = r.get(f"{name}:last-datadir")
     if last_datadir not in unprocessed:
-        log.warning(f"DATADIR mismatch, last datadir was {last_datadir}")
+        log.warning(f"DATADIR mismatch, last datadir was {last_datadir}, current datadirs are {unprocessed}")
         redis_util.alert(r, f":warning: `DATADIR` mismatch",
         f"analyzer:{name}")
         # add to list for deletion
@@ -216,7 +217,7 @@ def process(n):
         log.info(f"Processing completed for {name} with codes: {results} and {results_ml}")
 
         # Clean up
-        to_clean.union(unprocessed.difference(preserved))
+        to_clean = to_clean.union(unprocessed.difference(preserved))
 
         for datadir in to_clean:
             if datadir not in results:
