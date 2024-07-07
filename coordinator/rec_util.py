@@ -293,7 +293,7 @@ def set_datadir(r, array, pktstart_str, instance_numbers, sb_id, l):
             continue
         elif i > 0:
             redis_util.alert(r,
-                f":ballot_box_with_check: `{array}` retry `{key}` success",
+                f":ballot_box_with_check: `{array}` retry `DATADIR` success",
                 "coordinator")
         return listeners
 
