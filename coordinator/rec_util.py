@@ -441,9 +441,23 @@ def datadir_from_buffer(r, instances):
     These results are used by e.g. the analyzer to check if
     there is a DATADIR mismatch.
     """
+    retries = 5
+    delay = 0.1
     for instance in instances:
         # Actual status buffer datadir for each instance
-        last_datadir = r.hget(f"bluse://{instance}/status", "DATADIR")
+        for i in range(retries):
+            last_datadir = r.hget(f"bluse://{instance}/status", "DATADIR")
+            if not last_datadir:
+                if i == retries - 1:
+                    log.warning(f"No DATADIR set for {instance} after retries")
+                    log.warning("Setting to unknown")
+                    last_datadir = "unknown"
+                else:
+                    log.warning("Last DATADIR retrieved as None, retrying")
+                    time.sleep(delay)
+            else:
+                break
+
         listener = r.set(f"{instance}:last-datadir", last_datadir)
         log.info(f"{instance}: last datadir: {last_datadir} listeners: {listener}")
 
