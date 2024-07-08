@@ -9,7 +9,7 @@ processing on many processing nodes or instances via ZMQ. Each processing
 node or instance has a copy of the `bluse_analyzer` process, controlled by
 circus using ZMQ. Transfer of metadata is handled via Redis. 
 
-<img src="docs/coordinator.png" alt="coordinator" width=80%/>
+<img src="docs/figures/coordinator.png" alt="coordinator" width=80%/>
 
 
 ## Usage:
@@ -48,11 +48,11 @@ and other ancillary tasks.
 
 ### `FreeSubscribed` states:
 
-<img src="docs/free_subscribe.png" alt="free_subscribe" width=60%/>
+<img src="docs/figures/free_subscribe.png" alt="free_subscribe" width=60%/>
 
 ### `RecProc` states:
 
-<img src="docs/rec_proc.png" alt="rec_proc" width=70%/>
+<img src="docs/figures/rec_proc.png" alt="rec_proc" width=70%/>
 
 ### Instance allocation:
 
@@ -61,7 +61,7 @@ which there are 7 instances and three subarrays. Three instances are
 unassigned, while two each are assigned to `array_1` and `array_2`. `array_3`
 does not have any instances allocated to it.
 
-<img src="docs/allocation_example.png" alt="allocation_example" width=90%/>
+<img src="docs/figures/allocation_example.png" alt="allocation_example" width=90%/>
 
 The boxes and lines in different colours indicate the sets of instances that
 are shared between state machines. There is only one `free` set, which is
@@ -118,7 +118,7 @@ The current status of the entire system can conveniently be monitored via
  been created. See below for an example of the status updates in a dedicated
  Slack channel:
 
-<img src="docs/slack_reporting.png" alt="slack_reporting" width=90%/>
+<img src="docs/figures/slack_reporting.png" alt="slack_reporting" width=90%/>
 
 ## Installation and Deployment (BLUSE)
 
