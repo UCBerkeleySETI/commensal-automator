@@ -2,6 +2,10 @@
 
 Automation for Breakthrough Listen's commensal observing.
 
+For end-to-end system validation, see section [Validation](docs/Validation.md)
+
+For further details on the system as a whole, see section [System](docs/System.md)
+
 The `coordinator` is designed to enable commensal observing and processing
 cycles to take place without human intervention. It consists of a central
 `coordinator` process, designed to run on a head node, which controls
