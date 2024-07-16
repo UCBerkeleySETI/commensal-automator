@@ -12,6 +12,7 @@ import os
 import socket
 import sys
 import time
+import shutil
 
 from coordinator import proc_util
 from coordinator import redis_util
@@ -120,6 +121,9 @@ def process(n):
     """Set up and run processing.
     """
 
+    #shutil.rmtree("/buf0/20240706T154904Z-20240705-0012")
+    #return
+
     # Set up logging:
     log = logging.getLogger(LOGGER_NAME)
     logging.basicConfig(format=LOG_FORMAT)
@@ -221,9 +225,8 @@ def process(n):
 
         for datadir in to_clean:
             if datadir not in results:
-                log.error(f"Trying to clear {datadir}, but it has no returncodes.")
+                log.warning(f"{datadir} has no returncodes, deleting")
                 max_returncode = max(max_returncode, 1)
-                continue
             res = results[datadir]
             if res > 1:
                 log.error(f"Not deleting since seticore returned {res} for {datadir}")
