@@ -227,6 +227,7 @@ def process(n):
             if datadir not in results:
                 log.warning(f"{datadir} has no returncodes, deleting")
                 max_returncode = max(max_returncode, 1)
+                results[datadir] = 1
             res = results[datadir]
             if res > 1:
                 log.error(f"Not deleting since seticore returned {res} for {datadir}")
