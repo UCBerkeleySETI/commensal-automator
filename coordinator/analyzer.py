@@ -149,11 +149,16 @@ def process(n):
         to_clean.add(last_datadir)
 
     # Volume
-    volume = "scratch"
-    if n == 1:
-        volume = "scratch2"
-    elif n != 0:
-        log.warning(f"Instance no. {n}, defaulting to /scratch")
+    # If on new hosts, write to /buf0, else /scratch
+    host_n = int(host.split("blpn")[-1])
+    if host_n < 64:
+        volume = "scratch"
+        if n == 1:
+            volume = "scratch2"
+        elif n != 0:
+            log.warning(f"Instance no. {n}, defaulting to /scratch")
+    else:
+        volume = f"buf{n}"
 
     max_returncode = 0
     max_ml_returncode = -1
