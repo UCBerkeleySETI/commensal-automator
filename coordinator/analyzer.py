@@ -161,7 +161,6 @@ def process(n):
         volume = f"buf{n}"
 
     max_returncode = 0
-    max_ml_returncode = -1
 
     if unprocessed:
         # Set of directories that should be kept after processing (these are
@@ -169,7 +168,6 @@ def process(n):
         preserved = proc_util.get_items(r, name, "preserved")
 
         results = dict()
-        results_ml = dict()
 
         for datadir in unprocessed:
 
@@ -205,22 +203,11 @@ def process(n):
             if result == 0:
                 proc_util.completed(r, datadir, 1, 64, PRIORITY_CHANNEL)
 
-            # run ML detection script:
-            if proc_util.get_n_proc(r)%10 == 0:
-                try:
-                    ml_code = ml_detection(tsdir, volume, log)
-                except Exception as e:
-                    log.info("ML detection error:")
-                    log.error(e)
-                    ml_code = 1
-                results_ml[datadir] = ml_code
-                max_ml_returncode = max(max_ml_returncode, ml_code)
-
             # overall max_returncode for this analyser execution:
             max_returncode = max(max_returncode, result)
 
         # Done
-        log.info(f"Processing completed for {name} with codes: {results} and {results_ml}")
+        log.info(f"Processing completed for {name} with codes: {results}")
 
         # Clean up
         to_clean = to_clean.union(unprocessed.difference(preserved))
@@ -253,7 +240,8 @@ def process(n):
 
 
     # Publish result back to central coordinator via Redis:
-    r.publish(RESULT_CHANNEL, f"RETURN:{name}:{max_returncode}:{max_ml_returncode}")
+    log.info(f"Publishing return for {name}")
+    r.publish(RESULT_CHANNEL, f"RETURN:{name}:{max_returncode}:-1")
 
     if max_returncode > 1:
         redis_util.alert(r, f":warning: `{name}` code: `{max_returncode}`",
