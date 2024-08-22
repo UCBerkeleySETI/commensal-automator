@@ -116,12 +116,10 @@ def ml_detection(tsdir, outputvolume, log):
 
     return subprocess.run(cmd).returncode
 
+
 def process(n):
     """Set up and run processing.
     """
-
-    #shutil.rmtree("/buf0/20240706T154904Z-20240705-0012")
-    #return
 
     # Set up logging:
     log = logging.getLogger(LOGGER_NAME)
