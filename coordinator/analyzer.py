@@ -23,6 +23,7 @@ LOG_FORMAT = "[%(asctime)s - %(levelname)s - %(filename)s:%(lineno)s] %(message)
 LOGGER_NAME = "BLUSE.interface"
 BFRDIR = "/home/obs/bfr5"
 REDIS_HOST = "10.98.81.254"
+SAVE_BEAMFORMER = False
 
 def run_seticore(bfrdir, inputdir, tsdir, volume, r, log):
     """Processes the incoming data using seticore.
@@ -56,18 +57,16 @@ def run_seticore(bfrdir, inputdir, tsdir, volume, r, log):
                         "--fine_channels", "8388608",
                         "--telescope_id", "64",
                         "--recipe_dir", bfrdir]
-
-    # Check number of times a processing sequence has been run and write .h5
-    # files for each beamformer output for every tenth run.
-    n = proc_util.get_n_proc(r)
-    if n%10 == 0:
-        # create directory for h5 files
-        h5dir = f"/{volume}/data/{tsdir}/seticore_beamformer"
-        log.info(f"Creating beamformer output directory: {h5dir}")
-        if not proc_util.make_outputdir(h5dir, log):
-            return 1
-        # add --h5_dir arg to seticore command
-        seticore_command.extend(["--h5_dir", h5dir])
+    if SAVE_BEAMFORMER:
+        n = proc_util.get_n_proc(r)
+        if n%10 == 0:
+            # create directory for h5 files
+            h5dir = f"/{volume}/data/{tsdir}/seticore_beamformer"
+            log.info(f"Creating beamformer output directory: {h5dir}")
+            if not proc_util.make_outputdir(h5dir, log):
+                return 1
+            # add --h5_dir arg to seticore command
+            seticore_command.extend(["--h5_dir", h5dir])
 
     # run seticore
     return subprocess.run(seticore_command).returncode
