@@ -211,6 +211,8 @@ class TelstateInterface(object):
                     "nants":nants, "antenna_list":str(ants), "nchan":nchans,
                     "refant":refant, "script_ts":timestamp, "retrieval_ts":r_t}
         self.red.hmset(hash_key, hash_dict)
+        # Expire after 30 days to save space
+        self.red.expire(hash_key, 2592000)
         # Save to index (zset)
         index_name = "{}:cal_solutions:index".format(product_id)
         log.info("Saving into Redis zset index: {}".format(index_name))
