@@ -131,6 +131,13 @@ class Ready(State):
     def handle_event(self, event, data):
         super().handle_event(event, data)
         if event == "RECORD":
+            # check if we should ignore (for extra-short recordings)
+            if rec.check_ignore(self.r, self.array):
+                log.info("Ignoring likely short recording")
+                redis_util.alert(self.r,
+                f":pouring_liquid: `{self.array}` short recording expected, skipping",
+                "coordinator")
+                return self
             return Record(self.array, self.r)
         return self
 

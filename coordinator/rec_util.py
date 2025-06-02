@@ -266,7 +266,17 @@ def check_primary_time(r, array):
     log.info(f"Retrieved currrent proposal ID: {proposal_id}")
     # This is the current active proposal ID to look for. If it
     # is detected, we want to enter the "waiting" state.
-    if proposal_id.strip("'") == "DDT-20230920-DC-01":
+
+def check_ignore(r, array):
+    """Check if the current recording should be skipped.
+    """
+    array_num = array[-1] # last char is array number
+    key = f"{array}:subarray_{array_num}_script_proposal_id"
+    proposal_id = r.get(key)
+    if not proposal_id:
+        return
+    log.info(f"Retrieved currrent proposal ID: {proposal_id}")
+    if proposal_id.strip("'") == "SCI-20250221-PW-01":
         return True
 
 def set_datadir(r, array, pktstart_str, instance_numbers, sb_id, l):
